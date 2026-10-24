@@ -17,15 +17,23 @@ export interface Pile {
   rows: ScannedRow[];
 }
 
-const COLUMNS = {
-  name: 'name',
-  quantity: 'quantity',
-  scryfall_id: 'scryfall id',
-  set: 'set code',
-  collector_number: 'collector number',
-  foil: 'foil',
-  language: 'language',
-} as const;
+/** Header names per field, lower-cased; ManaBox first, then Delver Lens and common exports. */
+const COLUMNS: Record<'name' | 'quantity' | 'scryfall_id' | 'set' | 'collector_number' | 'foil' | 'language', string[]> = {
+  name: ['name', 'card name', 'card'],
+  quantity: ['quantity', 'qty', 'count'],
+  scryfall_id: ['scryfall id', 'scryfall_id', 'scryfallid'],
+  set: ['set code', 'edition code', 'set', 'edition', 'set_code'],
+  collector_number: ['collector number', "collector's number", 'collector_number', 'collector no', 'number'],
+  foil: ['foil', 'finish'],
+  language: ['language', 'lang'],
+};
+
+function field(r: Record<string, string>, names: string[]): unknown {
+  for (const n of names) if (n in r) return r[n];
+  return undefined;
+}
+
+const HEADER_SEPARATORS = [',', ';', '\t'];
 
 function clean(v: unknown): string | null {
   if (typeof v !== 'string') return null;
@@ -40,15 +48,14 @@ function parseQuantity(v: unknown): number {
 
 /** True when the first line looks like a CSV header with a Name column. */
 export function looksLikeCsv(text: string): boolean {
-  const first = text.replace(/^﻿/, '').split(/\r?\n/, 1)[0] ?? '';
-  if (!first.includes(',')) return false;
-  return first
-    .split(',')
-    .map((h) => h.replace(/"/g, '').trim().toLowerCase())
-    .includes('name');
+  const first = text.replace(/^\ufeff/, '').split(/\r?\n/, 1)[0] ?? '';
+  const sep = HEADER_SEPARATORS.find((c) => first.includes(c));
+  if (!sep) return false;
+  const heads = first.split(sep).map((h) => h.replace(/"/g, '').trim().toLowerCase());
+  return COLUMNS.name.some((n) => heads.includes(n));
 }
 
-/** ManaBox CSV, columns found by header name (case-insensitive); unknown columns are ignored. */
+/** Scanner CSV (ManaBox, Delver Lens and similar): columns found by header name, case-insensitive, any common separator; unknown columns are ignored. */
 export function parseManabox(text: string): ScannedRow[] {
   const result = Papa.parse<Record<string, string>>(text.replace(/^﻿/, ''), {
     header: true,
@@ -57,16 +64,16 @@ export function parseManabox(text: string): ScannedRow[] {
   });
   const rows: ScannedRow[] = [];
   for (const r of result.data) {
-    const name = clean(r[COLUMNS.name]);
+    const name = clean(field(r, COLUMNS.name));
     if (!name) continue;
     rows.push({
       name,
-      quantity: parseQuantity(r[COLUMNS.quantity]),
-      scryfall_id: clean(r[COLUMNS.scryfall_id])?.toLowerCase() ?? null,
-      set: clean(r[COLUMNS.set])?.toLowerCase() ?? null,
-      collector_number: clean(r[COLUMNS.collector_number]),
-      foil: clean(r[COLUMNS.foil]),
-      language: clean(r[COLUMNS.language]),
+      quantity: parseQuantity(field(r, COLUMNS.quantity)),
+      scryfall_id: clean(field(r, COLUMNS.scryfall_id))?.toLowerCase() ?? null,
+      set: clean(field(r, COLUMNS.set))?.toLowerCase() ?? null,
+      collector_number: clean(field(r, COLUMNS.collector_number)),
+      foil: clean(field(r, COLUMNS.foil)),
+      language: clean(field(r, COLUMNS.language)),
     });
   }
   return rows;

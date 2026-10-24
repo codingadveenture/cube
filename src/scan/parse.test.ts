@@ -64,6 +64,27 @@ describe('parseManabox', () => {
   });
 });
 
+describe('parseManabox with other scanners', () => {
+  it('reads a Delver Lens export with semicolons and its own column names', () => {
+    const text = [
+      "Name;Edition;Edition code;Collector's number;Quantity;Scryfall ID;Foil;Language",
+      'Plateau;Vintage Masters;VMA;313;1;0d6f7a2e-1b5a-4d2b-9d1e-aaaaaaaaaaaa;;en',
+      'Lightning Bolt;Alpha;LEA;161;2;;;en',
+    ].join('\n');
+    expect(looksLikeCsv(text)).toBe(true);
+    const rows = parseManabox(text);
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({ name: 'Plateau', set: 'vma', collector_number: '313', quantity: 1, scryfall_id: '0d6f7a2e-1b5a-4d2b-9d1e-aaaaaaaaaaaa' });
+    expect(rows[1]).toMatchObject({ name: 'Lightning Bolt', set: 'lea', collector_number: '161', quantity: 2, scryfall_id: null });
+  });
+
+  it('accepts a tab-separated file with Card name and Qty headers', () => {
+    const text = 'Card name\tQty\tSet\nSol Ring\t1\tLEA\n';
+    expect(looksLikeCsv(text)).toBe(true);
+    expect(parseManabox(text)[0]).toMatchObject({ name: 'Sol Ring', quantity: 1, set: 'lea' });
+  });
+});
+
 describe('parsePlainText', () => {
   it('reads the four line forms', () => {
     const rows = parsePlainText('Lightning Bolt\n2 Counterspell\n3x Brainstorm\nSol Ring (C21) 263\n\n# comment\n');
