@@ -18,6 +18,12 @@ describe('router', () => {
     expect(isDetailHash('#/cube/abc')).toBe(true);
   });
 
+  it('knows the Suggestions and Log views', () => {
+    expect(parseHash('#/suggestions').view).toBe('suggestions');
+    expect(parseHash('#/log').view).toBe('log');
+    expect(parseHash('#/about').view).toBe('about');
+  });
+
   it('remembers the previous hash, and a replace does not count as a step', () => {
     recordNavigation('#/cube');
     recordNavigation('#/cube?q=b', true);

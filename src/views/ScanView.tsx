@@ -22,6 +22,12 @@ import {
   type ScanSession,
 } from '../scan/session';
 import { takeSharedFiles } from '../scan/shared';
+import { useCardStates, useScans, useStore, type Live } from '../store/context';
+import { lookupPrinting } from '../store/lookup';
+import { MAX_PILE_ROWS, pilesForDiff, sharedPileInput } from '../store/piles';
+import { loadIncluded, loadSharedFrom, saveIncluded, saveSharedFrom } from '../store/scanPrefs';
+import type { SharedPile } from '../store/types';
+import { formatTime, LiveStatus, NameField, useDisplayName } from './common';
 
 type Tab = 'missing' | 'unexpected' | 'different-art' | 'duplicates' | 'other-set' | 'unknown';
 
@@ -51,7 +57,20 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
   const expected: ExpectedCard[] = useMemo(() => expectedCards(cards), [cards]);
   const known = useMemo(() => knownPrintings(cards), [cards]);
   const byOracle = useMemo(() => new Map(cards.map((c) => [c.oracle_id, c])), [cards]);
-  const rows = useMemo(() => mergedRows(session.piles), [session.piles]);
+  const { store, auth, save } = useStore();
+  const cardStates = useCardStates();
+  const scans = useScans();
+  const [by, setBy] = useDisplayName();
+  const [included, setIncluded] = useState<string[]>(loadIncluded);
+  const [sharedFrom, setSharedFrom] = useState<Record<string, string>>(loadSharedFrom);
+  useEffect(() => saveIncluded(included), [included]);
+  useEffect(() => saveSharedFrom(sharedFrom), [sharedFrom]);
+  // This device's piles plus the ticked shared piles; a pile shared from here counts once.
+  const diffPiles = useMemo(
+    () => pilesForDiff(session.piles, scans.data, new Set(included), sharedFrom),
+    [session.piles, scans.data, included, sharedFrom],
+  );
+  const rows = useMemo(() => mergedRows(diffPiles), [diffPiles]);
   const diff = useMemo(() => diffScan(expected, rows, printings), [expected, rows, printings]);
 
   useEffect(() => saveSession(session), [session]);
@@ -120,6 +139,64 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
     if (parsed.length === 0) return;
     setSession((s) => ({ ...s, piles: [...s.piles, makePile(`Pasted list ${s.piles.length + 1}`, parsed)] }));
     setPaste('');
+  }
+
+  function sharePile(pile: Pile) {
+    if (!store) return;
+    if (!by.trim()) {
+      setError('Write your name below the piles first; it is shown on the shared pile.');
+      return;
+    }
+    if (pile.rows.length > MAX_PILE_ROWS) {
+      setError(`A shared pile holds at most ${MAX_PILE_ROWS} rows; this one has ${pile.rows.length}. Split it into smaller files.`);
+      return;
+    }
+    setError(null);
+    void save(() => {
+      const { id, written } = store.createScanPile(sharedPileInput(pile, by));
+      setSharedFrom((m) => ({ ...m, [pile.id]: id }));
+      return written;
+    }, `Shared ${pile.label}.`);
+  }
+
+  /** Owner: the scanned Printing is what is in the box. Writes the In-box Printing; Wanted stays. */
+  async function boxHasThis(r: CardResult) {
+    if (!store) return;
+    const card = byOracle.get(r.card.oracle_id);
+    const s = r.scanned;
+    if (!card || !s) return;
+    if (cardStates.status !== 'ready') {
+      setError('The shared card state has not loaded yet. Try again in a moment.');
+      return;
+    }
+    try {
+      const id =
+        s.scryfall_id ??
+        r.rows.find((x) => x.printing === s && x.scryfall_id)?.scryfall_id ??
+        (await lookupPrinting(s.set, s.collector_number, known))?.scryfall_id;
+      if (!id) {
+        setError(`Could not find ${s.set.toUpperCase()} ${s.collector_number} on Scryfall.`);
+        return;
+      }
+      await save(
+        () =>
+          store.updateCard(card.oracle_id, {
+            kind: 'in_box',
+            in_box: {
+              scryfall_id: id,
+              set: s.set,
+              collector_number: s.collector_number,
+              illustration_id: s.illustration_id,
+              name: s.name,
+              source: 'scan',
+              confidence: 'high',
+            },
+          }),
+        `In-box Printing of ${card.name} set to ${s.set.toUpperCase()} ${s.collector_number}.`,
+      );
+    } catch (e) {
+      setError(String(e instanceof Error ? e.message : e));
+    }
   }
 
   function removePile(id: string) {
@@ -195,7 +272,9 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
     { id: 'other-set', label: 'Other set', count: t.sameArtOtherSet },
     { id: 'unknown', label: 'Unknown art', count: t.unknown },
   ];
-  const hasPiles = session.piles.length > 0;
+  const hasPiles = diffPiles.length > 0;
+  const hasLocalPiles = session.piles.length > 0;
+  const sharedIds = new Set(scans.data.map((s) => s.id));
   // Scryfall is still being asked: the art tabs are not final yet.
   const checking = progress !== null && progress.done < progress.total;
   const artEmpty = (text: string) => (checking ? 'Checking art…' : text);
@@ -208,7 +287,7 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
       <section className="panel import" aria-labelledby="import-head">
         <h2 id="import-head">Import</h2>
         <p className="muted">ManaBox CSV exports or a plain list, one card per line. Each file is one pile: a box or stack scanned together.</p>
-        {!hasPiles && (
+        {!hasLocalPiles && (
           <ol className="howto">
             <li>In ManaBox, make a binder for the Cube (or one per box or pile) and scan the cards into it with Quick Mode, in any order.</li>
             <li>Open the binder and export it as CSV.</li>
@@ -242,20 +321,46 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
         <button type="button" onClick={addPaste} disabled={!paste.trim()}>
           Add pasted list
         </button>
-        {hasPiles && (
+        {hasLocalPiles && (
           <ul className="piles">
-            {session.piles.map((p) => (
-              <li key={p.id}>
-                <span className="pile-label">{p.label}</span>
-                <span className="num muted">{p.rows.length} rows</span>
-                <button type="button" className="link" onClick={() => removePile(p.id)}>
-                  Remove
-                </button>
-              </li>
-            ))}
+            {session.piles.map((p) => {
+              const sharedId = sharedFrom[p.id];
+              const isShared = !!sharedId && (sharedIds.has(sharedId) || scans.status !== 'ready');
+              return (
+                <li key={p.id}>
+                  <span className="pile-label">{p.label}</span>
+                  <span className="num muted">{p.rows.length} rows</span>
+                  {isShared ? (
+                    <span className="muted">Shared</span>
+                  ) : (
+                    store && (
+                      <button type="button" className="link" onClick={() => sharePile(p)}>
+                        Share this pile
+                      </button>
+                    )
+                  )}
+                  <button type="button" className="link" onClick={() => removePile(p.id)}>
+                    Remove
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         )}
+        {hasLocalPiles && store && <NameField value={by} onChange={setBy} label="Your name, shown on shared piles" />}
       </section>
+
+      <SharedPiles
+        live={scans}
+        included={included}
+        onToggle={(id) => setIncluded((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]))}
+        canDelete={(p) => auth.isOwner || (!!auth.uid && p.createdByUid === auth.uid)}
+        onDelete={(p) => {
+          if (!store || !window.confirm(`Delete the shared pile ${p.label}?`)) return;
+          void save(() => store.deleteScanPile(p.id), `Deleted ${p.label}.`);
+          setIncluded((cur) => cur.filter((x) => x !== p.id));
+        }}
+      />
 
       {notice && <p className="notice" role="status">{notice}</p>}
       {removed && (
@@ -332,7 +437,15 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
             {tab === 'different-art' && (
               <ItemList empty={artEmpty('No card with different art.')}>
                 {differentArt.map((r) => (
-                  <ArtItem key={r.card.oracle_id} r={r} tab="different-art" session={session} toggle={toggle} imageOf={imageOf} />
+                  <ArtItem
+                    key={r.card.oracle_id}
+                    r={r}
+                    tab="different-art"
+                    session={session}
+                    toggle={toggle}
+                    imageOf={imageOf}
+                    onBoxHasThis={auth.isOwner && store && r.scanned ? () => void boxHasThis(r) : undefined}
+                  />
                 ))}
               </ItemList>
             )}
@@ -437,12 +550,14 @@ function ArtItem({
   session,
   toggle,
   imageOf,
+  onBoxHasThis,
 }: {
   r: CardResult;
   tab: Tab;
   session: ScanSession;
   toggle: (k: string) => void;
   imageOf: (c: ExpectedCard) => string;
+  onBoxHasThis?: () => void;
 }) {
   const s = r.scanned;
   const scannedLabel = s ? `Scanned ${s.set.toUpperCase()} ${s.collector_number}` : 'Scanned';
@@ -456,6 +571,11 @@ function ArtItem({
       </span>
       <Thumb src={imageOf(r.card)} label={`In-box ${r.card.in_box.set.toUpperCase()} ${r.card.in_box.collector_number}`} />
       <Thumb src={s?.image_small} label={scannedLabel} />
+      {onBoxHasThis && (
+        <button type="button" onClick={onBoxHasThis}>
+          Box has this printing
+        </button>
+      )}
     </Item>
   );
 }
@@ -487,5 +607,51 @@ function UnexpectedItem({
         </span>
       </span>
     </Item>
+  );
+}
+
+function SharedPiles({
+  live,
+  included,
+  onToggle,
+  canDelete,
+  onDelete,
+}: {
+  live: Live<SharedPile[]>;
+  included: string[];
+  onToggle: (id: string) => void;
+  canDelete: (p: SharedPile) => boolean;
+  onDelete: (p: SharedPile) => void;
+}) {
+  const piles = live.data;
+  return (
+    <section className="panel" aria-labelledby="shared-head">
+      <h2 id="shared-head">Shared piles</h2>
+      <p className="muted">Piles anyone in the group has shared. Tick the ones to include in the diff.</p>
+      <LiveStatus live={live} what="piles" />
+      {live.status === 'ready' && piles.length === 0 && (
+        <p className="status">No shared piles yet. Use Share this pile on an imported pile.</p>
+      )}
+      {piles.length > 0 && (
+        <ul className="piles">
+          {piles.map((p) => (
+            <li key={p.id}>
+              <label className="check">
+                <input type="checkbox" checked={included.includes(p.id)} onChange={() => onToggle(p.id)} />
+                <span className="pile-label">{p.label}</span>
+              </label>
+              <span className="num muted">
+                {p.row_count} rows · {p.by || 'someone'} · {formatTime(p.createdAt)}
+              </span>
+              {canDelete(p) && (
+                <button type="button" className="link" onClick={() => onDelete(p)}>
+                  Delete
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }

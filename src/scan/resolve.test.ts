@@ -52,6 +52,17 @@ describe('localPrintings', () => {
     expect([...printings.keys()]).toEqual(['a', 'b']);
     expect([...todo.keys()]).toEqual(['c']);
   });
+
+  it('ignores slice 1 cache entries, which lack scryfall_id', () => {
+    localStorage.setItem('cube.scryfall-printings.v1', JSON.stringify({ 'lea/1': printing('old') }));
+    const r: ScannedRow = { name: 'x', quantity: 1, scryfall_id: null, set: 'lea', collector_number: '1', foil: null, language: null };
+    const { printings, todo } = localPrintings([r], new Map());
+    expect(printings.size).toBe(0);
+    expect(todo.get('lea/1')).toEqual({ set: 'lea', collector_number: '1' });
+    saveCache({ b: printing('b') });
+    expect(localStorage.getItem('cube.scryfall-printings.v1')).toBeNull();
+    expect(CACHE_KEY).not.toBe('cube.scryfall-printings.v1');
+  });
 });
 
 describe('resolvePrintings', () => {

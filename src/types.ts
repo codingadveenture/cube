@@ -46,6 +46,9 @@ export interface WantedPrinting extends PrintingBase {
 export interface Flag {
   type: string;
   by: string;
+  /** The reason, for flags raised in the app. */
+  note?: string;
+  createdAt?: string | null;
 }
 
 export interface Card {

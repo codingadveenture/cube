@@ -5,6 +5,8 @@ import type { ScannedRow } from './parse';
 
 /** What is known about a scanned Printing once resolved. */
 export interface ResolvedPrinting {
+  /** Scryfall id, when known. */
+  scryfall_id?: string;
   illustration_id: string | null;
   name: string;
   set: string;

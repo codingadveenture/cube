@@ -5,7 +5,10 @@ import type { Card } from '../types';
 import { printingKey, type ResolvedPrinting } from './diff';
 import type { ScannedRow } from './parse';
 
-export const CACHE_KEY = 'cube.scryfall-printings.v1';
+// v2: every entry carries its scryfall_id. Slice 1 entries (v1) lacked it, so a lookup by set and
+// collector number that hit one could not name the Printing; v1 is ignored and removed.
+export const CACHE_KEY = 'cube.scryfall-printings.v2';
+export const OLD_CACHE_KEYS = ['cube.scryfall-printings.v1'];
 export const CACHE_CAP = 2000;
 const BATCH = 75;
 const GAP_MS = 150;
@@ -22,6 +25,7 @@ export function knownPrintings(cards: Card[]): Map<string, ResolvedPrinting> {
   for (const c of cards) {
     for (const p of [c.in_box, c.wanted]) {
       const resolved: ResolvedPrinting = {
+        scryfall_id: p.scryfall_id,
         illustration_id: p.illustration_id,
         name: c.name,
         set: p.set,
@@ -61,6 +65,11 @@ export function saveCache(entries: Cache): void {
   const trimmed: Cache = {};
   for (const k of keys.slice(Math.max(0, keys.length - CACHE_CAP))) trimmed[k] = cache[k]!;
   try {
+    for (const old of OLD_CACHE_KEYS) localStorage.removeItem(old);
+  } catch {
+    // Blocked storage: nothing to clean up.
+  }
+  try {
     localStorage.setItem(CACHE_KEY, JSON.stringify(trimmed));
   } catch {
     // Storage full or blocked: the cache is a convenience only.
@@ -83,6 +92,7 @@ interface ScryfallCard {
 function toResolved(c: ScryfallCard): ResolvedPrinting {
   const face = c.card_faces?.[0];
   return {
+    scryfall_id: c.id,
     illustration_id: c.illustration_id ?? face?.illustration_id ?? null,
     name: c.name,
     set: c.set,

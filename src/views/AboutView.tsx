@@ -1,4 +1,5 @@
 import type { CardsFile } from '../types';
+import { Account } from './Account';
 
 const REPO = 'https://github.com/codingadveenture/cube';
 
@@ -10,6 +11,7 @@ export function AboutView({ data }: { data: CardsFile | null }) {
         Cube keeps a paper Vintage Cube of about 540 proxy cards in order. It shows what is in the Cube,
         card by card and Printing by Printing, and checks the Cube against the List from phone Scans.
       </p>
+      <Account />
       <h2>Words</h2>
       <dl className="facts">
         <div>

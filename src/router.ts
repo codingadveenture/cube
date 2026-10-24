@@ -1,9 +1,12 @@
-// A tiny hash router: #/cube (default), #/cube?q=<search>, #/cube/<oracle_id>, #/scan, #/about.
+// A tiny hash router: #/cube (default), #/cube?q=<search>, #/cube/<oracle_id>, #/scan,
+// #/suggestions, #/log, #/about.
 import { useEffect, useState } from 'react';
 
 export type Route =
   | { view: 'cube'; oracleId: string | null; query: URLSearchParams }
   | { view: 'scan'; query: URLSearchParams }
+  | { view: 'suggestions' }
+  | { view: 'log' }
   | { view: 'about' };
 
 export function parseHash(hash: string): Route {
@@ -12,6 +15,8 @@ export function parseHash(hash: string): Route {
   const parts = path.split('/').filter(Boolean);
   if (parts[0] === 'scan') return { view: 'scan', query: new URLSearchParams(query) };
   if (parts[0] === 'about') return { view: 'about' };
+  if (parts[0] === 'suggestions') return { view: 'suggestions' };
+  if (parts[0] === 'log') return { view: 'log' };
   return {
     view: 'cube',
     oracleId: parts[0] === 'cube' && parts[1] ? decodeURIComponent(parts[1]) : null,

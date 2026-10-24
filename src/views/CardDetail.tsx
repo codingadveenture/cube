@@ -1,6 +1,7 @@
 import type { Card, PrintingBase } from '../types';
 import { wantedDiffers } from '../cube/order';
 import { isListHash, previousHash } from '../router';
+import { CardActions } from './CardActions';
 
 function scryfallUrl(p: PrintingBase): string {
   return `https://scryfall.com/card/${encodeURIComponent(p.set)}/${encodeURIComponent(p.collector_number)}`;
@@ -123,10 +124,12 @@ export function CardDetail({ cards, oracleId }: { cards: Card[]; oracleId: strin
           {card.flags.map((f, i) => (
             <li key={i}>
               {f.type === 'art' ? 'Art flag' : f.type} raised by {f.by}
+              {f.note ? `: ${f.note}` : ''}
             </li>
           ))}
         </ul>
       )}
+      <CardActions card={card} cards={cards} />
       <div className="side-by-side">
         <PrintingPanel
           title="In-box"

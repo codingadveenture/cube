@@ -546,3 +546,144 @@ progress {
 .about {
   max-width: 42rem;
 }
+
+/* Slice 2: account, forms, toasts */
+
+.account {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.9rem;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+button.primary {
+  background: var(--accent);
+  color: var(--accent-text);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+input[type='text'],
+input[type='date'],
+select {
+  min-height: 44px;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  max-width: 100%;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+  width: 100%;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  width: 100%;
+  max-width: 32rem;
+}
+.field > span {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.inline-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.inline-fields .field {
+  width: auto;
+}
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 44px;
+}
+.check input {
+  width: 1.2rem;
+  height: 1.2rem;
+}
+details.panel > summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 600;
+}
+.paste-text {
+  margin: 0.25rem 0 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius);
+  background: var(--chip);
+  white-space: pre-wrap;
+  font-size: 0.9rem;
+}
+.uid code {
+  overflow-wrap: anywhere;
+}
+.suggestion .resolve {
+  flex: 1 1 100%;
+}
+.suggestion.status-open {
+  border-left: 3px solid var(--accent);
+  padding-left: 0.6rem;
+}
+.suggestion.status-rejected .row-name {
+  color: var(--muted);
+}
+.actions-panel .actions {
+  margin: 0;
+}
+
+.toast {
+  position: fixed;
+  left: var(--gutter);
+  right: var(--gutter);
+  bottom: 1rem;
+  z-index: 20;
+  max-width: 40rem;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.25rem 0.25rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.18);
+}
+.toast span {
+  flex: 1;
+}
+.toast.error {
+  color: var(--warn);
+  background: var(--warn-bg);
+}
+
+@media (max-width: 700px) {
+  .toast {
+    bottom: calc(var(--nav-h) + env(safe-area-inset-bottom) + 0.5rem);
+  }
+  .nav a {
+    padding: 0 0.25rem;
+    font-size: 0.9rem;
+  }
+}

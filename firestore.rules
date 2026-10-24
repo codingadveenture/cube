@@ -1,0 +1,106 @@
+rules_version = '2';
+
+// Firestore rules for the Cube app (project cube-e647a).
+// Paste this file into Firebase console -> Firestore -> Rules -> Publish.
+// Everyone who opens the site is signed in anonymously; only the Owner signs in with Google.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function ownerPath() {
+      return /databases/$(database)/documents/config/owner;
+    }
+
+    // The Owner is the uid stored in config/owner.
+    function isOwner() {
+      return signedIn() && exists(ownerPath()) && get(ownerPath()).data.uid == request.auth.uid;
+    }
+
+    function isStr(v, max) {
+      return v is string && v.size() <= max;
+    }
+
+    function isStrOrNull(v, max) {
+      return v == null || isStr(v, max);
+    }
+
+    function validSuggestion() {
+      let d = request.resource.data;
+      return d.keys().hasAll(['type', 'card_name', 'oracle_id', 'printing', 'by', 'note', 'status',
+                              'createdAt', 'createdByUid', 'resolvedAt', 'resolution_note'])
+        && d.keys().hasOnly(['type', 'card_name', 'oracle_id', 'printing', 'by', 'note', 'status',
+                             'createdAt', 'createdByUid', 'resolvedAt', 'resolution_note'])
+        && d.type in ['add', 'ban', 'art_flag', 'printing', 'winner_pick', 'other']
+        && isStr(d.card_name, 200)
+        && isStrOrNull(d.oracle_id, 100)
+        && (d.printing == null || (d.printing is map && d.printing.keys().hasOnly(['set', 'collector_number', 'scryfall_id'])))
+        && isStr(d.by, 100)
+        && d.note is string && d.note.size() < 2000
+        && d.status == 'open'
+        && isStr(d.createdAt, 40)
+        && d.createdByUid == request.auth.uid
+        && d.resolvedAt == null
+        && d.resolution_note == null;
+    }
+
+    function validScan() {
+      let d = request.resource.data;
+      return d.keys().hasAll(['label', 'by', 'rows', 'row_count', 'createdAt', 'createdByUid'])
+        && d.keys().hasOnly(['label', 'by', 'rows', 'row_count', 'createdAt', 'createdByUid'])
+        && isStr(d.label, 200)
+        && isStr(d.by, 100)
+        && d.rows is list && d.rows.size() <= 2000
+        && d.row_count is int && d.row_count == d.rows.size()
+        && isStr(d.createdAt, 40)
+        && d.createdByUid == request.auth.uid;
+    }
+
+    // config/owner: created once, by a Google-signed-in user, with their own uid.
+    match /config/owner {
+      allow read: if true;
+      allow create: if signedIn()
+        && request.auth.token.firebase.sign_in_provider == 'google.com'
+        && !exists(ownerPath())
+        && request.resource.data.keys().hasOnly(['uid'])
+        && request.resource.data.uid == request.auth.uid;
+    }
+
+    match /cubes/main {
+      allow read: if true;
+      allow write: if isOwner();
+
+      match /cards/{oracleId} {
+        allow read: if true;
+        allow write: if isOwner();
+      }
+
+      match /suggestions/{id} {
+        allow read: if true;
+        allow create: if signedIn() && validSuggestion();
+        allow update, delete: if isOwner();
+      }
+
+      match /scans/{id} {
+        allow read: if true;
+        allow create: if signedIn() && validScan();
+        allow delete: if signedIn() && (resource.data.createdByUid == request.auth.uid || isOwner());
+      }
+
+      match /log/{id} {
+        allow read: if true;
+        allow write: if isOwner();
+      }
+
+      // cubes/main/meta/overrides: the pending List changes.
+      match /meta/{docId} {
+        allow read: if true;
+        allow write: if isOwner();
+      }
+    }
+
+    // Everything else is denied by default.
+  }
+}
