@@ -4,7 +4,7 @@ import type { Card } from '../types';
 import { compareCards, wantedDiffers } from '../cube/order';
 import { largeFromPng, largeImage, pngImage } from '../printings/images';
 import type { SlipGroup } from './layout';
-import type { Quality } from './settings';
+import type { PrintHistoryEntry, Quality } from './settings';
 import type { CardPatchFor } from '../store/types';
 
 /** One card line of the batch: a new card (to print), a reprint (Wanted differs from In-box) or an extra line. */
@@ -174,7 +174,30 @@ export function markPrintedPatches(cards: Card[], lines: BatchLine[]): CardPatch
  */
 export function printedHistoryNames(lines: BatchLine[], patches: CardPatchFor[]): string[] {
   const patched = new Set(patches.map((p) => p.oracle_id));
-  return lines
-    .filter((l) => (l.source === 'reprint' || l.source === 'new') && l.oracle_id && patched.has(l.oracle_id))
-    .map((l) => l.name);
+  return lines.filter((l) => changesInBox(l, patched)).map((l) => l.name);
+}
+
+function changesInBox(l: BatchLine, patched: ReadonlySet<string>): boolean {
+  return (l.source === 'reprint' || l.source === 'new') && !!l.oracle_id && patched.has(l.oracle_id);
+}
+
+/**
+ * The print history entry for a printed batch: `count` and `names` are the In-box changes,
+ * `extras` the other front slips (extra lines, and lines that change no In-box Printing, one per
+ * copy) plus the token slips. A batch of only extras or tokens still gets an entry, with count 0.
+ * Null when the batch printed nothing.
+ */
+export function printHistoryEntry(
+  lines: BatchLine[],
+  tokens: TokenLine[],
+  patches: CardPatchFor[],
+  when: { date: string; at: string; printer: string },
+): PrintHistoryEntry | null {
+  const patched = new Set(patches.map((p) => p.oracle_id));
+  const names = printedHistoryNames(lines, patches);
+  const extraFronts = lines.filter((l) => !changesInBox(l, patched)).reduce((n, l) => n + Math.max(1, Math.floor(l.quantity)), 0);
+  const tokenSlips = tokens.reduce((n, t) => n + Math.max(0, Math.floor(t.count)), 0);
+  const extras = extraFronts + tokenSlips;
+  if (names.length === 0 && extras === 0) return null;
+  return { date: when.date, at: when.at, count: names.length, printer: when.printer, names, ...(extras > 0 ? { extras } : {}) };
 }

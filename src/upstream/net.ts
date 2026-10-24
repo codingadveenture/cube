@@ -40,6 +40,12 @@ export async function fetchCubelist(id: string, signal?: AbortSignal): Promise<s
   return parseCubelist(await res.text());
 }
 
+/** The List's cubeJSON (about 1.6 MB), fetched fresh each time: the CSV export reads its basics board. */
+export async function fetchListJson(signal?: AbortSignal): Promise<CubeJson> {
+  const res = await get(`${BASE}/cubeJSON/${LIST_ID}`, signal);
+  return (await res.json()) as CubeJson;
+}
+
 let upstreamJson: Promise<CubeJson> | null = null;
 
 /** Upstream's cubeJSON (about 1.6 MB), fetched once per session and only when an Update is built. */

@@ -3,6 +3,7 @@ import { useMemo, useState, type FormEvent } from 'react';
 import type { Card } from '../types';
 import { useCardStates, useStore } from '../store/context';
 import { lookupPrinting } from '../store/lookup';
+import { plainError } from '../print/errors';
 import { knownPrintings } from '../scan/resolve';
 import { SUGGESTION_LABEL, SUGGESTION_TYPES, type SuggestionType } from '../store/types';
 import { addFlagPatch } from '../store/writes';
@@ -126,7 +127,8 @@ function SuggestForm({ card, onDone }: { card: Card; onDone: () => void }) {
           }
           printing = { set: p.set, collector_number: p.collector_number, scryfall_id: p.scryfall_id };
         } catch (err) {
-          setError(String(err instanceof Error ? err.message : err));
+          console.error('Printing lookup:', err);
+          setError(plainError(err, 'scryfall'));
           return;
         } finally {
           setLooking(false);
@@ -212,7 +214,8 @@ function BoxPrintingForm({ card, cards, onDone }: { card: Card; cards: Card[]; o
       );
       if (ok) onDone();
     } catch (err) {
-      setError(String(err instanceof Error ? err.message : err));
+      console.error('Printing lookup:', err);
+      setError(plainError(err, 'scryfall'));
     } finally {
       setBusy(false);
     }

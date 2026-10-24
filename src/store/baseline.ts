@@ -15,15 +15,27 @@ export function chunk<T>(items: T[], size = BATCH_LIMIT): T[][] {
 }
 
 /**
- * The cubes/main fields an import writes (merged). baselineImportedAt records the first import
- * only: a top-up import, made while the server already holds card docs, leaves it alone.
+ * Whether an import writes baselineImportedAt: when the server holds no card docs yet, or when
+ * cubes/main on the server lacks the field (missing doc, null or empty), for example after a first
+ * import whose cube write never landed. `cubeOnServer` is the cube doc's data as the server has it,
+ * or undefined when the doc does not exist.
  */
-export function baselineCubeDoc(now: string, docsOnServer: number): Omit<CubeDoc, 'baselineImportedAt'> & Partial<Pick<CubeDoc, 'baselineImportedAt'>> {
+export function shouldStampBaseline(docsOnServer: number, cubeOnServer: Record<string, unknown> | null | undefined): boolean {
+  if (docsOnServer === 0) return true;
+  const at = cubeOnServer?.baselineImportedAt;
+  return typeof at !== 'string' || at === '';
+}
+
+/**
+ * The cubes/main fields an import writes (merged). baselineImportedAt is written only when
+ * `stamp` (shouldStampBaseline); otherwise a top-up import leaves the stored one alone.
+ */
+export function baselineCubeDoc(now: string, stamp: boolean): Omit<CubeDoc, 'baselineImportedAt'> & Partial<Pick<CubeDoc, 'baselineImportedAt'>> {
   return {
     name: 'Vintage Cube',
     cubecobraId: 'MTGVintageCube',
     upstreamId: 'modovintage',
-    ...(docsOnServer === 0 ? { baselineImportedAt: now } : {}),
+    ...(stamp ? { baselineImportedAt: now } : {}),
     updatedAt: now,
   };
 }

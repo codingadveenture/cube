@@ -7,7 +7,7 @@ import { cardPatchWrite } from '../store/writes';
 import { acceptRemaining, computeFeed, decide, groupFeed, markApplied, stickySets } from './feed';
 import { keyOf, nameIndex, parseCubelist, parseNameLines } from './names';
 import { buildUpdateWrites, inAction, updateBatches, type InCard } from './update';
-import { CSV_COLUMNS, csvField, cubecobraCsv, cubecobraPaste, pasteLine, upstreamPrintings } from './cubecobra';
+import { CSV_COLUMNS, csvField, cubecobraCsv, cubecobraPaste, exportName, listBasics, pasteLine, upstreamPrintings } from './cubecobra';
 import { colorCategory, factsFromScryfall, indexPrinting, keepPrinting, lookupName, typeCategory, type ScryfallCard } from './scryfall';
 import { findUpstream, resolveOuts, upstreamWanted } from './resolveIn';
 import { toUpdateHistory, toUpstreamMeta } from './meta';
@@ -216,7 +216,8 @@ describe('building an Update', () => {
 
 describe('the CubeCobra export', () => {
   const fire = { ...byName('Fire // Ice') };
-  const goblin: Card = { ...byName('Lightning Bolt'), name: '"Name Sticker" Goblin, the Test' };
+  const bolt = byName('Lightning Bolt');
+  const goblin: Card = { ...bolt, name: '"Name Sticker" Goblin, the Test', wanted: { ...bolt.wanted, name: '"Name Sticker" Goblin, the Test' } };
 
   it('quotes per RFC 4180', () => {
     expect(csvField('plain')).toBe('plain');
@@ -238,12 +239,50 @@ describe('the CubeCobra export', () => {
     expect(lines.length).toBe(4); // header, two rows, final empty string after the last CRLF
     expect(lines[3]).toBe('');
     const row = lines.find((l) => l.startsWith('"""Name Sticker'))!;
-    expect(row.startsWith('"""Name Sticker"" Goblin, the Test",1,')).toBe(true);
+    // Type (the third column) is empty, so CubeCobra stores no type-line override.
+    expect(row.startsWith(`"""Name Sticker"" Goblin, the Test",1,,${bolt.colors.join('')},`)).toBe(true);
     const cells = row.split(',');
     expect(row).toContain(`,${goblin.wanted.set.toLowerCase()},${goblin.wanted.collector_number},`);
     expect(row).toContain(',Proxied,Non-foil,mainboard,false,');
     expect(cells.length).toBeGreaterThanOrEqual(CSV_COLUMNS.length);
     expect(csv).not.toContain('Sol Ring');
+    const fireRow = lines.find((l) => l.startsWith('Fire // Ice,'))!;
+    expect(fireRow.split(',')[2]).toBe('');
+    expect(csv).not.toContain('—');
+  });
+
+  it('writes the Printing’s own name, so a renamed card reaches its paper Printing', () => {
+    const ademi = byName('Ademi of the Silkchutes');
+    expect(ademi.wanted.name).toBe('Spectacular Spider-Man');
+    const fixture: Card = { ...ademi, wanted: { ...ademi.wanted, set: 'pspl', collector_number: '6' } };
+    const row = cubecobraCsv([fixture]).split('\r\n')[1]!;
+    expect(row.startsWith('Spectacular Spider-Man,')).toBe(true);
+    expect(row).toContain(',pspl,6,');
+    expect(row).not.toContain('Ademi');
+    expect(pasteLine(fixture)).toBe('1 Spectacular Spider-Man [PSPL] 6');
+    // Without a name on the Printing, the card's own name is used.
+    expect(exportName({ name: 'Plain Card', wanted: { ...ademi.wanted, name: null } })).toBe('Plain Card');
+  });
+
+  it('keeps the basics board as rows of its own', () => {
+    const json = {
+      cards: {
+        mainboard: [],
+        basics: [
+          { cardID: 'f1', name: 'Forest', status: 'Owned', details: { name: 'Forest', set: 'UNF', collector_number: '240' } },
+          { cardID: 'i1', details: { name: 'Island', set: 'unf', collector_number: '236' } },
+          { cardID: 'x' },
+        ],
+      },
+    };
+    const basics = listBasics(json);
+    expect(basics).toHaveLength(2);
+    expect(listBasics({})).toEqual([]);
+    const lines = cubecobraCsv([fire], basics).split('\r\n');
+    expect(lines).toHaveLength(5); // header, one List row, two basics, final empty string
+    expect(lines[2]).toBe('Forest,,,,unf,240,,,Owned,Non-foil,basics,false,,,,,,false,false,');
+    expect(lines[3]).toBe('Island,,,,unf,236,,,Not Owned,Non-foil,basics,false,,,,,,false,false,');
+    expect(lines[1]!.split(',').length).toBe(CSV_COLUMNS.length);
   });
 
   it('writes "1 Name [SET] number" paste lines', () => {

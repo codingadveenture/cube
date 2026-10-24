@@ -16,7 +16,7 @@ import {
   type DocumentData,
   type Firestore,
 } from 'firebase/firestore';
-import { baselineCubeDoc, chunk, withoutExisting } from './baseline';
+import { baselineCubeDoc, chunk, shouldStampBaseline, withoutExisting } from './baseline';
 import { cardBatches, cardPatchWrite, listChangeWrite, markPrintedWrites, type CardWrite } from './writes';
 import { ownerFromDoc } from './owner';
 import { guardNewCards, updateBatches } from '../upstream/update';
@@ -216,10 +216,11 @@ export class FirestoreStore implements Store {
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       throw new Error('Import baseline needs a connection to the server. Try again when online.');
     }
-    // Which docs exist is asked of the server, never the local cache, so nothing stored is replaced.
-    const onServer = await getDocsFromServer(this.col('cards'));
+    // Which docs exist, and whether cubes/main has baselineImportedAt, is asked of the server,
+    // never the local cache, so nothing stored is replaced.
+    const [onServer, cubeOnServer] = await Promise.all([getDocsFromServer(this.col('cards')), getDocFromServer(this.cubeRef())]);
     const docs = withoutExisting(all, new Set(onServer.docs.map((d) => d.id)));
-    const cube = baselineCubeDoc(now(), onServer.size);
+    const cube = baselineCubeDoc(now(), shouldStampBaseline(onServer.size, cubeOnServer.data()));
     const chunks = chunk(docs);
     if (chunks.length === 0) chunks.push([]);
     const commits: Promise<void>[] = [];

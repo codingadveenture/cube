@@ -35,9 +35,13 @@ export const DEFAULT_SETTINGS: PrintSettings = {
 /** One entry of the print history (the last 50 are kept). */
 export interface PrintHistoryEntry {
   date: string;
+  /** In-box changes: the new cards and reprints whose In-box Printing the print set. */
   count: number;
   printer: string;
+  /** The names of the In-box changes. */
   names: string[];
+  /** Other slips printed with them (extra lines and token slips); absent on older entries. */
+  extras?: number;
   /** When the entry was written (ISO time), so two equal prints on one day stay two entries. */
   at?: string;
 }
@@ -126,6 +130,7 @@ export function toPrintMeta(d: unknown): PrintMeta {
             count: typeof e.count === 'number' ? e.count : 0,
             printer: typeof e.printer === 'string' ? e.printer : '',
             names: Array.isArray(e.names) ? e.names.filter((x): x is string => typeof x === 'string') : [],
+            ...(typeof e.extras === 'number' && e.extras > 0 ? { extras: e.extras } : {}),
             ...(typeof e.at === 'string' ? { at: e.at } : {}),
           };
         })
@@ -133,6 +138,13 @@ export function toPrintMeta(d: unknown): PrintMeta {
         .slice(-HISTORY_LIMIT)
     : [];
   return { settings: o.settings ? mergeSettings(o.settings) : null, profiles, history };
+}
+
+/** One line of the Print history, e.g. "2026-10-24: 3 In-box changes and 9 extra slips on Canon". */
+export function historyLine(h: PrintHistoryEntry): string {
+  const changes = `${h.count} In-box ${h.count === 1 ? 'change' : 'changes'}`;
+  const extras = h.extras ? ` and ${h.extras} extra ${h.extras === 1 ? 'slip' : 'slips'}` : '';
+  return `${h.date}: ${changes}${extras} on ${h.printer || 'an unnamed printer'}`;
 }
 
 /** The history with `entry` appended, keeping the last HISTORY_LIMIT entries. */

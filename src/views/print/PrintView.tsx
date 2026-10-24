@@ -8,7 +8,7 @@ import { smallImage } from '../../printings/images';
 import {
   composeSlips,
   markPrintedPatches,
-  printedHistoryNames,
+  printHistoryEntry,
   mtgprintList,
   proxyGeneratorList,
   newCardLines,
@@ -29,6 +29,7 @@ import {
   RANGES,
   UNCHECKED_KEY,
   effectiveSettings,
+  historyLine,
   historyTrim,
   mergeSettings,
   parseSetting,
@@ -196,15 +197,15 @@ export default function PrintView({ cards, section }: { cards: Card[]; section: 
     if (!store) return;
     // In-box comes from the lines that went on the sheet, not the cards' current Wanted.
     const patches = markPrintedPatches(cards, g.lines);
-    const names = printedHistoryNames(g.lines, patches);
-    const entry = { date: localDateIso(), at: new Date().toISOString(), count: names.length, printer: settings.profile.name, names };
+    // A batch of only extras or tokens changes no In-box Printing but is still recorded.
+    const entry = printHistoryEntry(g.lines, g.tokens, patches, { date: localDateIso(), at: new Date().toISOString(), printer: settings.profile.name });
     // The entry is appended with arrayUnion, so a stale or empty snapshot never replaces the
     // stored history; old entries are trimmed only from what the server last said.
     const trim = metaLive.status === 'ready' && !metaLive.fromCache ? historyTrim(metaLive.data?.history) : [];
     // One atomic batch: the In-box patches and the history entry land together or not at all.
     const ok = await save(
-      () => store.markPrinted(patches, names.length ? entry : null, trim),
-      `Marked ${patches.length} ${patches.length === 1 ? 'card' : 'cards'} as printed.`,
+      () => store.markPrinted(patches, entry ? { ...entry } : null, trim),
+      patches.length > 0 ? `Marked ${patches.length} ${patches.length === 1 ? 'card' : 'cards'} as printed.` : 'Print recorded in the history.',
     );
     if (!ok) return;
     const done = new Set(g.lines.map((l) => l.key));
@@ -436,7 +437,7 @@ export default function PrintView({ cards, section }: { cards: Card[]; section: 
             <ul>
               {[...meta.history].reverse().map((h, i) => (
                 <li key={i}>
-                  {h.date}: {h.count} cards on {h.printer || 'an unnamed printer'}
+                  {historyLine(h)}
                   {h.names.length > 0 ? ` (${h.names.slice(0, 8).join(', ')}${h.names.length > 8 ? ', …' : ''})` : ''}
                 </li>
               ))}

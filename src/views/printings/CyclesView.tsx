@@ -1,14 +1,14 @@
 // #/cycles: every Cycle with its status; #/cycles/<name>: one Cycle and its candidate Print runs.
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import type { Card } from '../../types';
-import { useCardStates, useStore } from '../../store/context';
-import type { CardPatchFor } from '../../store/types';
+import { useCardStates, useCycleAcks, useStore } from '../../store/context';
+import type { CardPatchFor, CycleAcks } from '../../store/types';
 import { candidateRuns, cyclesOf, humanizeCycle, type CandidateRun } from '../../printings/cycles';
 import { todayIso } from '../../printings/defaultRule';
 import { smallImage } from '../../printings/images';
 import { wantedFromInBox, wantedFromPrinting } from '../../printings/wanted';
 import { cycleHash, printingsHash } from '../../router';
-import { SplitLine, StatusChip, printingLine, useCycleAnalysis, type CycleAnalysis } from './shared';
+import { SplitLine, StatusChip, printingLine, useCycleAnalysis, useCycleAnalysisWith, type CycleAnalysis } from './shared';
 
 export default function CyclesView({ cards, cycle }: { cards: Card[]; cycle: string | null }) {
   return cycle ? <CyclePage key={cycle} cards={cards} cycle={cycle} /> : <CycleList cards={cards} />;
@@ -46,11 +46,11 @@ function useSeen(ref: RefObject<HTMLElement | null>): boolean {
 }
 
 /** One Cycle in the list. Its members' printings files load only once it scrolls into view. */
-function CycleItem({ cards, name }: { cards: Card[]; name: string }) {
+function CycleItem({ cards, name, acks }: { cards: Card[]; name: string; acks: CycleAcks }) {
   const ref = useRef<HTMLLIElement>(null);
   const seen = useSeen(ref);
   const names = useMemo(() => [name], [name]);
-  const { analyses, loading, errors } = useCycleAnalysis(cards, names, seen);
+  const { analyses, loading, errors } = useCycleAnalysisWith(cards, names, acks, seen);
   const a = analyses[0]!;
   return (
     <li ref={ref} className="cycle-item">
@@ -70,6 +70,8 @@ function CycleItem({ cards, name }: { cards: Card[]; name: string }) {
 
 function CycleList({ cards }: { cards: Card[] }) {
   const names = useMemo(() => cyclesOf(cards).map((c) => c.name), [cards]);
+  // One listener for the accepted splits, shared by every item.
+  const acks = useCycleAcks();
   return (
     <div className="cycles">
       <h1>Cycles</h1>
@@ -79,7 +81,7 @@ function CycleList({ cards }: { cards: Card[] }) {
       </p>
       <ul className="items">
         {names.map((name) => (
-          <CycleItem key={name} cards={cards} name={name} />
+          <CycleItem key={name} cards={cards} name={name} acks={acks.data} />
         ))}
       </ul>
       {names.length === 0 && <p className="status">No card belongs to a Cycle.</p>}

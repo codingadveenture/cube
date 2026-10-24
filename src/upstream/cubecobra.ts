@@ -43,15 +43,31 @@ export function listCards(cards: readonly Card[]): Card[] {
 }
 
 /**
- * The CSV for CubeCobra's "Replace with CSV": one row per card on the List, with its Wanted
- * Printing (Set and Collector Number carry the Printing) and status "Proxied". Lines end in CRLF.
+ * The name CubeCobra should look a row up by: the Printing's own name. CubeCobra finds the
+ * printings by name first and only then picks set and collector number among them, and a Through
+ * the Omenpaths name (Ademi of the Silkchutes) is filed only under its digital printing, while the
+ * paper Spider-Man printing is filed under its own name (Spectacular Spider-Man).
  */
-export function cubecobraCsv(cards: readonly Card[]): string {
+export function exportName(c: Pick<Card, 'name' | 'wanted'>): string {
+  return c.wanted.name || c.name;
+}
+
+/** The board CubeCobra keeps a cube's basic lands on, as its CSV board column reads it. */
+export const BASICS_BOARD = 'basics';
+
+/**
+ * The CSV for CubeCobra's "Replace with CSV": one row per card on the List, with its Wanted
+ * Printing (Set and Collector Number carry the Printing), then one row per card of the cube's
+ * basics board, since the replace empties every board the file leaves out. Type is left empty so
+ * CubeCobra stores no type-line override. Status is "Proxied", which CubeCobra applies only to
+ * rows whose Printing changes. Lines end in CRLF.
+ */
+export function cubecobraCsv(cards: readonly Card[], basics: readonly CubeJsonCard[] = []): string {
   const rows = listCards(cards).map((c) =>
     csvLine([
-      c.name,
+      exportName(c),
       c.cmc,
-      c.type_line.replace(/ — /g, ' - '),
+      '',
       c.colors.join(''),
       c.wanted.set.toLowerCase(),
       c.wanted.collector_number,
@@ -71,12 +87,36 @@ export function cubecobraCsv(cards: readonly Card[]): string {
       c.wanted.artist,
     ]),
   );
-  return [csvLine(CSV_COLUMNS), ...rows].join('\r\n') + '\r\n';
+  const basicRows = basics.map((b) =>
+    csvLine([
+      b.details?.name || b.name || '',
+      '',
+      '',
+      '',
+      (b.details?.set ?? '').toLowerCase(),
+      b.details?.collector_number ?? '',
+      '',
+      '',
+      b.status || 'Not Owned',
+      b.finish || 'Non-foil',
+      BASICS_BOARD,
+      'false',
+      '',
+      '',
+      '',
+      '',
+      '',
+      'false',
+      'false',
+      '',
+    ]),
+  );
+  return [csvLine(CSV_COLUMNS), ...rows, ...basicRows].join('\r\n') + '\r\n';
 }
 
 /** One bulk-upload line, "1 Name [SET] number": CubeCobra adds exactly that Printing. */
 export function pasteLine(c: Pick<Card, 'name' | 'wanted'>): string {
-  return `1 ${c.name} [${c.wanted.set.toUpperCase()}] ${c.wanted.collector_number}`;
+  return `1 ${exportName(c)} [${c.wanted.set.toUpperCase()}] ${c.wanted.collector_number}`;
 }
 
 /** The bulk-upload text for the given cards (all on the List by default), one line per card. */
@@ -90,10 +130,12 @@ export function csvFileName(date: string): string {
 
 // --- cubeJSON ---------------------------------------------------------------------------------
 
-/** The part of a cubeJSON mainboard card the app reads. */
+/** The part of a cubeJSON card the app reads. */
 export interface CubeJsonCard {
   cardID: string;
   name?: string;
+  status?: string;
+  finish?: string;
   details?: {
     oracle_id?: string;
     name?: string;
@@ -108,7 +150,13 @@ export interface CubeJsonCard {
 }
 
 export interface CubeJson {
-  cards?: { mainboard?: CubeJsonCard[] };
+  cards?: { mainboard?: CubeJsonCard[]; basics?: CubeJsonCard[] };
+}
+
+/** The cards on the cube's basics board that have a name to write. */
+export function listBasics(json: CubeJson): CubeJsonCard[] {
+  const basics = json.cards?.basics;
+  return Array.isArray(basics) ? basics.filter((b) => !!b && !!(b.details?.name || b.name)) : [];
 }
 
 export interface UpstreamPrinting {

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ResolvedPrinting } from './diff';
 import type { ScannedRow } from './parse';
-import { CACHE_KEY, loadCache, localPrintings, matchCollection, resolvePrintings, saveCache } from './resolve';
+import { CACHE_KEY, NOT_FOUND_TTL_MS, loadCache, localPrintings, matchCollection, notFoundFresh, resolvePrintings, saveCache } from './resolve';
 
 function memoryStorage() {
   const data = new Map<string, string>();
@@ -123,13 +123,34 @@ describe('not found and renamed identifiers', () => {
     const result = await resolvePrintings(rows, new Map());
     expect(result.printings.get('mh2/0263')?.illustration_id).toBe('ill');
     expect(result.printings.has('zzz/1')).toBe(false);
-    expect(loadCache()['zzz/1']).toBeNull();
+    expect(loadCache()['zzz/1']).toEqual({ not_found_at: expect.any(Number) });
     // Second run: both keys are settled from the cache, nothing is fetched.
     const { printings, todo } = localPrintings(rows, new Map());
     expect(todo.size).toBe(0);
     expect(printings.has('mh2/0263')).toBe(true);
     await resolvePrintings(rows, new Map());
     expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it('asks Scryfall again for a not_found key after 24 hours', async () => {
+    const t0 = Date.parse('2026-10-24T12:00:00Z');
+    const rows = [setRow('zzz', '1')];
+    const entry = { not_found_at: t0 };
+    expect(notFoundFresh(entry, t0 + NOT_FOUND_TTL_MS - 1)).toBe(true);
+    expect(notFoundFresh(entry, t0 + NOT_FOUND_TTL_MS)).toBe(false);
+    expect(notFoundFresh(null, t0)).toBe(false);
+    // Within a day the key is settled; after a day, or for an old entry without a time, it is asked again.
+    expect(localPrintings(rows, new Map(), { 'zzz/1': entry }, t0 + 60_000).todo.size).toBe(0);
+    expect(localPrintings(rows, new Map(), { 'zzz/1': entry }, t0 + NOT_FOUND_TTL_MS + 1).todo.get('zzz/1')).toEqual({ set: 'zzz', collector_number: '1' });
+    expect(localPrintings(rows, new Map(), { 'zzz/1': null }, t0).todo.size).toBe(1);
+    // An expired entry is refetched, and the new answer replaces it.
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ 'zzz/1': { not_found_at: Date.now() - NOT_FOUND_TTL_MS - 1000 } }));
+    const fn = vi.fn(async () => new Response(JSON.stringify({ data: [{ id: 'z1', name: 'New', set: 'zzz', collector_number: '1' }], not_found: [] }), { status: 200 }));
+    vi.stubGlobal('fetch', fn);
+    const result = await resolvePrintings(rows, new Map());
+    expect(fn).toHaveBeenCalledTimes(1);
+    expect(result.printings.get('zzz/1')?.scryfall_id).toBe('z1');
+    expect(loadCache()['zzz/1']).toMatchObject({ scryfall_id: 'z1' });
   });
 
   it('falls back to the card id and set/number when the counts disagree', () => {

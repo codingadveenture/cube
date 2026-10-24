@@ -11,13 +11,14 @@ import {
   composeSlips,
   frontImage,
   markPrintedPatches,
+  printHistoryEntry,
   printedHistoryNames,
   mtgprintList,
   proxyGeneratorList,
   reprintLines,
   type BatchLine,
 } from './batch';
-import { DEFAULT_SETTINGS, appendHistory, effectiveSettings, historyTrim, mergeSettings, parseSetting, toPrintMeta, type PrintSettings } from './settings';
+import { DEFAULT_SETTINGS, appendHistory, effectiveSettings, historyLine, historyTrim, mergeSettings, parseSetting, toPrintMeta, type PrintSettings } from './settings';
 import { fromScryfall, mergeExtras, resolveExtras, toExtras, type ExtraDeps } from './extras';
 import { plainError } from './errors';
 import { defaultFetch } from './pdf';
@@ -330,6 +331,37 @@ describe('batch composition', () => {
       image_normal: line.image_normal,
       name: line.list_name,
     });
+  });
+
+  it('builds the print history entry: In-box changes, plus extra and token slips', () => {
+    const when = { date: '2026-10-24', at: NOW, printer: 'Canon' };
+    const reprint = reprintLines(merged).find((l) => l.oracle_id === aang.oracle_id)!;
+    const extra: BatchLine = { ...reprint, key: 'x:1', source: 'extra', oracle_id: null, name: 'Fiery Islet', quantity: 2 };
+    const token = { key: 't:1', name: 'Treasure', count: 3, image_png: 'p.png' };
+    const patches = markPrintedPatches(merged, [reprint, extra]);
+    expect(printHistoryEntry([reprint, extra], [token], patches, when)).toEqual({
+      ...when,
+      count: 1,
+      names: [reprint.name],
+      extras: 5,
+    });
+    // Only extras and tokens: still an entry, with no In-box changes.
+    expect(printHistoryEntry([extra], [token], [], when)).toEqual({ ...when, count: 0, names: [], extras: 5 });
+    expect(printHistoryEntry([], [token], [], when)).toEqual({ ...when, count: 0, names: [], extras: 3 });
+    // Reprints only: no extras field.
+    expect(printHistoryEntry([reprint], [], patches, when)).toEqual({ ...when, count: 1, names: [reprint.name] });
+    // A reprint whose card is gone changes no In-box Printing and counts as an extra slip.
+    expect(printHistoryEntry([reprint], [], [], when)).toEqual({ ...when, count: 0, names: [], extras: 1 });
+    expect(printHistoryEntry([], [], [], when)).toBeNull();
+    expect(printHistoryEntry([], [{ ...token, count: 0 }], [], when)).toBeNull();
+  });
+
+  it('says what the history count means', () => {
+    expect(historyLine({ date: 'd', count: 3, printer: 'Canon', names: [] })).toBe('d: 3 In-box changes on Canon');
+    expect(historyLine({ date: 'd', count: 1, printer: '', names: [], extras: 1 })).toBe('d: 1 In-box change and 1 extra slip on an unnamed printer');
+    expect(historyLine({ date: 'd', count: 0, printer: 'p', names: [], extras: 9 })).toBe('d: 0 In-box changes and 9 extra slips on p');
+    // The extras count survives a read of the stored meta doc.
+    expect(toPrintMeta({ history: [{ date: 'd', count: 0, printer: 'p', names: [], extras: 9 }] }).history[0]!.extras).toBe(9);
   });
 });
 

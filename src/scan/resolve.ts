@@ -15,8 +15,27 @@ const GAP_MS = 150;
 const BACKOFF_MS = 2000;
 const MAX_RETRIES = 5;
 
-/** null marks a key Scryfall reported as not found, so it is not asked for again. */
-type Cache = Record<string, ResolvedPrinting | null>;
+/**
+ * A key Scryfall reported as not found, with when (ms since the epoch), so it is not asked for
+ * again until NOT_FOUND_TTL_MS has passed: a new set can appear on Scryfall later.
+ */
+export interface NotFoundEntry {
+  not_found_at: number;
+}
+
+export const NOT_FOUND_TTL_MS = 24 * 60 * 60 * 1000;
+
+/** A bare null is an older not-found entry without a time; it counts as expired. */
+type Cache = Record<string, ResolvedPrinting | NotFoundEntry | null>;
+
+function isNotFound(v: ResolvedPrinting | NotFoundEntry | null | undefined): v is NotFoundEntry | null {
+  return v === null || (!!v && typeof (v as NotFoundEntry).not_found_at === 'number');
+}
+
+/** True while a not-found entry is fresh enough to skip asking Scryfall again. */
+export function notFoundFresh(entry: NotFoundEntry | null, now: number): boolean {
+  return entry !== null && now - entry.not_found_at >= 0 && now - entry.not_found_at < NOT_FOUND_TTL_MS;
+}
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -176,14 +195,23 @@ export function localPrintings(
   rows: ScannedRow[],
   known: ReadonlyMap<string, ResolvedPrinting>,
   cache: Cache = loadCache(),
+  now: number = Date.now(),
 ): { printings: Map<string, ResolvedPrinting>; todo: Map<string, Identifier> } {
   const printings = new Map<string, ResolvedPrinting>();
   const todo = new Map<string, Identifier>();
   for (const r of rows) {
     const key = printingKey(r);
     if (!key || printings.has(key) || todo.has(key)) continue;
-    const hit = known.get(key) ?? cache[key];
-    if (hit === null) continue; // Scryfall did not know it last time.
+    let hit: ResolvedPrinting | undefined = known.get(key);
+    if (!hit) {
+      const cached = cache[key];
+      if (isNotFound(cached)) {
+        // Scryfall did not know it lately; an older answer is asked again.
+        if (notFoundFresh(cached, now)) continue;
+      } else {
+        hit = cached;
+      }
+    }
     if (hit) {
       printings.set(key, hit);
     } else if (r.scryfall_id) {
@@ -230,7 +258,8 @@ export async function resolvePrintings(
           fresh[key] = resolved;
         }
       }
-      for (const key of missing) fresh[key] = null;
+      const notFound: NotFoundEntry = { not_found_at: Date.now() };
+      for (const key of missing) fresh[key] = notFound;
       saveCache(fresh);
     } catch (e) {
       if (isAbort(e) || signal?.aborted) return { printings: out, error: null, aborted: true };

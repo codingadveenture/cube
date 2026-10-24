@@ -10,6 +10,7 @@ import { runStyle, styleLabel, runKey } from '../../printings/style';
 import type { IndexPrinting } from '../../printings/types';
 import { wantedFromPrinting } from '../../printings/wanted';
 import { printingsHash } from '../../router';
+import { focusTrapTarget } from '../../lib/focusTrap';
 import { SplitLine, printingLine, useCycleAnalysis } from './shared';
 
 type Step = { kind: 'choose' } | { kind: 'cycle'; cycle: string } | { kind: 'done' };
@@ -39,18 +40,14 @@ export function CycleSheet({
       if (e.key === 'Tab' && ref.current) {
         // Keep Tab inside the dialog.
         const focusable = [...ref.current.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), [tabindex="0"]')];
-        const first = focusable[0];
-        const last = focusable[focusable.length - 1];
-        if (!first || !last) return;
         // Focus on the heading (tabIndex -1) or outside the sheet is not a trap stop, so wrap from there too.
         const active = document.activeElement;
-        const onStop = active instanceof HTMLElement && focusable.includes(active);
-        if (e.shiftKey && (active === first || !onStop)) {
+        const index = active instanceof HTMLElement ? focusable.indexOf(active) : -1;
+        const onHeading = !!active && active === ref.current.querySelector('#sheet-title');
+        const target = focusTrapTarget(index, focusable.length, e.shiftKey, onHeading);
+        if (target) {
           e.preventDefault();
-          last.focus();
-        } else if (!e.shiftKey && (active === last || !onStop)) {
-          e.preventDefault();
-          first.focus();
+          focusable[target === 'first' ? 0 : focusable.length - 1]!.focus();
         }
       }
     };

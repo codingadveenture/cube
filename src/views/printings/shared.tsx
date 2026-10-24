@@ -12,6 +12,7 @@ import {
   type CycleStatus,
 } from '../../printings/cycles';
 import { useManyPrintings } from '../../printings/load';
+import type { CycleAcks } from '../../store/types';
 import type { IndexPrinting } from '../../printings/types';
 
 export interface CycleAnalysis {
@@ -30,6 +31,14 @@ export interface CycleAnalysis {
  */
 export function useCycleAnalysis(cards: Card[], cycles: readonly string[], load = true) {
   const acks = useCycleAcks();
+  return useCycleAnalysisWith(cards, cycles, acks.data, load);
+}
+
+/**
+ * useCycleAnalysis with the accepted splits passed in, so a list of Cycles reads them through one
+ * listener in its parent instead of one per item.
+ */
+export function useCycleAnalysisWith(cards: Card[], cycles: readonly string[], acks: CycleAcks, load = true) {
   const byCycle = useMemo(() => cycles.map((c) => ({ name: c, members: cycleMembers(cards, c) })), [cards, cycles]);
   const ids = useMemo(() => (load ? byCycle.flatMap((c) => c.members.map((m) => m.oracle_id)) : []), [byCycle, load]);
   const many = useManyPrintings(ids);
@@ -37,10 +46,10 @@ export function useCycleAnalysis(cards: Card[], cycles: readonly string[], load 
     () =>
       byCycle.map(({ name, members }) => {
         const status = cycleStatus(members.map((m) => memberRun(m, many.files.get(m.oracle_id))));
-        const ack = acks.data.ack[name];
+        const ack = acks.ack[name];
         return { name, label: humanizeCycle(name), members, status, shown: displayStatus(status, ack), ack };
       }),
-    [byCycle, many.files, acks.data],
+    [byCycle, many.files, acks],
   );
   return { analyses, files: many.files, loading: many.loading || !load, errors: many.errors };
 }

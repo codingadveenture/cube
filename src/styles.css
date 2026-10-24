@@ -1214,7 +1214,13 @@ details[open] > summary::before {
   transform: rotate(45deg);
 }
 @media (prefers-reduced-motion: reduce) {
-  details > summary::before {
+  /* The same selectors as the transition rule above, so this override wins on specificity and order. */
+  details > summary::before,
+  details.panel > summary::before,
+  .token-body details summary::before,
+  .print details > summary::before,
+  .retired > summary::before,
+  .upstream details > summary::before {
     transition: none;
   }
 }

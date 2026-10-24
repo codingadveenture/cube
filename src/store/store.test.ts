@@ -7,7 +7,7 @@ import { diffScan } from '../scan/diff';
 import { expectedCards } from '../scan/expected';
 import { mergedRows } from '../scan/session';
 import { applySuggestion, ApplyError } from './apply';
-import { BATCH_LIMIT, baselineCubeDoc, baselineDocs, cardStateOf, chunk, mergeCard, mergeCards, withoutExisting } from './baseline';
+import { BATCH_LIMIT, baselineCubeDoc, baselineDocs, cardStateOf, chunk, mergeCard, mergeCards, shouldStampBaseline, withoutExisting } from './baseline';
 import { newLogEntries, parseLogFile, sortLog } from './logImport';
 import { isOwnerUid, nextOwnerState, ownerFromDoc } from './owner';
 import { addsText, bansText, cubecobraPasteText } from './paste';
@@ -293,10 +293,24 @@ describe('Owner state from snapshots', () => {
 
 describe('baseline import', () => {
   it('records baselineImportedAt on the first import only', () => {
-    expect(baselineCubeDoc(NOW, 0).baselineImportedAt).toBe(NOW);
-    const topUp = baselineCubeDoc(NOW, 12);
+    expect(baselineCubeDoc(NOW, true).baselineImportedAt).toBe(NOW);
+    const topUp = baselineCubeDoc(NOW, false);
     expect('baselineImportedAt' in topUp).toBe(false);
     expect(topUp.updatedAt).toBe(NOW);
+  });
+
+  it('stamps baselineImportedAt when the server has no card docs or cubes/main lacks it', () => {
+    // No card docs yet: a first import.
+    expect(shouldStampBaseline(0, undefined)).toBe(true);
+    expect(shouldStampBaseline(0, { baselineImportedAt: '2026-01-01T00:00:00Z' })).toBe(true);
+    // Card docs exist, but cubes/main is missing or lacks the field.
+    expect(shouldStampBaseline(12, undefined)).toBe(true);
+    expect(shouldStampBaseline(12, null)).toBe(true);
+    expect(shouldStampBaseline(12, { name: 'Vintage Cube' })).toBe(true);
+    expect(shouldStampBaseline(12, { baselineImportedAt: null })).toBe(true);
+    expect(shouldStampBaseline(12, { baselineImportedAt: '' })).toBe(true);
+    // A top-up import leaves a stored time alone.
+    expect(shouldStampBaseline(12, { baselineImportedAt: '2026-01-01T00:00:00Z' })).toBe(false);
   });
 
   it('chunks into batches of at most 400', () => {
