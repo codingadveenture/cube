@@ -1,0 +1,7 @@
+{
+ "name": "Headliner Scarlett",
+ "oracle_id": "f5420901-b5e6-4d54-b3e8-5f45e37f1fab",
+ "printings": [
+  {"id":"be77b98a-dd79-477c-8ab2-7ebf5637a89e","set":"clu","set_name":"Ravnica: Clue Edition","set_type":"draft_innovation","collector_number":"4","released_at":"2024-02-23","frame":"2015","frame_effects":["legendary","inverted"],"border_color":"borderless","full_art":false,"textless":false,"promo":false,"promo_types":["universesbeyond"],"finishes":["nonfoil"],"highres":true,"illustration_id":"78e60fbd-fcd3-4a3f-8de2-480cc4431f09","artist":"Heonhwa","image_normal":"https://cards.scryfall.io/normal/front/b/e/be77b98a-dd79-477c-8ab2-7ebf5637a89e.jpg?1783912584","back_image_normal":null,"back_illustration_id":null,"security_stamp":"triangle","reprint":false,"variation":false,"booster":false,"digital":false}
+ ]
+}

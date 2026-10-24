@@ -1,0 +1,8 @@
+{
+ "name": "Jacked Rabbit",
+ "oracle_id": "5a343a5f-3f9b-43c3-8532-8391de7a5443",
+ "printings": [
+  {"id":"e732176f-faff-4b0e-9a4a-12d6b011be82","set":"blc","set_name":"Bloomburrow Commander","set_type":"commander","collector_number":"45","released_at":"2024-08-02","frame":"2015","frame_effects":["extendedart"],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":["boosterfun"],"finishes":["nonfoil"],"highres":true,"illustration_id":"e19616c0-3810-45e4-a85f-28efeea19167","artist":"Scott Murphy","image_normal":"https://cards.scryfall.io/normal/front/e/7/e732176f-faff-4b0e-9a4a-12d6b011be82.jpg?1783910723","back_image_normal":null,"back_illustration_id":null,"security_stamp":"oval","reprint":false,"variation":false,"booster":false,"digital":false},
+  {"id":"2c695df6-6bf2-4e6b-8500-e3116137ca27","set":"blc","set_name":"Bloomburrow Commander","set_type":"commander","collector_number":"9","released_at":"2024-08-02","frame":"2015","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil"],"highres":true,"illustration_id":"e19616c0-3810-45e4-a85f-28efeea19167","artist":"Scott Murphy","image_normal":"https://cards.scryfall.io/normal/front/2/c/2c695df6-6bf2-4e6b-8500-e3116137ca27.jpg?1783910736","back_image_normal":null,"back_illustration_id":null,"security_stamp":"oval","reprint":false,"variation":false,"booster":false,"digital":false}
+ ]
+}

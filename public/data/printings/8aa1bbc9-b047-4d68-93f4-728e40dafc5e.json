@@ -1,0 +1,8 @@
+{
+ "name": "Kitesail Freebooter",
+ "oracle_id": "8aa1bbc9-b047-4d68-93f4-728e40dafc5e",
+ "printings": [
+  {"id":"88496096-fd9a-451a-85d9-31ccc3580623","set":"m21","set_name":"Core Set 2021","set_type":"core","collector_number":"107","released_at":"2020-07-03","frame":"2015","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"a3ab9d96-e08e-4822-9e54-576fe97fddce","artist":"Dan Murayama Scott","image_normal":"https://cards.scryfall.io/normal/front/8/8/88496096-fd9a-451a-85d9-31ccc3580623.jpg?1783930706","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":true,"variation":false,"booster":true,"digital":false},
+  {"id":"f62fd592-4910-417d-a500-e7029f3d119f","set":"xln","set_name":"Ixalan","set_type":"expansion","collector_number":"110","released_at":"2017-09-29","frame":"2015","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"a3ab9d96-e08e-4822-9e54-576fe97fddce","artist":"Dan Murayama Scott","image_normal":"https://cards.scryfall.io/normal/front/f/6/f62fd592-4910-417d-a500-e7029f3d119f.jpg?1783935759","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":false,"variation":false,"booster":true,"digital":false}
+ ]
+}

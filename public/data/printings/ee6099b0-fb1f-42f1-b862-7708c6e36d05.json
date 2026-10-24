@@ -1,0 +1,7 @@
+{
+ "name": "Lion's Eye Diamond",
+ "oracle_id": "ee6099b0-fb1f-42f1-b862-7708c6e36d05",
+ "printings": [
+  {"id":"63bacc32-d6ba-420c-9b49-299c08e5fb39","set":"mir","set_name":"Mirage","set_type":"expansion","collector_number":"307","released_at":"1996-10-08","frame":"1997","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil"],"highres":true,"illustration_id":"ad8c632d-2155-4fec-bdef-109e260eaf40","artist":"Margaret Organ-Kean","image_normal":"https://cards.scryfall.io/normal/front/6/3/63bacc32-d6ba-420c-9b49-299c08e5fb39.jpg?1783947041","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":false,"variation":false,"booster":true,"digital":false}
+ ]
+}

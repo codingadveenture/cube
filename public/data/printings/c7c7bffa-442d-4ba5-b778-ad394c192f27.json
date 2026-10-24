@@ -1,0 +1,7 @@
+{
+ "name": "Candelabra of Tawnos",
+ "oracle_id": "c7c7bffa-442d-4ba5-b778-ad394c192f27",
+ "printings": [
+  {"id":"35a335bf-7358-460f-b7c9-1e8bc4300f64","set":"atq","set_name":"Antiquities","set_type":"expansion","collector_number":"43","released_at":"1994-03-04","frame":"1993","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil"],"highres":true,"illustration_id":"3bd842cd-1faa-4085-b975-df367f87e671","artist":"Douglas Shuler","image_normal":"https://cards.scryfall.io/normal/front/3/5/35a335bf-7358-460f-b7c9-1e8bc4300f64.jpg?1783948364","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":false,"variation":false,"booster":true,"digital":false}
+ ]
+}

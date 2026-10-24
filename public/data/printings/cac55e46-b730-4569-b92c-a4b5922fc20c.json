@@ -1,0 +1,7 @@
+{
+ "name": "Time Spiral",
+ "oracle_id": "cac55e46-b730-4569-b92c-a4b5922fc20c",
+ "printings": [
+  {"id":"f3d62dbd-63db-4ac9-950f-9852627f23f2","set":"usg","set_name":"Urza's Saga","set_type":"expansion","collector_number":"103","released_at":"1998-10-12","frame":"1997","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil"],"highres":true,"illustration_id":"d8dc9bd3-3e5d-43d7-b003-34d96d351462","artist":"Michael Sutfin","image_normal":"https://cards.scryfall.io/normal/front/f/3/f3d62dbd-63db-4ac9-950f-9852627f23f2.jpg?1783946354","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":false,"variation":false,"booster":true,"digital":false}
+ ]
+}

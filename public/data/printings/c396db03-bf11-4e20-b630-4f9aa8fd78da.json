@@ -1,0 +1,8 @@
+{
+ "name": "The Mightstone and Weakstone",
+ "oracle_id": "c396db03-bf11-4e20-b630-4f9aa8fd78da",
+ "printings": [
+  {"id":"bc8cfad0-78e8-4a8b-b8cb-cd4a5eeade24","set":"pbro","set_name":"The Brothers' War Promos","set_type":"promo","collector_number":"238s","released_at":"2022-11-18","frame":"2015","frame_effects":["legendary"],"border_color":"black","full_art":false,"textless":false,"promo":true,"promo_types":["prerelease","datestamped"],"finishes":["foil"],"highres":true,"illustration_id":"f8e05098-615d-4720-b674-d3323fd23118","artist":"Ryan Pancoast","image_normal":"https://cards.scryfall.io/normal/front/b/c/bc8cfad0-78e8-4a8b-b8cb-cd4a5eeade24.jpg?1783919813","back_image_normal":null,"back_illustration_id":null,"security_stamp":"oval","reprint":true,"variation":false,"booster":false,"digital":false},
+  {"id":"02aea379-b444-46a3-82f4-3038f698d4f4","set":"bro","set_name":"The Brothers' War","set_type":"expansion","collector_number":"238","released_at":"2022-11-18","frame":"2015","frame_effects":["legendary"],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"f8e05098-615d-4720-b674-d3323fd23118","artist":"Ryan Pancoast","image_normal":"https://cards.scryfall.io/normal/front/0/2/02aea379-b444-46a3-82f4-3038f698d4f4.jpg?1783920017","back_image_normal":null,"back_illustration_id":null,"security_stamp":"oval","reprint":false,"variation":false,"booster":true,"digital":false}
+ ]
+}

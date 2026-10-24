@@ -1,0 +1,8 @@
+{
+ "name": "Cryogen Relic",
+ "oracle_id": "106e9c0d-67a2-4db7-97d9-03e1ea1b40b5",
+ "printings": [
+  {"id":"5f2e681d-348d-4112-9510-cf92966522b9","set":"plst","set_name":"The List","set_type":"masters","collector_number":"EOE-52","released_at":"2026-10-19","frame":"2015","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil"],"highres":true,"illustration_id":"6d4cfab0-8dfd-462c-962a-68cbd8b4c842","artist":"Eelis Kyttanen","image_normal":"https://cards.scryfall.io/normal/front/5/f/5f2e681d-348d-4112-9510-cf92966522b9.jpg?1787680513","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":true,"variation":false,"booster":true,"digital":false},
+  {"id":"7bfb33b6-e2bf-498f-8c58-ae21a840cf75","set":"eoe","set_name":"Edge of Eternities","set_type":"expansion","collector_number":"52","released_at":"2025-08-01","frame":"2015","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"6d4cfab0-8dfd-462c-962a-68cbd8b4c842","artist":"Eelis Kyttanen","image_normal":"https://cards.scryfall.io/normal/front/7/b/7bfb33b6-e2bf-498f-8c58-ae21a840cf75.jpg?1783905984","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":false,"variation":false,"booster":true,"digital":false}
+ ]
+}

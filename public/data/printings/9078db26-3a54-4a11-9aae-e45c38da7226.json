@@ -1,0 +1,8 @@
+{
+ "name": "Miscalculation",
+ "oracle_id": "9078db26-3a54-4a11-9aae-e45c38da7226",
+ "printings": [
+  {"id":"b332dda4-04d4-43da-83d4-c50484bcdcff","set":"plst","set_name":"The List","set_type":"masters","collector_number":"ULG-36","released_at":"2024-08-02","frame":"1997","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil"],"highres":true,"illustration_id":"ae0dfde5-7b10-405e-8851-1860fcfac893","artist":"Jeff Laubenstein","image_normal":"https://cards.scryfall.io/normal/front/b/3/b332dda4-04d4-43da-83d4-c50484bcdcff.jpg?1783910387","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":true,"variation":false,"booster":true,"digital":false},
+  {"id":"4b4956a2-9a39-4152-9c98-70e4b2acfa26","set":"ulg","set_name":"Urza's Legacy","set_type":"expansion","collector_number":"36","released_at":"1999-02-15","frame":"1997","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"ae0dfde5-7b10-405e-8851-1860fcfac893","artist":"Jeff Laubenstein","image_normal":"https://cards.scryfall.io/normal/front/4/b/4b4956a2-9a39-4152-9c98-70e4b2acfa26.jpg?1783946245","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":false,"variation":false,"booster":true,"digital":false}
+ ]
+}

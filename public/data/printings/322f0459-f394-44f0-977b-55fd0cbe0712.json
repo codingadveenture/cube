@@ -1,0 +1,8 @@
+{
+ "name": "Yawgmoth's Will",
+ "oracle_id": "322f0459-f394-44f0-977b-55fd0cbe0712",
+ "printings": [
+  {"id":"75d4f6fc-c5cd-416c-aafd-19c2f2c0cd51","set":"g07","set_name":"Judge Gift Cards 2007","set_type":"promo","collector_number":"3","released_at":"2007-01-01","frame":"2003","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":true,"promo_types":["judgegift"],"finishes":["foil"],"highres":true,"illustration_id":"1eb67adf-187c-47e5-9fac-8db33729aaae","artist":"Ron Spencer","image_normal":"https://cards.scryfall.io/normal/front/7/5/75d4f6fc-c5cd-416c-aafd-19c2f2c0cd51.jpg?1783943176","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":true,"variation":false,"booster":false,"digital":false},
+  {"id":"6d3e3c3a-d351-4d91-8884-312d4b6f540d","set":"usg","set_name":"Urza's Saga","set_type":"expansion","collector_number":"171","released_at":"1998-10-12","frame":"1997","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil"],"highres":true,"illustration_id":"1eb67adf-187c-47e5-9fac-8db33729aaae","artist":"Ron Spencer","image_normal":"https://cards.scryfall.io/normal/front/6/d/6d3e3c3a-d351-4d91-8884-312d4b6f540d.jpg?1783946334","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":false,"variation":false,"booster":true,"digital":false}
+ ]
+}

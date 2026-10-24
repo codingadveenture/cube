@@ -1,0 +1,8 @@
+{
+ "name": "Baloth Prime",
+ "oracle_id": "dba3dcc1-2177-4a8c-8cf3-7d4fb83c7a16",
+ "printings": [
+  {"id":"9ea5a4f4-14d0-4da4-9cd0-0b3188307302","set":"eoc","set_name":"Edge of Eternities Commander","set_type":"commander","collector_number":"33","released_at":"2025-08-01","frame":"2015","frame_effects":["extendedart"],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":["boosterfun"],"finishes":["nonfoil"],"highres":true,"illustration_id":"fc197835-889b-4e1a-972e-6f14cdd3cf99","artist":"Joshua Raphael","image_normal":"https://cards.scryfall.io/normal/front/9/e/9ea5a4f4-14d0-4da4-9cd0-0b3188307302.jpg?1783906057","back_image_normal":null,"back_illustration_id":null,"security_stamp":"oval","reprint":false,"variation":false,"booster":false,"digital":false},
+  {"id":"2c723fc9-d5c9-4126-a9a6-f80c247a4b6b","set":"eoc","set_name":"Edge of Eternities Commander","set_type":"commander","collector_number":"13","released_at":"2025-08-01","frame":"2015","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil"],"highres":true,"illustration_id":"fc197835-889b-4e1a-972e-6f14cdd3cf99","artist":"Joshua Raphael","image_normal":"https://cards.scryfall.io/normal/front/2/c/2c723fc9-d5c9-4126-a9a6-f80c247a4b6b.jpg?1783906064","back_image_normal":null,"back_illustration_id":null,"security_stamp":"oval","reprint":false,"variation":false,"booster":false,"digital":false}
+ ]
+}

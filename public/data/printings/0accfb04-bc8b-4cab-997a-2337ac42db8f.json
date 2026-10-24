@@ -1,0 +1,8 @@
+{
+ "name": "Parallax Wave",
+ "oracle_id": "0accfb04-bc8b-4cab-997a-2337ac42db8f",
+ "printings": [
+  {"id":"90538019-58eb-4b4f-b2a5-4650e5b6ec84","set":"plst","set_name":"The List","set_type":"masters","collector_number":"NEM-17","released_at":"2020-09-01","frame":"1997","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil"],"highres":true,"illustration_id":"fb552595-ca42-4b93-9a07-395e0b674a6f","artist":"Greg Staples","image_normal":"https://cards.scryfall.io/normal/front/9/0/90538019-58eb-4b4f-b2a5-4650e5b6ec84.jpg?1783929733","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":true,"variation":false,"booster":true,"digital":false},
+  {"id":"cef789e8-e4cc-4f61-bc15-debc2487777f","set":"nem","set_name":"Nemesis","set_type":"expansion","collector_number":"17","released_at":"2000-02-14","frame":"1997","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"fb552595-ca42-4b93-9a07-395e0b674a6f","artist":"Greg Staples","image_normal":"https://cards.scryfall.io/normal/front/c/e/cef789e8-e4cc-4f61-bc15-debc2487777f.jpg?1783945841","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":false,"variation":false,"booster":true,"digital":false}
+ ]
+}

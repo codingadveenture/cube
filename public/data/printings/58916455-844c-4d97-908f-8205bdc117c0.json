@@ -1,0 +1,8 @@
+{
+ "name": "Exorcise",
+ "oracle_id": "58916455-844c-4d97-908f-8205bdc117c0",
+ "printings": [
+  {"id":"be5b4b1d-fd4e-4783-9393-85e08d9ae0df","set":"fdc","set_name":"Foundations Commander","set_type":"commander","collector_number":"29","released_at":"2026-10-02","frame":"2015","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil"],"highres":true,"illustration_id":"dcbe92c4-97ac-4f96-a0b9-e9fc76d2ee8b","artist":"Dominik Mayer","image_normal":"https://cards.scryfall.io/normal/front/b/e/be5b4b1d-fd4e-4783-9393-85e08d9ae0df.jpg?1789752834","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":true,"variation":false,"booster":false,"digital":false},
+  {"id":"f49006f2-a097-417d-8eb0-b8016ff2e0d5","set":"dsk","set_name":"Duskmourn: House of Horror","set_type":"expansion","collector_number":"8","released_at":"2024-09-27","frame":"2015","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"dcbe92c4-97ac-4f96-a0b9-e9fc76d2ee8b","artist":"Dominik Mayer","image_normal":"https://cards.scryfall.io/normal/front/f/4/f49006f2-a097-417d-8eb0-b8016ff2e0d5.jpg?1783909509","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":false,"variation":false,"booster":true,"digital":false}
+ ]
+}

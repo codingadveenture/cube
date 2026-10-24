@@ -1,0 +1,8 @@
+{
+ "name": "Bloodbraid Challenger",
+ "oracle_id": "6e111622-c7cc-49cf-83e8-3555e06518c1",
+ "printings": [
+  {"id":"fbca967e-578f-4b05-b697-2e2ee1a40dfb","set":"m3c","set_name":"Modern Horizons 3 Commander","set_type":"commander","collector_number":"122","released_at":"2024-06-14","frame":"2015","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil"],"highres":true,"illustration_id":"97faebfc-bcc1-474c-9100-017d907cc360","artist":"Lie Setiawan","image_normal":"https://cards.scryfall.io/normal/front/f/b/fbca967e-578f-4b05-b697-2e2ee1a40dfb.jpg?1783911405","back_image_normal":null,"back_illustration_id":null,"security_stamp":"oval","reprint":false,"variation":false,"booster":false,"digital":false},
+  {"id":"4b39d43d-2a02-4edb-915a-6a7c002c945f","set":"m3c","set_name":"Modern Horizons 3 Commander","set_type":"commander","collector_number":"70","released_at":"2024-06-14","frame":"2015","frame_effects":["extendedart"],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":["ripplefoil","boosterfun"],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"97faebfc-bcc1-474c-9100-017d907cc360","artist":"Lie Setiawan","image_normal":"https://cards.scryfall.io/normal/front/4/b/4b39d43d-2a02-4edb-915a-6a7c002c945f.jpg?1783911418","back_image_normal":null,"back_illustration_id":null,"security_stamp":"oval","reprint":false,"variation":false,"booster":false,"digital":false}
+ ]
+}

@@ -1,0 +1,8 @@
+{
+ "name": "Starting Town",
+ "oracle_id": "d04e0975-f401-41b8-a9db-9bcf9cbbce66",
+ "printings": [
+  {"id":"7cf8d52a-d503-4285-a909-380c3c619f91","set":"pfin","set_name":"Final Fantasy Promos","set_type":"promo","collector_number":"289s","released_at":"2025-06-13","frame":"2015","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":true,"promo_types":["prerelease","datestamped","universesbeyond"],"finishes":["foil"],"highres":true,"illustration_id":"941ee9be-1a71-465f-b9d2-721cda486188","artist":"Hristo D. Chukov","image_normal":"https://cards.scryfall.io/normal/front/7/c/7cf8d52a-d503-4285-a909-380c3c619f91.jpg?1783906146","back_image_normal":null,"back_illustration_id":null,"security_stamp":"triangle","reprint":true,"variation":false,"booster":false,"digital":false},
+  {"id":"fc7d1912-7e27-49ef-bd98-375d975a42b0","set":"fin","set_name":"Final Fantasy","set_type":"expansion","collector_number":"289","released_at":"2025-06-13","frame":"2015","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":["ffi","universesbeyond"],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"941ee9be-1a71-465f-b9d2-721cda486188","artist":"Hristo D. Chukov","image_normal":"https://cards.scryfall.io/normal/front/f/c/fc7d1912-7e27-49ef-bd98-375d975a42b0.jpg?1783906546","back_image_normal":null,"back_illustration_id":null,"security_stamp":"triangle","reprint":false,"variation":false,"booster":true,"digital":false}
+ ]
+}

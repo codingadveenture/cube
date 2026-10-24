@@ -1,0 +1,8 @@
+{
+ "name": "Emberwilde Captain",
+ "oracle_id": "4f4ec0fa-fcaf-4dc2-9c67-ee7881f5f77d",
+ "printings": [
+  {"id":"db9b1282-01fd-48a0-929f-356f6d7e201e","set":"cmr","set_name":"Commander Legends","set_type":"draft_innovation","collector_number":"664","released_at":"2020-11-20","frame":"2015","frame_effects":["extendedart"],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":["boosterfun"],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"767f5d55-50ef-4011-8b22-97a4a9bcaa43","artist":"Tyler Walpole","image_normal":"https://cards.scryfall.io/normal/front/d/b/db9b1282-01fd-48a0-929f-356f6d7e201e.jpg?1783928611","back_image_normal":null,"back_illustration_id":null,"security_stamp":"oval","reprint":false,"variation":false,"booster":false,"digital":false},
+  {"id":"362850cd-d33c-4f61-9b3a-5de748adee7c","set":"cmr","set_name":"Commander Legends","set_type":"draft_innovation","collector_number":"175","released_at":"2020-11-20","frame":"2015","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"767f5d55-50ef-4011-8b22-97a4a9bcaa43","artist":"Tyler Walpole","image_normal":"https://cards.scryfall.io/normal/front/3/6/362850cd-d33c-4f61-9b3a-5de748adee7c.jpg?1783928816","back_image_normal":null,"back_illustration_id":null,"security_stamp":"oval","reprint":false,"variation":false,"booster":true,"digital":false}
+ ]
+}

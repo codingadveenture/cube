@@ -1,0 +1,8 @@
+{
+ "name": "Nishoba Brawler",
+ "oracle_id": "c501e577-5137-4dd6-b923-95408b78258a",
+ "printings": [
+  {"id":"49ed86e0-91d9-4ba3-8fd4-0f27d3095412","set":"dmu","set_name":"Dominaria United","set_type":"expansion","collector_number":"434","released_at":"2022-09-09","frame":"2015","frame_effects":["inverted"],"border_color":"black","full_art":false,"textless":false,"promo":true,"promo_types":["promopack"],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"d839abaf-47dd-4776-81c6-8deef57eeef5","artist":"Valera Lutfullina","image_normal":"https://cards.scryfall.io/normal/front/4/9/49ed86e0-91d9-4ba3-8fd4-0f27d3095412.jpg?1783921174","back_image_normal":null,"back_illustration_id":null,"security_stamp":"oval","reprint":false,"variation":false,"booster":false,"digital":false},
+  {"id":"2ef6cb5f-0ab3-4652-9b39-c2cbf6d693d5","set":"dmu","set_name":"Dominaria United","set_type":"expansion","collector_number":"174","released_at":"2022-09-09","frame":"2015","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"d839abaf-47dd-4776-81c6-8deef57eeef5","artist":"Valera Lutfullina","image_normal":"https://cards.scryfall.io/normal/front/2/e/2ef6cb5f-0ab3-4652-9b39-c2cbf6d693d5.jpg?1783921297","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":false,"variation":false,"booster":true,"digital":false}
+ ]
+}

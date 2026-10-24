@@ -1,0 +1,7 @@
+{
+ "name": "Heritage Reclamation",
+ "oracle_id": "09955b4b-6052-4c27-8b63-9548482b3c5c",
+ "printings": [
+  {"id":"4f8fee37-a050-4329-8b10-46d150e7a95e","set":"tdm","set_name":"Tarkir: Dragonstorm","set_type":"expansion","collector_number":"145","released_at":"2025-04-11","frame":"2015","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil","foil"],"highres":false,"illustration_id":"89770bbb-a22f-4224-9b10-07422a8290ca","artist":"Konstantin Porubov","image_normal":"https://cards.scryfall.io/normal/front/4/f/4f8fee37-a050-4329-8b10-46d150e7a95e.jpg?1783907340","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":false,"variation":false,"booster":true,"digital":false}
+ ]
+}

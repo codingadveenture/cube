@@ -1,0 +1,7 @@
+{
+ "name": "Seam Rip",
+ "oracle_id": "dfd5939e-a71a-4e16-9b93-752162be4ccd",
+ "printings": [
+  {"id":"9d298847-2d02-4593-b4d3-c5b722edac1e","set":"eoe","set_name":"Edge of Eternities","set_type":"expansion","collector_number":"34","released_at":"2025-08-01","frame":"2015","frame_effects":["enchantment"],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"5c7a26dd-e469-4a03-af98-45eafdd09848","artist":"Sam Guay","image_normal":"https://cards.scryfall.io/normal/front/9/d/9d298847-2d02-4593-b4d3-c5b722edac1e.jpg?1783905989","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":false,"variation":false,"booster":true,"digital":false}
+ ]
+}

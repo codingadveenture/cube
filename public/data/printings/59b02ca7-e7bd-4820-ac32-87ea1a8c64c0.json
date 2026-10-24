@@ -1,0 +1,7 @@
+{
+ "name": "Corpse Dance",
+ "oracle_id": "59b02ca7-e7bd-4820-ac32-87ea1a8c64c0",
+ "printings": [
+  {"id":"76ae81ea-13e3-4ab8-b956-4c7b139a5e9c","set":"tmp","set_name":"Tempest","set_type":"expansion","collector_number":"116","released_at":"1997-10-14","frame":"1997","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil"],"highres":true,"illustration_id":"45d27b1b-9d3b-4309-b0f6-7ae9434554fe","artist":"Brian Snõddy","image_normal":"https://cards.scryfall.io/normal/front/7/6/76ae81ea-13e3-4ab8-b956-4c7b139a5e9c.jpg?1783946643","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":false,"variation":false,"booster":true,"digital":false}
+ ]
+}

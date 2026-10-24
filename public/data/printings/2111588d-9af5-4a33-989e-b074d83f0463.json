@@ -1,0 +1,7 @@
+{
+ "name": "Library of Alexandria",
+ "oracle_id": "2111588d-9af5-4a33-989e-b074d83f0463",
+ "printings": [
+  {"id":"ee266113-34ce-4189-84e7-ee2c86a2722c","set":"arn","set_name":"Arabian Nights","set_type":"expansion","collector_number":"76","released_at":"1993-12-17","frame":"1993","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil"],"highres":true,"illustration_id":"337f3eae-b39b-4902-8f15-beb7b819a23b","artist":"Mark Poole","image_normal":"https://cards.scryfall.io/normal/front/e/e/ee266113-34ce-4189-84e7-ee2c86a2722c.jpg?1783948374","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":false,"variation":false,"booster":true,"digital":false}
+ ]
+}

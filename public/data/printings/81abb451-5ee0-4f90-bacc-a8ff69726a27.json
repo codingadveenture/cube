@@ -1,0 +1,8 @@
+{
+ "name": "Death-Greeter's Champion",
+ "oracle_id": "81abb451-5ee0-4f90-bacc-a8ff69726a27",
+ "printings": [
+  {"id":"b0dbcce3-d914-4e07-95a6-27a6b675ca38","set":"moc","set_name":"March of the Machine Commander","set_type":"commander","collector_number":"117","released_at":"2023-04-21","frame":"2015","frame_effects":["extendedart"],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":["boosterfun"],"finishes":["nonfoil"],"highres":true,"illustration_id":"f3d684e5-969f-4f60-904d-b6817da8b819","artist":"Jason Rainville","image_normal":"https://cards.scryfall.io/normal/front/b/0/b0dbcce3-d914-4e07-95a6-27a6b675ca38.jpg?1783917232","back_image_normal":null,"back_illustration_id":null,"security_stamp":"oval","reprint":false,"variation":false,"booster":false,"digital":false},
+  {"id":"7cb2b582-1c45-4bb2-8aef-59a71a5a9e94","set":"moc","set_name":"March of the Machine Commander","set_type":"commander","collector_number":"30","released_at":"2023-04-21","frame":"2015","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil"],"highres":true,"illustration_id":"f3d684e5-969f-4f60-904d-b6817da8b819","artist":"Jason Rainville","image_normal":"https://cards.scryfall.io/normal/front/7/c/7cb2b582-1c45-4bb2-8aef-59a71a5a9e94.jpg?1783917284","back_image_normal":null,"back_illustration_id":null,"security_stamp":"oval","reprint":false,"variation":false,"booster":false,"digital":false}
+ ]
+}

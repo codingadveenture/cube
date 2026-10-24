@@ -1,0 +1,8 @@
+{
+ "name": "Hexdrinker",
+ "oracle_id": "69bc2afd-9f53-47f2-b9c8-f12732784e10",
+ "printings": [
+  {"id":"b71c2044-328a-4e29-8b3a-0eeb75fee2bf","set":"sld","set_name":"Secret Lair Drop","set_type":"box","collector_number":"1222","released_at":"2023-04-14","frame":"2015","frame_effects":["inverted"],"border_color":"borderless","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"0f11aa53-f71c-47a2-9087-2097f63a5a9e","artist":"Boneface","image_normal":"https://cards.scryfall.io/normal/front/b/7/b71c2044-328a-4e29-8b3a-0eeb75fee2bf.jpg?1783917373","back_image_normal":null,"back_illustration_id":null,"security_stamp":"oval","reprint":true,"variation":false,"booster":false,"digital":false},
+  {"id":"89f5cc05-5d9d-4709-b3c5-a6249c294acc","set":"mh1","set_name":"Modern Horizons","set_type":"draft_innovation","collector_number":"168","released_at":"2019-06-14","frame":"2015","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"c258b198-dedd-4db8-846e-8bf0b339520d","artist":"Forrest Imel","image_normal":"https://cards.scryfall.io/normal/front/8/9/89f5cc05-5d9d-4709-b3c5-a6249c294acc.jpg?1783933097","back_image_normal":null,"back_illustration_id":null,"security_stamp":"oval","reprint":false,"variation":false,"booster":true,"digital":false}
+ ]
+}

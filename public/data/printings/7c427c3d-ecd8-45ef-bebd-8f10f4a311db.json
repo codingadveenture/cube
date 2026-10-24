@@ -1,0 +1,8 @@
+{
+ "name": "Gaea's Cradle",
+ "oracle_id": "7c427c3d-ecd8-45ef-bebd-8f10f4a311db",
+ "printings": [
+  {"id":"25b0b816-0583-44aa-9dc5-f3ff48993a51","set":"usg","set_name":"Urza's Saga","set_type":"expansion","collector_number":"321","released_at":"1998-10-12","frame":"1997","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil"],"highres":true,"illustration_id":"9f670261-15a3-4f13-a0f2-5a29982585e9","artist":"Mark Zug","image_normal":"https://cards.scryfall.io/normal/front/2/5/25b0b816-0583-44aa-9dc5-f3ff48993a51.jpg?1783946299","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":false,"variation":false,"booster":true,"digital":false},
+  {"id":"9a3cccac-c826-41ad-b595-4d53db1ab8fa","set":"jgp","set_name":"Judge Gift Cards 1998","set_type":"promo","collector_number":"3","released_at":"1998-01-01","frame":"1997","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":true,"promo_types":["judgegift"],"finishes":["foil"],"highres":true,"illustration_id":"9f670261-15a3-4f13-a0f2-5a29982585e9","artist":"Mark Zug","image_normal":"https://cards.scryfall.io/normal/front/9/a/9a3cccac-c826-41ad-b595-4d53db1ab8fa.jpg?1783946579","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":true,"variation":false,"booster":false,"digital":false}
+ ]
+}

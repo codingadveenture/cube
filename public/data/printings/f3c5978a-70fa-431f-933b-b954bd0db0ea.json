@@ -1,0 +1,8 @@
+{
+ "name": "Mox Diamond",
+ "oracle_id": "f3c5978a-70fa-431f-933b-b954bd0db0ea",
+ "printings": [
+  {"id":"fadb218d-29e2-42d1-a7a1-1066741d63ad","set":"v10","set_name":"From the Vault: Relics","set_type":"from_the_vault","collector_number":"10","released_at":"2010-08-27","frame":"2003","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["foil"],"highres":true,"illustration_id":"eefbb064-70d8-40fc-b2c5-aecaf2b9510e","artist":"Volkan Baǵa","image_normal":"https://cards.scryfall.io/normal/front/f/a/fadb218d-29e2-42d1-a7a1-1066741d63ad.jpg?1783941773","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":true,"variation":false,"booster":false,"digital":false},
+  {"id":"28028830-83ed-45e2-b495-3b9ad9d3e988","set":"sth","set_name":"Stronghold","set_type":"expansion","collector_number":"138","released_at":"1998-03-02","frame":"1997","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil"],"highres":true,"illustration_id":"dab17c89-7efb-48b9-b7e3-dc57f2e65622","artist":"Dan Frazier","image_normal":"https://cards.scryfall.io/normal/front/2/8/28028830-83ed-45e2-b495-3b9ad9d3e988.jpg?1783946538","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":false,"variation":false,"booster":true,"digital":false}
+ ]
+}

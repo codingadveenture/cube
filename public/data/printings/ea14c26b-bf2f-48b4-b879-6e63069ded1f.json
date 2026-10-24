@@ -1,0 +1,8 @@
+{
+ "name": "Chain of Smog",
+ "oracle_id": "ea14c26b-bf2f-48b4-b879-6e63069ded1f",
+ "printings": [
+  {"id":"a56d9468-9d33-48e3-b41c-942653669b1a","set":"plst","set_name":"The List","set_type":"masters","collector_number":"ONS-132","released_at":"2022-09-09","frame":"1997","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil"],"highres":true,"illustration_id":"ad9a119c-3247-43be-a994-e09dd987c489","artist":"Greg Staples","image_normal":"https://cards.scryfall.io/normal/front/a/5/a56d9468-9d33-48e3-b41c-942653669b1a.jpg?1783921151","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":true,"variation":false,"booster":true,"digital":false},
+  {"id":"6bfe64f9-8b03-41f6-a47b-fade397ad9d1","set":"ons","set_name":"Onslaught","set_type":"expansion","collector_number":"132","released_at":"2002-10-07","frame":"1997","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"ad9a119c-3247-43be-a994-e09dd987c489","artist":"Greg Staples","image_normal":"https://cards.scryfall.io/normal/front/6/b/6bfe64f9-8b03-41f6-a47b-fade397ad9d1.jpg?1783945072","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":false,"variation":false,"booster":true,"digital":false}
+ ]
+}

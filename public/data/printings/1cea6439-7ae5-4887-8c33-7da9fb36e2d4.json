@@ -1,0 +1,7 @@
+{
+ "name": "Lose Focus",
+ "oracle_id": "1cea6439-7ae5-4887-8c33-7da9fb36e2d4",
+ "printings": [
+  {"id":"985bdb0c-ce6c-4506-8163-76f3b2fdf5fb","set":"mh2","set_name":"Modern Horizons 2","set_type":"draft_innovation","collector_number":"49","released_at":"2021-06-18","frame":"2015","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"817f4da1-8433-4117-8234-a2b42e3de042","artist":"Martina Fačková","image_normal":"https://cards.scryfall.io/normal/front/9/8/985bdb0c-ce6c-4506-8163-76f3b2fdf5fb.jpg?1792506017","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":false,"variation":false,"booster":true,"digital":false}
+ ]
+}

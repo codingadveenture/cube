@@ -1,0 +1,8 @@
+{
+ "name": "Nurturing Peatland",
+ "oracle_id": "8ed932ff-986c-4592-ad70-53b3fac80d69",
+ "printings": [
+  {"id":"ab4b80c5-fe04-4e5e-9637-b745c2c8956b","set":"acr","set_name":"Assassin's Creed","set_type":"draft_innovation","collector_number":"114","released_at":"2024-07-05","frame":"2015","frame_effects":["inverted"],"border_color":"borderless","full_art":false,"textless":false,"promo":false,"promo_types":["universesbeyond","boosterfun"],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"360ee8ad-9b7a-4813-8ee1-b89e4e550875","artist":"Alexander Gering","image_normal":"https://cards.scryfall.io/normal/front/a/b/ab4b80c5-fe04-4e5e-9637-b745c2c8956b.jpg?1783910950","back_image_normal":null,"back_illustration_id":null,"security_stamp":"triangle","reprint":true,"variation":false,"booster":false,"digital":false},
+  {"id":"2744ac83-a79f-4042-8720-688b5adda382","set":"mh1","set_name":"Modern Horizons","set_type":"draft_innovation","collector_number":"243","released_at":"2019-06-14","frame":"2015","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"97d6be4c-a2ae-4b33-a877-1539415457b4","artist":"Noah Bradley","image_normal":"https://cards.scryfall.io/normal/front/2/7/2744ac83-a79f-4042-8720-688b5adda382.jpg?1783933066","back_image_normal":null,"back_illustration_id":null,"security_stamp":"oval","reprint":false,"variation":false,"booster":true,"digital":false}
+ ]
+}
