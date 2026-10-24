@@ -249,6 +249,98 @@ textarea.scan-paste {
   display: block;
   margin: 0.5rem 0;
 }
+.cube-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.cube-tools .search {
+  flex: 1;
+  min-width: 0;
+}
+.segmented {
+  display: inline-flex;
+  flex: none;
+}
+.segmented button {
+  min-height: 44px;
+  padding: 0 0.75rem;
+  border-radius: 0;
+  font-size: 0.9rem;
+}
+.segmented button:first-child {
+  border-radius: var(--radius) 0 0 var(--radius);
+}
+.segmented button + button {
+  margin-left: -1px;
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+.segmented button[aria-pressed='true'] {
+  position: relative;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+/* Spoiler layout: as many card images per row as fit, about 150 px on phones (two at 360 px)
+   and about 180 px wider. The aspect-ratio box keeps the page still while images load. */
+.spoiler {
+  list-style: none;
+  margin: 0.25rem 0 0.75rem;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(140px, 100%), 1fr));
+  gap: 0.75rem 0.5rem;
+}
+@media (min-width: 600px) {
+  .spoiler {
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  }
+}
+.spoiler-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+.spoiler-link {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+.spoiler-link:hover .spoiler-name {
+  text-decoration: underline;
+}
+.spoiler-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 5 / 7;
+  margin-bottom: 0.2rem;
+  border-radius: 4.75% / 3.4%;
+  background: var(--chip);
+  object-fit: cover;
+}
+.spoiler-name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.spoiler-set {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.spoiler-badges {
+  margin-top: 0.15rem;
+}
+.spoiler-badges .chip {
+  font-size: 0.72rem;
+}
 
 .section-head {
   position: sticky;
@@ -921,6 +1013,172 @@ button.tile-button {
 }
 .run-preview {
   margin-top: 0.5rem;
+}
+.run-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.run-actions .run-preview,
+.compare-foot .run-preview {
+  flex-basis: 100%;
+  margin-top: 0;
+}
+
+/* Cycle page: the Wanted Printings and each run's picks as card-sized tiles (the "normal" image),
+   in rows that scroll sideways when they do not fit. */
+.art-row {
+  list-style: none;
+  margin: 0.5rem 0;
+  padding: 0 0 0.5rem;
+  display: flex;
+  gap: 0.6rem;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+}
+.art-tile {
+  flex: none;
+  width: 150px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+  scroll-snap-align: start;
+}
+@media (min-width: 600px) {
+  .art-tile {
+    width: 180px;
+  }
+}
+.art-link {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  color: inherit;
+  text-decoration: none;
+}
+.art-link:hover .art-name {
+  text-decoration: underline;
+}
+.art-img,
+.compare-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 5 / 7;
+  margin-bottom: 0.2rem;
+  border-radius: 4.75% / 3.4%;
+  background: var(--chip);
+  object-fit: cover;
+}
+.art-name {
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.art-tile .marker,
+.compare-cell .marker {
+  align-self: flex-start;
+}
+
+/* The Compare overlay: over the bottom nav (10), under the toast (20) so a write made from the
+   overlay is still told. */
+.compare-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+  display: flex;
+  justify-content: center;
+  background: rgb(0 0 0 / 0.7);
+  overscroll-behavior: contain;
+}
+.compare {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background: var(--surface);
+  color: var(--text);
+}
+@media (min-width: 600px) {
+  .compare-backdrop {
+    padding: 12px;
+  }
+  .compare {
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgb(0 0 0 / 0.4);
+  }
+}
+@media (min-width: 900px) {
+  /* Five columns: as wide as lets two rows of cards fit the screen's height, at least 900 px. */
+  .compare {
+    max-width: max(900px, calc((100vh - 16.5rem) * 1.78 + 4rem));
+    max-width: max(900px, calc((100dvh - 16.5rem) * 1.78 + 4rem));
+  }
+}
+.compare-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: calc(0.5rem + env(safe-area-inset-top)) var(--gutter) 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+.compare-title {
+  flex: 1;
+  min-width: 0;
+}
+.compare-title h2 {
+  margin: 0.35rem 0 0.15rem;
+  font-size: 1.05rem;
+}
+.compare-title .printing {
+  margin: 0;
+}
+.compare-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.75rem var(--gutter);
+}
+.compare-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem 0.5rem;
+}
+.compare-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.compare-cell .row-name {
+  color: var(--text);
+}
+.compare-empty {
+  border: 2px dashed var(--warn);
+  background: var(--warn-bg);
+}
+.compare-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  max-height: 45%;
+  overflow-y: auto;
+  padding: 0.5rem var(--gutter) calc(0.5rem + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border);
 }
 
 /* Six entries in the bottom bar (About is in the account menu): 60 px each at 360 px, still 44 px tall. */

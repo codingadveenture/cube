@@ -3,7 +3,8 @@ import type { Card } from '../types';
 import { COLOR_LABEL, compareCards, groupCards, summarize, wantedDiffers } from '../cube/order';
 import { cubeHash, isDetailHash, previousHash, replaceHash } from '../router';
 import { humanizeCycle } from '../printings/cycles';
-import { lifecycleOf, partitionCards, physicallyPresent, pullPatches, shownPrinting } from '../store/lifecycle';
+import { LIFECYCLE_LABEL, lifecycleOf, partitionCards, physicallyPresent, pullPatches, shownPrinting } from '../store/lifecycle';
+import { readCubeLayout, writeCubeLayout, type CubeLayout } from '../cube/layout';
 import { useStore } from '../store/context';
 
 // Scroll position of the list when a card was opened from it, restored on the way back.
@@ -26,6 +27,13 @@ export function CubeView({ cards, initialQuery }: { cards: Card[]; initialQuery:
   function changeQuery(q: string) {
     setQuery(q);
     replaceHash(cubeHash(q));
+  }
+
+  // Read before the first render, so the remembered layout shows without a flash of the other one.
+  const [layout, setLayout] = useState<CubeLayout>(() => readCubeLayout());
+  function chooseLayout(next: CubeLayout) {
+    setLayout(next);
+    writeCubeLayout(next);
   }
 
   const lastY = useRef(0);
@@ -70,24 +78,34 @@ export function CubeView({ cards, initialQuery }: { cards: Card[]; initialQuery:
         <span>{summary.flagged} with an Art flag</span>
         <span>{summary.nonPaper} In-box not on paper</span>
       </p>
-      <label className="search">
-        <span className="visually-hidden">Search by name</span>
-        <input
-          type="search"
-          placeholder="Search by name"
-          value={query}
-          onChange={(e) => changeQuery(e.target.value)}
-          autoComplete="off"
-          spellCheck={false}
-        />
-      </label>
+      <div className="cube-tools">
+        <label className="search">
+          <span className="visually-hidden">Search by name</span>
+          <input
+            type="search"
+            placeholder="Search by name"
+            value={query}
+            onChange={(e) => changeQuery(e.target.value)}
+            autoComplete="off"
+            spellCheck={false}
+          />
+        </label>
+        <div className="segmented" role="group" aria-label="Layout">
+          <button type="button" aria-pressed={layout === 'spoiler'} onClick={() => chooseLayout('spoiler')}>
+            Spoiler
+          </button>
+          <button type="button" aria-pressed={layout === 'list'} onClick={() => chooseLayout('list')}>
+            List
+          </button>
+        </div>
+      </div>
       {query && (
         <p className="muted num" aria-live="polite">
           {shown} of {listed} cards
         </p>
       )}
-      {view.toPrint.length > 0 && <ToPrint cards={view.toPrint} />}
-      {view.toPull.length > 0 && <ToPull cards={view.toPull} />}
+      {view.toPrint.length > 0 && <ToPrint cards={view.toPrint} layout={layout} />}
+      {view.toPull.length > 0 && <ToPull cards={view.toPull} layout={layout} />}
       {sections.map((section) => (
         <section key={section.color} className="section" aria-labelledby={`sec-${section.color}`}>
           <h2 id={`sec-${section.color}`} className="section-head">
@@ -98,11 +116,7 @@ export function CubeView({ cards, initialQuery }: { cards: Card[]; initialQuery:
               <h3 className="group-head">
                 {group.type} <span className="count num">{group.cards.length}</span>
               </h3>
-              <ul className="rows">
-                {group.cards.map((c) => (
-                  <CardRow key={c.oracle_id} card={c} />
-                ))}
-              </ul>
+              <CardList cards={group.cards} layout={layout} />
             </div>
           ))}
         </section>
@@ -114,18 +128,14 @@ export function CubeView({ cards, initialQuery }: { cards: Card[]; initialQuery:
             <span className="num">{view.retired.length}</span> retired {view.retired.length === 1 ? 'card' : 'cards'}: off the List and out of
             the box
           </summary>
-          <ul className="rows">
-            {view.retired.map((c) => (
-              <CardRow key={c.oracle_id} card={c} />
-            ))}
-          </ul>
+          <CardList cards={view.retired} layout={layout} />
         </details>
       )}
     </div>
   );
 }
 
-function ToPrint({ cards }: { cards: Card[] }) {
+function ToPrint({ cards, layout }: { cards: Card[]; layout: CubeLayout }) {
   return (
     <section className="section lifecycle" aria-labelledby="sec-to-print">
       <h2 id="sec-to-print" className="section-head">
@@ -134,16 +144,12 @@ function ToPrint({ cards }: { cards: Card[] }) {
       <p className="muted">
         On the List but not in the box yet. They are in the <a href="#/print">Print batch</a>; Mark as printed puts them in the box.
       </p>
-      <ul className="rows">
-        {cards.map((c) => (
-          <CardRow key={c.oracle_id} card={c} />
-        ))}
-      </ul>
+      <CardList cards={cards} layout={layout} />
     </section>
   );
 }
 
-function ToPull({ cards }: { cards: Card[] }) {
+function ToPull({ cards, layout }: { cards: Card[]; layout: CubeLayout }) {
   const { auth, store, save } = useStore();
   const [busy, setBusy] = useState(false);
   async function pull(list: Card[]) {
@@ -177,29 +183,89 @@ function ToPull({ cards }: { cards: Card[] }) {
           </button>
         </div>
       )}
+      <CardList
+        cards={cards}
+        layout={layout}
+        action={(c) =>
+          owner ? (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => {
+                // Nothing in the app puts a card back in the box, so a stray tap is confirmed.
+                if (window.confirm(`Mark ${c.name} as pulled from the box?`)) void pull([c]);
+              }}
+            >
+              Mark pulled
+            </button>
+          ) : null
+        }
+      />
+    </section>
+  );
+}
+
+/** The cards in the chosen layout: a grid of card images (Spoiler) or compact rows (List). */
+function CardList({ cards, layout, action }: { cards: Card[]; layout: CubeLayout; action?: (card: Card) => ReactNode }) {
+  if (layout === 'list') {
+    return (
       <ul className="rows">
         {cards.map((c) => (
-          <CardRow
-            key={c.oracle_id}
-            card={c}
-            action={
-              owner ? (
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => {
-                    // Nothing in the app puts a card back in the box, so a stray tap is confirmed.
-                    if (window.confirm(`Mark ${c.name} as pulled from the box?`)) void pull([c]);
-                  }}
-                >
-                  Mark pulled
-                </button>
-              ) : null
-            }
-          />
+          <CardRow key={c.oracle_id} card={c} action={action?.(c)} />
         ))}
       </ul>
-    </section>
+    );
+  }
+  return (
+    <ul className="spoiler">
+      {cards.map((c) => (
+        <CardCell key={c.oracle_id} card={c} action={action?.(c)} />
+      ))}
+    </ul>
+  );
+}
+
+/** "SET 123"; "Wanted SET 123" for a card not printed yet; "Was SET 123" for a retired one. */
+function printingText(card: Card): string {
+  const life = lifecycleOf(card);
+  const was = life === 'retired' && card.retired_printing ? card.retired_printing : null;
+  const p = was ?? shownPrinting(card);
+  return `${life === 'to_print' ? 'Wanted ' : was ? 'Was ' : ''}${p.set.toUpperCase()} ${p.collector_number.toUpperCase()}`;
+}
+
+function CardCell({ card, action }: { card: Card; action?: ReactNode }) {
+  const differs = wantedDiffers(card);
+  const life = lifecycleOf(card);
+  const badges = life !== 'in_box' || differs || card.flags.length > 0;
+  return (
+    <li className="spoiler-cell">
+      <a className="spoiler-link" href={`#/cube/${encodeURIComponent(card.oracle_id)}`}>
+        <img className="spoiler-img" src={shownPrinting(card).image_normal} alt="" loading="lazy" decoding="async" width={488} height={680} />
+        <span className="spoiler-name" title={card.name}>
+          {card.name}
+        </span>
+        <span className="spoiler-set num">{printingText(card)}</span>
+        {badges && (
+          <span className="chips spoiler-badges">
+            {life !== 'in_box' && <span className="chip">{LIFECYCLE_LABEL[life]}</span>}
+            {differs && (
+              <span className="chip chip-flag num">
+                Wanted {card.wanted.set.toUpperCase()} {card.wanted.collector_number.toUpperCase()}
+              </span>
+            )}
+            {card.flags.map((f, i) => {
+              const label = f.type === 'art' ? 'Art flag' : f.type;
+              return (
+                <span key={i} className="chip chip-flag" title={`${label} · ${f.by}`}>
+                  {label}
+                </span>
+              );
+            })}
+          </span>
+        )}
+      </a>
+      {action}
+    </li>
   );
 }
 
