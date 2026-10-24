@@ -1,0 +1,17 @@
+# planning notes and research contain local paths and first names; kept out of the public repo
+.scratch/
+research/
+data/log.json
+
+# build and tooling
+node_modules/
+dist/
+.cache/
+*.log
+.DS_Store
+Thumbs.db
+
+scripts/.cache/
+
+# local Claude Code launch config
+.claude/

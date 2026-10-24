@@ -1,0 +1,25 @@
+{
+ "cards": 537,
+ "by_color_category": {
+  "M": 59,
+  "L": 96,
+  "U": 74,
+  "R": 55,
+  "W": 66,
+  "C": 72,
+  "B": 61,
+  "G": 54
+ },
+ "by_type_category": {
+  "Creature": 205,
+  "Land": 95,
+  "Instant": 68,
+  "Artifact": 71,
+  "Enchantment": 16,
+  "Sorcery": 61,
+  "Planeswalker": 21
+ },
+ "cards_with_back_face": 14,
+ "cards_with_tokens": 84,
+ "in_box_not_paper": 9
+}

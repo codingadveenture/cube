@@ -1,0 +1,491 @@
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import type { Card } from '../types';
+import { normalizeName } from '../lib/normalize';
+import { replaceHash } from '../router';
+import { parseScanText, type Pile } from '../scan/parse';
+import {
+  diffScan,
+  type CardResult,
+  type ExpectedCard,
+  type ResolvedPrinting,
+  type UnexpectedResult,
+} from '../scan/diff';
+import { knownPrintings, localPrintings, resolvePrintings, type ResolveProgress } from '../scan/resolve';
+import { expectedCards } from '../scan/expected';
+import {
+  clearSession,
+  emptySession,
+  loadSession,
+  makePile,
+  mergedRows,
+  saveSession,
+  type ScanSession,
+} from '../scan/session';
+import { takeSharedFiles } from '../scan/shared';
+
+type Tab = 'missing' | 'unexpected' | 'different-art' | 'duplicates' | 'other-set' | 'unknown';
+
+const NOTHING_SHARED = 'Nothing arrived from the share. Try Choose files instead.';
+
+/** One line per tab: what the list means and what to do with it. */
+const TAB_HINT: Record<Tab, string> = {
+  missing: 'On the List but not scanned: look for these in the box.',
+  unexpected: 'Scanned but not on the List: take these out.',
+  'different-art': 'Scanned with other art than the In-box Printing: check the card in the box.',
+  duplicates: 'Scanned more than once: take out the extra copies.',
+  'other-set': 'Same art as the In-box Printing but another set or number. Probably the scanner guessed the wrong Printing; counted as present.',
+  unknown: 'No scanned row of these cards could be matched to a Printing, so the art was not checked.',
+};
+
+export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchParams }) {
+  const [session, setSession] = useState<ScanSession>(loadSession);
+  const [printings, setPrintings] = useState<Map<string, ResolvedPrinting>>(new Map());
+  const [progress, setProgress] = useState<ResolveProgress | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [removed, setRemoved] = useState<{ pile: Pile; index: number } | null>(null);
+  const [paste, setPaste] = useState('');
+  const [tab, setTab] = useState<Tab>('missing');
+  const fileInput = useRef<HTMLInputElement>(null);
+
+  const expected: ExpectedCard[] = useMemo(() => expectedCards(cards), [cards]);
+  const known = useMemo(() => knownPrintings(cards), [cards]);
+  const byOracle = useMemo(() => new Map(cards.map((c) => [c.oracle_id, c])), [cards]);
+  const rows = useMemo(() => mergedRows(session.piles), [session.piles]);
+  const diff = useMemo(() => diffScan(expected, rows, printings), [expected, rows, printings]);
+
+  useEffect(() => saveSession(session), [session]);
+
+  // Files shared from another app arrive as #/scan?shared=1; sw.js sends shared=0 when it
+  // could store nothing.
+  const sharedFlag = query.get('shared');
+  useEffect(() => {
+    if (sharedFlag === null) return;
+    if (sharedFlag !== '1') {
+      setNotice(NOTHING_SHARED);
+      replaceHash('#/scan');
+      return;
+    }
+    // No unmount guard: the files are deleted from the cache as they are read, so the result
+    // must be kept even if this effect is cleaned up meanwhile (React StrictMode runs it twice).
+    takeSharedFiles()
+      .then((files) => {
+        if (files === null) return; // Another call is importing them.
+        if (files.length > 0) {
+          const piles = files.map((f) => makePile(f.label, parseScanText(f.text)));
+          setSession((s) => ({ ...s, piles: [...s.piles, ...piles] }));
+          setNotice(`Imported ${files.length} shared ${files.length === 1 ? 'file' : 'files'}.`);
+        } else {
+          setNotice(NOTHING_SHARED);
+        }
+        replaceHash('#/scan');
+      })
+      .catch((e: unknown) => setError(`Could not read the shared file: ${String(e)}`));
+  }, [sharedFlag]);
+
+  // Resolve scanned Printings whenever the piles change. What cards.json and the cache already
+  // know is shown at once; Scryfall fills in the rest. A newer run cancels the older one.
+  useEffect(() => {
+    const controller = new AbortController();
+    setError(null);
+    setPrintings(localPrintings(rows, known).printings);
+    void resolvePrintings(rows, known, {
+      signal: controller.signal,
+      onProgress: (p) => {
+        if (!controller.signal.aborted) setProgress(p);
+      },
+    }).then((result) => {
+      if (result.aborted) return;
+      setPrintings(result.printings);
+      setProgress(null);
+      if (result.error) {
+        setError(`Could not reach Scryfall to check all art: ${result.error}. Names are still compared.`);
+      }
+    });
+    return () => controller.abort();
+  }, [rows, known]);
+
+  async function addFiles(list: FileList | null) {
+    if (!list) return;
+    const piles: Pile[] = [];
+    for (const file of Array.from(list)) {
+      piles.push(makePile(file.name, parseScanText(await file.text())));
+    }
+    setSession((s) => ({ ...s, piles: [...s.piles, ...piles] }));
+    if (fileInput.current) fileInput.current.value = '';
+  }
+
+  function addPaste() {
+    const parsed = parseScanText(paste);
+    if (parsed.length === 0) return;
+    setSession((s) => ({ ...s, piles: [...s.piles, makePile(`Pasted list ${s.piles.length + 1}`, parsed)] }));
+    setPaste('');
+  }
+
+  function removePile(id: string) {
+    const index = session.piles.findIndex((p) => p.id === id);
+    const pile = session.piles[index];
+    if (!pile) return;
+    setRemoved({ pile, index });
+    setSession((s) => ({ ...s, piles: s.piles.filter((p) => p.id !== id) }));
+  }
+
+  function undoRemove() {
+    if (!removed) return;
+    const { pile, index } = removed;
+    setSession((s) => {
+      const piles = [...s.piles];
+      piles.splice(Math.min(index, piles.length), 0, pile);
+      return { ...s, piles };
+    });
+    setRemoved(null);
+  }
+
+  function toggle(key: string) {
+    setSession((s) => {
+      const resolved = { ...s.resolved };
+      if (resolved[key]) delete resolved[key];
+      else resolved[key] = true;
+      return { ...s, resolved };
+    });
+  }
+
+  function exportJson() {
+    const body = JSON.stringify(
+      { exported_at: new Date().toISOString(), started_at: session.started_at, piles: session.piles, diff, resolved: session.resolved },
+      null,
+      1,
+    );
+    const url = URL.createObjectURL(new Blob([body], { type: 'application/json' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `cube-scan-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  async function copyMissing() {
+    const text = diff.missing.map((c) => c.name).join('\n');
+    try {
+      await navigator.clipboard.writeText(text);
+      setNotice(`Copied ${diff.missing.length} names.`);
+    } catch {
+      setNotice('Copying was blocked by the browser.');
+    }
+  }
+
+  function clearAll() {
+    if (!window.confirm('Clear the imported piles and the Resolved marks?')) return;
+    clearSession();
+    setSession(emptySession());
+    setNotice(null);
+    setRemoved(null);
+  }
+
+  const t = diff.totals;
+  const withArt = [...diff.present, ...diff.duplicates];
+  const differentArt = withArt.filter((r) => r.verdict === 'different-art');
+  const otherSet = withArt.filter((r) => r.verdict === 'same-art-other-set');
+  const unknown = withArt.filter((r) => r.verdict === 'unknown');
+  const tabs: { id: Tab; label: string; count: number }[] = [
+    { id: 'missing', label: 'Missing', count: t.missing },
+    { id: 'unexpected', label: 'Unexpected', count: t.unexpected },
+    { id: 'different-art', label: 'Different art', count: t.differentArt },
+    { id: 'duplicates', label: 'Duplicates', count: t.duplicates },
+    { id: 'other-set', label: 'Other set', count: t.sameArtOtherSet },
+    { id: 'unknown', label: 'Unknown art', count: t.unknown },
+  ];
+  const hasPiles = session.piles.length > 0;
+  // Scryfall is still being asked: the art tabs are not final yet.
+  const checking = progress !== null && progress.done < progress.total;
+  const artEmpty = (text: string) => (checking ? 'Checking art…' : text);
+
+  const imageOf = (c: ExpectedCard) => byOracle.get(c.oracle_id)?.in_box.image_small ?? c.in_box.image_small;
+
+  return (
+    <div className="scan">
+      <h1>Scan</h1>
+      <section className="panel import" aria-labelledby="import-head">
+        <h2 id="import-head">Import</h2>
+        <p className="muted">ManaBox CSV exports or a plain list, one card per line. Each file is one pile: a box or stack scanned together.</p>
+        {!hasPiles && (
+          <ol className="howto">
+            <li>In ManaBox, make a binder for the Cube (or one per box or pile) and scan the cards into it with Quick Mode, in any order.</li>
+            <li>Open the binder and export it as CSV.</li>
+            <li>
+              Share the CSV file to Cube. Sharing works only after installing this site: Chrome menu, Add to Home screen.
+              Or pick the file here with Choose files.
+            </li>
+            <li>Add one file per pile; the counts are added up. Then work through the tabs.</li>
+          </ol>
+        )}
+        <label className="button">
+          Choose files
+          <input
+            ref={fileInput}
+            className="visually-hidden"
+            type="file"
+            multiple
+            accept=".csv,.txt,text/csv,text/plain"
+            onChange={(e) => void addFiles(e.target.files)}
+          />
+        </label>
+        <label className="paste">
+          <span>Or paste a list</span>
+          <textarea
+            rows={4}
+            value={paste}
+            onChange={(e) => setPaste(e.target.value)}
+            placeholder={'Lightning Bolt\n2x Counterspell\nSol Ring (C21) 263'}
+          />
+        </label>
+        <button type="button" onClick={addPaste} disabled={!paste.trim()}>
+          Add pasted list
+        </button>
+        {hasPiles && (
+          <ul className="piles">
+            {session.piles.map((p) => (
+              <li key={p.id}>
+                <span className="pile-label">{p.label}</span>
+                <span className="num muted">{p.rows.length} rows</span>
+                <button type="button" className="link" onClick={() => removePile(p.id)}>
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {notice && <p className="notice" role="status">{notice}</p>}
+      {removed && (
+        <p className="notice" role="status">
+          Removed {removed.pile.label}.{' '}
+          <button type="button" className="link" onClick={undoRemove}>
+            Undo
+          </button>
+        </p>
+      )}
+      {error && <p className="status error" role="alert">{error}</p>}
+      {progress && (
+        <p className="status num" role="status">
+          Checking art on Scryfall: {progress.done} of {progress.total} printings
+          <progress max={progress.total || 1} value={progress.done} />
+        </p>
+      )}
+
+      {hasPiles && (
+        <>
+          <dl className="totals num">
+            <Total label="Expected" value={t.expected} />
+            <Total label="Scanned rows" value={t.scannedRows} />
+            <Total label="Scanned names" value={t.scannedUniqueNames} />
+            <Total label="Missing" value={t.missing} warn />
+            <Total label="Unexpected" value={t.unexpected} warn />
+            <Total label="Duplicates" value={t.duplicates} warn />
+            <Total label="Different art" value={t.differentArt} warn />
+            <Total label="Unknown art" value={t.unknown} />
+          </dl>
+
+          <div className="actions">
+            <button type="button" onClick={exportJson}>Export session JSON</button>
+            <button type="button" onClick={() => void copyMissing()} disabled={diff.missing.length === 0}>
+              Copy missing as list
+            </button>
+            <button type="button" className="danger" onClick={clearAll}>Clear session</button>
+          </div>
+
+          <div className="tabs" role="tablist" aria-label="Diff">
+            {tabs.map((x) => (
+              <button
+                key={x.id}
+                type="button"
+                role="tab"
+                aria-selected={tab === x.id}
+                className="tab"
+                onClick={() => setTab(x.id)}
+              >
+                {x.label} <span className="count num">{x.count}</span>
+              </button>
+            ))}
+          </div>
+
+          <div role="tabpanel">
+            <p className="muted">{TAB_HINT[tab]}</p>
+            {tab === 'missing' && (
+              <ItemList empty="Nothing missing.">
+                {diff.missing.map((c) => (
+                  <Item key={c.oracle_id} k={`missing:${c.oracle_id}`} session={session} toggle={toggle}>
+                    <Thumb src={imageOf(c)} />
+                    <ItemText card={c} note={`In-box ${c.in_box.set.toUpperCase()} ${c.in_box.collector_number}`} />
+                  </Item>
+                ))}
+              </ItemList>
+            )}
+            {tab === 'unexpected' && (
+              <ItemList empty="Nothing unexpected.">
+                {diff.unexpected.map((u) => (
+                  <UnexpectedItem key={u.name} u={u} session={session} toggle={toggle} />
+                ))}
+              </ItemList>
+            )}
+            {tab === 'different-art' && (
+              <ItemList empty={artEmpty('No card with different art.')}>
+                {differentArt.map((r) => (
+                  <ArtItem key={r.card.oracle_id} r={r} tab="different-art" session={session} toggle={toggle} imageOf={imageOf} />
+                ))}
+              </ItemList>
+            )}
+            {tab === 'duplicates' && (
+              <ItemList empty="No duplicates.">
+                {diff.duplicates.map((r) => (
+                  <Item key={r.card.oracle_id} k={`duplicates:${r.card.oracle_id}`} session={session} toggle={toggle}>
+                    <Thumb src={imageOf(r.card)} />
+                    <ItemText card={r.card} note={`Scanned ${r.count} times, expected once`} />
+                  </Item>
+                ))}
+              </ItemList>
+            )}
+            {tab === 'other-set' && (
+              <>
+                <ItemList empty={artEmpty('None.')}>
+                  {otherSet.map((r) => (
+                    <ArtItem key={r.card.oracle_id} r={r} tab="other-set" session={session} toggle={toggle} imageOf={imageOf} />
+                  ))}
+                </ItemList>
+              </>
+            )}
+            {tab === 'unknown' && (
+              <>
+                <ItemList empty={artEmpty('None.')}>
+                  {unknown.map((r) => (
+                    <Item key={r.card.oracle_id} k={`unknown:${r.card.oracle_id}`} session={session} toggle={toggle}>
+                      <Thumb src={imageOf(r.card)} />
+                      <ItemText card={r.card} note={`Scanned ${r.count}`} />
+                    </Item>
+                  ))}
+                </ItemList>
+              </>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function Total({ label, value, warn }: { label: string; value: number; warn?: boolean }) {
+  return (
+    <div className={warn && value > 0 ? 'total warn' : 'total'}>
+      <dt>{label}</dt>
+      <dd>{value}</dd>
+    </div>
+  );
+}
+
+function ItemList({ children, empty }: { children: ReactNode[]; empty: string }) {
+  if (children.length === 0) return <p className="status">{empty}</p>;
+  return <ul className="items">{children}</ul>;
+}
+
+function Item({
+  k,
+  session,
+  toggle,
+  children,
+}: {
+  k: string;
+  session: ScanSession;
+  toggle: (k: string) => void;
+  children: ReactNode;
+}) {
+  const done = !!session.resolved[k];
+  return (
+    <li className={done ? 'item done' : 'item'}>
+      {children}
+      <label className="resolved">
+        <input type="checkbox" checked={done} onChange={() => toggle(k)} />
+        Resolved
+      </label>
+    </li>
+  );
+}
+
+function Thumb({ src, label }: { src: string | null | undefined; label?: string }) {
+  return (
+    <figure className="thumb-fig">
+      {src ? <img className="thumb" src={src} alt="" loading="lazy" decoding="async" width={146} height={204} /> : <span className="thumb thumb-empty" />}
+      {label && <figcaption className="num">{label}</figcaption>}
+    </figure>
+  );
+}
+
+function ItemText({ card, note }: { card: ExpectedCard; note: string }) {
+  return (
+    <span className="row-text">
+      <a className="row-name" href={`#/cube/${encodeURIComponent(card.oracle_id)}`}>
+        {card.name}
+      </a>
+      <span className="muted num">{note}</span>
+    </span>
+  );
+}
+
+function ArtItem({
+  r,
+  tab,
+  session,
+  toggle,
+  imageOf,
+}: {
+  r: CardResult;
+  tab: Tab;
+  session: ScanSession;
+  toggle: (k: string) => void;
+  imageOf: (c: ExpectedCard) => string;
+}) {
+  const s = r.scanned;
+  const scannedLabel = s ? `Scanned ${s.set.toUpperCase()} ${s.collector_number}` : 'Scanned';
+  return (
+    <Item k={`${tab}:${r.card.oracle_id}`} session={session} toggle={toggle}>
+      <span className="row-text art-name">
+        <a className="row-name" href={`#/cube/${encodeURIComponent(r.card.oracle_id)}`}>
+          {r.card.name}
+        </a>
+        {tab === 'other-set' && <span className="muted">Probable scanner guess</span>}
+      </span>
+      <Thumb src={imageOf(r.card)} label={`In-box ${r.card.in_box.set.toUpperCase()} ${r.card.in_box.collector_number}`} />
+      <Thumb src={s?.image_small} label={scannedLabel} />
+    </Item>
+  );
+}
+
+function UnexpectedItem({
+  u,
+  session,
+  toggle,
+}: {
+  u: UnexpectedResult;
+  session: ScanSession;
+  toggle: (k: string) => void;
+}) {
+  const p = u.rows.find((r) => r.printing)?.printing ?? null;
+  const first = u.rows[0];
+  const where = p
+    ? `${p.set.toUpperCase()} ${p.collector_number}`
+    : first?.set
+      ? `${first.set.toUpperCase()} ${first.collector_number ?? ''}`
+      : '';
+  return (
+    <Item k={`unexpected:${normalizeName(u.name)}`} session={session} toggle={toggle}>
+      <Thumb src={p?.image_small} />
+      <span className="row-text">
+        <span className="row-name">{u.name}</span>
+        <span className="muted num">
+          {u.count > 1 ? `${u.count} scanned` : '1 scanned'}
+          {where && ` · ${where}`} · not on the List
+        </span>
+      </span>
+    </Item>
+  );
+}

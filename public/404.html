@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Cube</title>
+    <script>
+      // GitHub Pages has no SPA fallback; send any unknown path back to the app, keeping the hash.
+      location.replace('/cube/' + (location.hash || '#/cube'));
+    </script>
+  </head>
+  <body>
+    <p><a href="/cube/">Open Cube</a></p>
+  </body>
+</html>
