@@ -1,4 +1,4 @@
-import { useEffect, useMemo, type ReactNode } from 'react';
+import { Suspense, lazy, useEffect, useMemo, type ReactNode } from 'react';
 import { useRoute } from './router';
 import { useCards } from './data';
 import type { Card } from './types';
@@ -13,8 +13,13 @@ import { SuggestionsView } from './views/SuggestionsView';
 import { LogView } from './views/LogView';
 import { BaselinePanel } from './views/BaselinePanel';
 
+// The Printing picker and the Cycles view load on demand, in their own chunks.
+const PickerView = lazy(() => import('./views/printings/PickerView'));
+const CyclesView = lazy(() => import('./views/printings/CyclesView'));
+
 const NAV = [
   { view: 'cube', href: '#/cube', label: 'Cube' },
+  { view: 'cycles', href: '#/cycles', label: 'Cycles' },
   { view: 'scan', href: '#/scan', label: 'Scan' },
   { view: 'suggestions', href: '#/suggestions', label: 'Suggest' },
   { view: 'log', href: '#/log', label: 'Log' },
@@ -37,7 +42,7 @@ function Shell() {
   // The stored card state laid over cards.json; cards.json alone until the store has answered.
   const merged = useMemo(() => (base ? mergeCards(base, states.data) : null), [base, states.data]);
 
-  const detailId = route.view === 'cube' ? route.oracleId : null;
+  const detailId = route.view === 'cube' || route.view === 'printings' ? route.oracleId : route.view === 'cycles' ? route.cycle : null;
   useEffect(() => {
     if (detailId) window.scrollTo(0, 0);
   }, [detailId]);
@@ -56,6 +61,10 @@ function Shell() {
       );
   } else if (route.view === 'scan') {
     body = <ScanView cards={merged} query={route.query} />;
+  } else if (route.view === 'printings') {
+    body = <PickerView key={route.oracleId} cards={merged} oracleId={route.oracleId} />;
+  } else if (route.view === 'cycles') {
+    body = <CyclesView cards={merged} cycle={route.cycle} />;
   } else if (route.view === 'suggestions') {
     body = <SuggestionsView cards={merged} />;
   } else if (route.oracleId) {
@@ -77,17 +86,24 @@ function Shell() {
         </a>
         <nav className="nav" aria-label="Views">
           {NAV.map((n) => (
-            <a key={n.view} href={n.href} aria-current={route.view === n.view ? 'page' : undefined}>
+            <a key={n.view} href={n.href} aria-current={navView(route.view) === n.view ? 'page' : undefined}>
               {n.label}
             </a>
           ))}
         </nav>
         <AccountChip />
       </header>
-      <main className="main">{body}</main>
+      <main className="main">
+        <Suspense fallback={<p className="status">Loading…</p>}>{body}</Suspense>
+      </main>
       <Toast />
     </>
   );
+}
+
+/** The nav entry a view belongs to: the picker is part of the Cube. */
+function navView(view: string): string {
+  return view === 'printings' ? 'cube' : view;
 }
 
 /** Where the Cube view's card state comes from, and the Owner's Import baseline. */

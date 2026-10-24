@@ -2,8 +2,8 @@
 // `union` and `remove` into arrayUnion and arrayRemove; everything else is set with merge.
 import type { Card } from '../types';
 import { normalizeName } from '../lib/normalize';
-import { cardStateOf } from './baseline';
-import type { CardPatch, FlagState, ListChange, Overrides } from './types';
+import { chunk, cardStateOf } from './baseline';
+import type { CardPatch, CardPatchFor, FlagState, ListChange, Overrides } from './types';
 
 export interface CardWrite {
   /** Fields set with merge. */
@@ -17,12 +17,30 @@ export function cardPatchWrite(patch: CardPatch, now: string): CardWrite {
     case 'in_box':
       return { fields: { in_box: patch.in_box, updatedAt: now }, unionFlags: null };
     case 'wanted':
-      return { fields: { wanted: patch.wanted, updatedAt: now }, unionFlags: null };
+      // Set with merge merges nested maps key by key, so image_normal is always written (null when
+      // unknown); otherwise an earlier Printing's image would stay next to the new scryfall_id.
+      return { fields: { wanted: { ...patch.wanted, image_normal: patch.wanted.image_normal ?? null }, updatedAt: now }, unionFlags: null };
     case 'clear_flags':
       return { fields: { flags: [], updatedAt: now }, unionFlags: null };
     case 'add_flag':
       return { fields: { updatedAt: now }, unionFlags: [...(patch.seedFlags ?? []), patch.flag] };
   }
+}
+
+/**
+ * Several card writes split into writeBatches of at most `size` docs (default 400; Firestore allows 500).
+ * A card named twice keeps only its last patch, so one batch never writes a doc twice.
+ */
+export function cardBatches(patches: CardPatchFor[], now: string, size?: number): { oracle_id: string; write: CardWrite }[][] {
+  const last = new Map<string, CardPatch>();
+  for (const p of patches) {
+    last.delete(p.oracle_id);
+    last.set(p.oracle_id, p.patch);
+  }
+  return chunk(
+    [...last].map(([oracle_id, patch]) => ({ oracle_id, write: cardPatchWrite(patch, now) })),
+    size,
+  );
 }
 
 /** Add an Art flag. A card without a stored doc keeps its cards.json flags as well. */

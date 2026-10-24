@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "build:data": "node scripts/build-cards.mjs"
+    "build:data": "node scripts/build-cards.mjs",
+    "build:printings": "node scripts/build-printings.mjs"
   },
   "dependencies": {
     "firebase": "13.1.0",

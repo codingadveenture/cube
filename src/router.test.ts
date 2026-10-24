@@ -30,4 +30,21 @@ describe('router', () => {
     recordNavigation('#/cube/abc');
     expect(previousHash()).toBe('#/cube?q=b');
   });
+
+  it('treats a Back from the picker as a step back, so the card still knows its list', () => {
+    recordNavigation('#/cube?q=mox');
+    recordNavigation('#/cube/ghi');
+    recordNavigation('#/cube/ghi/printings');
+    expect(previousHash()).toBe('#/cube/ghi');
+    recordNavigation('#/cube/ghi'); // history.back()
+    expect(previousHash()).toBe('#/cube?q=mox');
+    expect(isListHash(previousHash()!)).toBe(true);
+  });
+
+  it('leaves the page before the picker as previous when the picker is left by a replace', () => {
+    recordNavigation('#/cycles/moxen');
+    recordNavigation('#/cube/def/printings');
+    recordNavigation('#/cube/def', true);
+    expect(previousHash()).toBe('#/cycles/moxen');
+  });
 });

@@ -79,6 +79,7 @@ describe('applySuggestion', () => {
     const w = cardPatchWrite(plan.card!.patch, NOW);
     expect(Object.keys(w.fields).sort()).toEqual(['updatedAt', 'wanted']);
     expect(w.fields.wanted).toMatchObject({ scryfall_id: 'abc', set: 'lea', collector_number: '1', illustration_id: 'ill' });
+    expect(plan.card!.patch.kind === 'wanted' && plan.card!.patch.wanted.image_normal).toBeNull();
     expect(w.unionFlags).toBeNull();
   });
 
@@ -146,6 +147,31 @@ describe('card writes', () => {
   it('writes only the In-box Printing', () => {
     const in_box = { ...cardStateOf(card, NOW).in_box, scryfall_id: 'xyz' };
     expect(cardPatchWrite({ kind: 'in_box', in_box }, NOW)).toEqual({ fields: { in_box, updatedAt: NOW }, unionFlags: null });
+  });
+
+  it('always writes image_normal on a Wanted Printing, so a merge cannot keep a stale one', () => {
+    const noImage = { ...cardStateOf(card, NOW).wanted, scryfall_id: 'new' };
+    delete noImage.image_normal;
+    const w = cardPatchWrite({ kind: 'wanted', wanted: noImage }, NOW);
+    expect((w.fields.wanted as Record<string, unknown>).image_normal).toBeNull();
+    // Firestore's set with merge merges nested maps key by key.
+    const merge = (a: Record<string, unknown>, b: Record<string, unknown>): Record<string, unknown> => {
+      const out: Record<string, unknown> = { ...a };
+      for (const [k, v] of Object.entries(b)) {
+        const prev = out[k];
+        out[k] =
+          v && typeof v === 'object' && !Array.isArray(v) && prev && typeof prev === 'object' && !Array.isArray(prev)
+            ? merge(prev as Record<string, unknown>, v as Record<string, unknown>)
+            : v;
+      }
+      return out;
+    };
+    const stored = { wanted: { ...noImage, scryfall_id: 'old', image_normal: 'https://cards.scryfall.io/normal/front/o/l/old.jpg' } };
+    const after = merge(stored, w.fields) as { wanted: { scryfall_id: string; image_normal: string | null } };
+    expect(after.wanted.scryfall_id).toBe('new');
+    expect(after.wanted.image_normal).toBeNull();
+    const withImage = cardPatchWrite({ kind: 'wanted', wanted: { ...noImage, image_normal: 'img' } }, NOW);
+    expect((withImage.fields.wanted as Record<string, unknown>).image_normal).toBe('img');
   });
 
   it('clears flags without touching other fields', () => {

@@ -1,6 +1,9 @@
 import type { Card, PrintingBase } from '../types';
 import { wantedDiffers } from '../cube/order';
-import { isListHash, previousHash } from '../router';
+import { cycleHash, isListHash, previousHash, printingsHash } from '../router';
+import { humanizeCycle } from '../printings/cycles';
+import { reasonLabel } from '../printings/wanted';
+import { useStore } from '../store/context';
 import { CardActions } from './CardActions';
 
 function scryfallUrl(p: PrintingBase): string {
@@ -95,6 +98,7 @@ function BackToCube() {
 }
 
 export function CardDetail({ cards, oracleId }: { cards: Card[]; oracleId: string }) {
+  const { auth } = useStore();
   const card = cards.find((c) => c.oracle_id === oracleId);
   if (!card) {
     return (
@@ -117,7 +121,14 @@ export function CardDetail({ cards, oracleId }: { cards: Card[]; oracleId: strin
         {card.type_line} {card.mana_cost && <span className="num">· {card.mana_cost}</span>}
       </p>
       <p className={differs ? 'marker-line' : 'muted'}>
-        {differs ? 'Wanted Printing differs from In-box: reprint in the next Print batch.' : 'Wanted is the In-box Printing.'}
+        {differs
+          ? `Reprint pending: Wanted ${card.wanted.set.toUpperCase()} ${card.wanted.collector_number} differs from In-box ${card.in_box.set.toUpperCase()} ${card.in_box.collector_number}.`
+          : 'Wanted is the In-box Printing.'}
+      </p>
+      <p>
+        <a className="button" href={printingsHash(card.oracle_id)}>
+          {auth.isOwner ? 'Choose Wanted Printing' : 'Suggest a Printing'}
+        </a>
       </p>
       {card.flags.length > 0 && (
         <ul className="flags">
@@ -139,9 +150,20 @@ export function CardDetail({ cards, oracleId }: { cards: Card[]; oracleId: strin
             ['Confidence', card.in_box.confidence],
           ]}
         />
-        <PrintingPanel title="Wanted" printing={card.wanted} extra={[['Reason', card.wanted.reason]]} />
+        <PrintingPanel title="Wanted" printing={card.wanted} extra={[['Reason', reasonLabel(card.wanted.reason)]]} />
       </div>
-      <TagList label="Cycles" items={card.cycles} />
+      {card.cycles.length > 0 && (
+        <div className="taglist">
+          <h3>Cycles</h3>
+          <p className="chips">
+            {card.cycles.map((cy) => (
+              <a key={cy} className="chip chip-link" href={cycleHash(cy)}>
+                {humanizeCycle(cy)}
+              </a>
+            ))}
+          </p>
+        </div>
+      )}
       <TagList label="Oracle cycle tags" items={card.oracle_cycle_tags} />
       {card.produces_tokens.length > 0 && (
         <div className="taglist">

@@ -13,7 +13,12 @@ export interface ApplyContext {
   now: string;
   resolutionNote: string | null;
   /** Art and name of the suggested Printing, looked up before accepting a printing Suggestion. */
-  printingDetails?: { scryfall_id: string | null; illustration_id: string | null; name: string | null } | null;
+  printingDetails?: {
+    scryfall_id: string | null;
+    illustration_id: string | null;
+    name: string | null;
+    image_normal?: string | null;
+  } | null;
 }
 
 export class ApplyError extends Error {}
@@ -54,6 +59,8 @@ export function applySuggestion(s: Suggestion, ctx: ApplyContext): AcceptPlan {
             illustration_id: ctx.printingDetails?.illustration_id ?? null,
             name: ctx.printingDetails?.name ?? ctx.card.wanted.name,
             reason: s.note ? `Suggestion by ${s.by}: ${s.note}` : `Suggestion by ${s.by}`,
+            // Always written: the merge write would otherwise keep an earlier Printing's image.
+            image_normal: ctx.printingDetails?.image_normal ?? null,
           },
         },
       };

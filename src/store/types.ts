@@ -32,7 +32,26 @@ export interface WantedState {
   collector_number: string;
   illustration_id: string | null;
   name: string | null;
+  /** A WantedReason for writes made in the app; cards.json also has other reasons. */
   reason: string;
+  /** Scryfall's normal image, so the Cube view can show Wanted without the printings index. */
+  image_normal?: string | null;
+}
+
+/** Why the Owner set a Wanted Printing in the app. */
+export type WantedReason = 'picked' | 'cycle' | 'default-rule' | 'reset-to-box';
+
+/** cubes/main/meta/cycles: the splits the Owner accepted, Cycle name to signature. */
+export interface CycleAcks {
+  ack: Record<string, string>;
+}
+
+export const EMPTY_CYCLE_ACKS: CycleAcks = { ack: {} };
+
+/** One card's change in a batch of card writes. */
+export interface CardPatchFor {
+  oracle_id: string;
+  patch: CardPatch;
 }
 
 export interface FlagState {
@@ -192,6 +211,11 @@ export interface Store {
   importBaseline(docs: [string, CardState][]): Promise<number>;
   /** Write only the fields the patch changes. */
   updateCard(oracleId: string, patch: CardPatch): Promise<void>;
+  /** Owner only: merge-write several card docs, in writeBatches of at most 400. */
+  updateCards(patches: CardPatchFor[]): Promise<void>;
+  subscribeCycleAcks(next: (s: Snapshot<CycleAcks>) => void, error: OnError): Unsubscribe;
+  /** Owner only: merge fields into cubes/main/meta/{docId}; nested maps merge key by key. */
+  setMeta(docId: string, data: Record<string, unknown>): Promise<void>;
   createSuggestion(input: SuggestionInput): Promise<void>;
   /** Reject (plan null) or accept with the plan computed by applySuggestion. */
   resolveSuggestion(id: string, status: 'accepted' | 'rejected', note: string | null, plan: AcceptPlan | null): Promise<void>;

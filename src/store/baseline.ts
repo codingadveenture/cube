@@ -1,6 +1,7 @@
 // The baseline: card state documents built from cards.json, and the join back into Cards.
 import type { Card, Flag, InBoxPrinting, PrintingBase, WantedPrinting } from '../types';
 import type { CardState, InBoxState, WantedState } from './types';
+import { pngImage, smallImage } from '../printings/images';
 
 /** Documents per writeBatch (Firestore allows 500). */
 export const BATCH_LIMIT = 400;
@@ -62,6 +63,8 @@ function printingFor(card: Card, s: InBoxState | WantedState): PrintingBase {
   const known = [card.in_box, card.wanted].find((p) => p.scryfall_id === s.scryfall_id);
   if (known) return { ...known, illustration_id: s.illustration_id ?? known.illustration_id };
   const hasBack = !!card.in_box.back_image_normal;
+  // A Wanted Printing written from the printings index carries its own image URL.
+  const stored = 'image_normal' in s && s.image_normal ? s.image_normal : null;
   return {
     scryfall_id: s.scryfall_id,
     name: s.name,
@@ -75,9 +78,9 @@ function printingFor(card: Card, s: InBoxState | WantedState): PrintingBase {
     border_color: '',
     illustration_id: s.illustration_id,
     artist: '',
-    image_small: scryfallImage(s.scryfall_id, 'small'),
-    image_normal: scryfallImage(s.scryfall_id, 'normal'),
-    image_png: scryfallImage(s.scryfall_id, 'png'),
+    image_small: stored ? smallImage(stored) : scryfallImage(s.scryfall_id, 'small'),
+    image_normal: stored ?? scryfallImage(s.scryfall_id, 'normal'),
+    image_png: stored ? pngImage(stored) : scryfallImage(s.scryfall_id, 'png'),
     back_name: hasBack ? card.in_box.back_name : null,
     back_image_normal: hasBack ? scryfallImage(s.scryfall_id, 'normal', 'back') : null,
     back_illustration_id: null,

@@ -95,6 +95,13 @@ production mode refuses every read and write.
 The Firebase web config in `src/store/firebase.ts` is public client configuration; access is
 controlled by the rules.
 
+## Printings and Cycles
+
+Every card has a Printing picker ("Choose Wanted Printing" on the card, "Suggest a Printing" for visitors) that loads that card's file from `public/data/printings/` and shows one tile per art, with filters for promos, collectors' editions, frame, border and resolution, plus the Printing the default rule would pick (the newest black-bordered, non-promo paper Printing outside Secret Lair and memorabilia).
+When the Owner sets Wanted on a card in a Cycle, a sheet offers "This card only" or the whole Cycle, and a whole Cycle gets the same Print run (set and style) in one batch, listing any card with no Printing in that run.
+The Cycles view (`#/cycles`) shows each Cycle as uniform, styled (same frame, border and style from different sets) or split, and a Cycle page ranks the Print runs that cover all members, or all but one, so a whole Cycle can be set or reset to its In-box Printings at once.
+The Owner can accept a split; the accepted arrangement is stored in `cubes/main/meta/cycles` and shows as a quiet "accepted split" until any member changes.
+
 ## Development
 
 Needs Node 22 or later.
@@ -124,7 +131,7 @@ The app icons are drawn by `node scripts/make-icons.mjs`.
 Every push to `main` runs `.github/workflows/deploy.yml`: `npm ci`, the tests, `npm run build`,
 and a deploy of `dist/` to GitHub Pages (repository settings: Pages, source "GitHub Actions").
 The site lives under `/cube/`, so Vite's `base` is `/cube/` and routes are hash based
-(`#/cube`, `#/scan`, `#/suggestions`, `#/log`, `#/about`). The service worker in `public/sw.js` only receives files shared
+(`#/cube`, `#/cycles`, `#/scan`, `#/suggestions`, `#/log`, `#/about`). The service worker in `public/sw.js` only receives files shared
 to the app; it caches nothing else.
 
 ## Licence

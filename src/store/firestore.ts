@@ -15,13 +15,16 @@ import {
   type Firestore,
 } from 'firebase/firestore';
 import { chunk, withoutExisting } from './baseline';
-import { cardPatchWrite, listChangeWrite } from './writes';
+import { cardBatches, cardPatchWrite, listChangeWrite, type CardWrite } from './writes';
 import { ownerFromDoc } from './owner';
 import {
   CUBE_ID,
+  EMPTY_CYCLE_ACKS,
   EMPTY_OVERRIDES,
   type AcceptPlan,
   type CardPatch,
+  type CardPatchFor,
+  type CycleAcks,
   type CardState,
   type CubeDoc,
   type LogEntry,
@@ -95,11 +98,20 @@ function toOverrides(d: DocumentData | undefined): Overrides {
   };
 }
 
+function toCycleAcks(d: DocumentData | undefined): CycleAcks {
+  const ack = d?.ack;
+  if (!ack || typeof ack !== 'object') return EMPTY_CYCLE_ACKS;
+  return { ack: Object.fromEntries(Object.entries(ack as Record<string, unknown>).filter(([, v]) => typeof v === 'string')) as Record<string, string> };
+}
+
 const META = { includeMetadataChanges: true } as const;
 
 /** The data for a merge-set of one card: the changed fields only, flags through arrayUnion. */
 function cardData(patch: CardPatch, t: string): DocumentData {
-  const w = cardPatchWrite(patch, t);
+  return writeData(cardPatchWrite(patch, t));
+}
+
+function writeData(w: CardWrite): DocumentData {
   const data: DocumentData = { ...w.fields };
   if (w.unionFlags) data.flags = arrayUnion(...w.unionFlags);
   return data;
@@ -129,6 +141,9 @@ export class FirestoreStore implements Store {
   private overridesRef() {
     // A document needs an even path, so the overrides live at cubes/main/meta/overrides.
     return doc(this.db, 'cubes', CUBE_ID, 'meta', 'overrides');
+  }
+  private metaRef(docId: string) {
+    return doc(this.db, 'cubes', CUBE_ID, 'meta', docId);
   }
   private ownerRef() {
     return doc(this.db, 'config', 'owner');
@@ -224,6 +239,31 @@ export class FirestoreStore implements Store {
 
   updateCard(oracleId: string, patch: CardPatch): Promise<void> {
     return setDoc(doc(this.col('cards'), oracleId), cardData(patch, now()), { merge: true });
+  }
+
+  async updateCards(patches: CardPatchFor[]): Promise<void> {
+    const t = now();
+    await Promise.all(
+      cardBatches(patches, t).map((part) => {
+        const batch = writeBatch(this.db);
+        for (const { oracle_id, write } of part) batch.set(doc(this.col('cards'), oracle_id), writeData(write), { merge: true });
+        return batch.commit();
+      }),
+    );
+  }
+
+  subscribeCycleAcks(next: (s: Snapshot<CycleAcks>) => void, error: OnError) {
+    return onSnapshot(
+      this.metaRef('cycles'),
+      META,
+      (snap) =>
+        next({ data: toCycleAcks(snap.data()), fromCache: snap.metadata.fromCache, hasPendingWrites: snap.metadata.hasPendingWrites }),
+      error,
+    );
+  }
+
+  setMeta(docId: string, data: Record<string, unknown>): Promise<void> {
+    return setDoc(this.metaRef(docId), { ...data, updatedAt: now() }, { merge: true });
   }
 
   async createSuggestion(input: SuggestionInput): Promise<void> {

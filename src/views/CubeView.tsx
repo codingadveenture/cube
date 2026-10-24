@@ -2,6 +2,7 @@ import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState
 import type { Card } from '../types';
 import { COLOR_LABEL, groupCards, summarize, wantedDiffers } from '../cube/order';
 import { cubeHash, isDetailHash, previousHash, replaceHash } from '../router';
+import { humanizeCycle } from '../printings/cycles';
 
 // Scroll position of the list when a card was opened from it, restored on the way back.
 let savedScroll: { hash: string; y: number } | null = null;
@@ -128,7 +129,7 @@ function CardRow({ card }: { card: Card }) {
             <span className="chips">
               {card.cycles.map((cy) => (
                 <span key={cy} className="chip">
-                  {cy}
+                  {humanizeCycle(cy)}
                 </span>
               ))}
               {card.flags.map((f, i) => (

@@ -5,7 +5,9 @@ import type { AuthUser, Backend } from './firebase';
 import { isOwnerUid } from './owner';
 import { ANON_SIGN_IN_FAILED } from './signin';
 import {
+  EMPTY_CYCLE_ACKS,
   EMPTY_OVERRIDES,
+  type CycleAcks,
   type CardState,
   type LogEntry,
   type OnError,
@@ -274,9 +276,11 @@ const subSuggestions: Subscribe<Suggestion[]> = (s, n, e) => s.subscribeSuggesti
 const subScans: Subscribe<SharedPile[]> = (s, n, e) => s.subscribeScans(n, e);
 const subLog: Subscribe<LogEntry[]> = (s, n, e) => s.subscribeLog(n, e);
 const subOverrides: Subscribe<Overrides> = (s, n, e) => s.subscribeOverrides(n, e);
+const subCycleAcks: Subscribe<CycleAcks> = (s, n, e) => s.subscribeCycleAcks(n, e);
 
 export const useCardStates = () => useLive(subCards, EMPTY_CARDS);
 export const useSuggestions = () => useLive<Suggestion[]>(subSuggestions, NONE);
 export const useScans = () => useLive<SharedPile[]>(subScans, NONE);
 export const useLog = () => useLive<LogEntry[]>(subLog, NONE);
 export const useOverrides = () => useLive(subOverrides, EMPTY_OVERRIDES);
+export const useCycleAcks = () => useLive(subCycleAcks, EMPTY_CYCLE_ACKS);
