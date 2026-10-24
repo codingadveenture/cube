@@ -6,6 +6,34 @@ import type { IndexPrinting, PrintingsFile } from './types';
 
 const cache = new Map<string, Promise<PrintingsFile>>();
 
+/** Runs at most `max` tasks at once; the rest wait in order. */
+export function createLimiter(max: number) {
+  let active = 0;
+  const queue: (() => void)[] = [];
+  const next = () => {
+    if (active >= max) return;
+    const start = queue.shift();
+    if (start) start();
+  };
+  return function run<T>(task: () => Promise<T>): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      queue.push(() => {
+        active++;
+        task()
+          .then(resolve, reject)
+          .finally(() => {
+            active--;
+            next();
+          });
+      });
+      next();
+    });
+  };
+}
+
+// A few files at a time, so a page that needs many does not flood a phone's connection.
+const limit = createLimiter(4);
+
 export function printingsUrl(oracleId: string): string {
   return `${import.meta.env.BASE_URL}data/printings/${encodeURIComponent(oracleId)}.json`;
 }
@@ -13,7 +41,7 @@ export function printingsUrl(oracleId: string): string {
 export function loadPrintings(oracleId: string): Promise<PrintingsFile> {
   let p = cache.get(oracleId);
   if (!p) {
-    p = fetch(printingsUrl(oracleId)).then(async (res) => {
+    p = limit(() => fetch(printingsUrl(oracleId))).then(async (res) => {
       if (res.status === 404) {
         const { searchPrintings } = await import('../upstream/scryfall');
         return { name: '', oracle_id: oracleId, printings: await searchPrintings(oracleId) };

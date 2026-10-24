@@ -93,16 +93,33 @@ export function artVerdict(
   if (resolved.length === 0 || !card.in_box.illustration_id) {
     return { verdict: 'unknown', scanned: null };
   }
-  const sameArt = resolved.filter((p) => p.illustration_id === card.in_box.illustration_id);
-  const first = sameArt[0];
-  if (!first) return { verdict: 'different-art', scanned: resolved[0] ?? null };
-  const exact = sameArt.find(
+  // Any copy with other art wins, so a second copy with different art does not hide behind a
+  // matching first copy.
+  const otherArt = resolved.find((p) => p.illustration_id !== card.in_box.illustration_id);
+  if (otherArt) return { verdict: 'different-art', scanned: otherArt };
+  // Every resolved copy has the In-box art from here on.
+  const exact = resolved.find(
     (p) =>
       p.set.toLowerCase() === card.in_box.set.toLowerCase() &&
       p.collector_number.toLowerCase() === card.in_box.collector_number.toLowerCase(),
   );
   if (exact) return { verdict: 'match', scanned: exact };
-  return { verdict: 'same-art-other-set', scanned: first };
+  return { verdict: 'same-art-other-set', scanned: resolved[0]! };
+}
+
+/** The distinct scanned Printings of a card's rows, as "SET 123", in scan order. */
+export function scannedPrintings(rows: ScannedRowWithPrinting[]): string[] {
+  const out: string[] = [];
+  for (const r of rows) {
+    const p = r.printing;
+    const label = p
+      ? `${p.set.toUpperCase()} ${p.collector_number}`
+      : r.set && r.collector_number
+        ? `${r.set.toUpperCase()} ${r.collector_number}`
+        : null;
+    if (label && !out.includes(label)) out.push(label);
+  }
+  return out;
 }
 
 /** Index the expected cards by every name they may be scanned under. */

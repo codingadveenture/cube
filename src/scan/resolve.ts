@@ -15,7 +15,8 @@ const GAP_MS = 150;
 const BACKOFF_MS = 2000;
 const MAX_RETRIES = 5;
 
-type Cache = Record<string, ResolvedPrinting>;
+/** null marks a key Scryfall reported as not found, so it is not asked for again. */
+type Cache = Record<string, ResolvedPrinting | null>;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -104,7 +105,36 @@ function toResolved(c: ScryfallCard): ResolvedPrinting {
 
 type Identifier = { id: string } | { set: string; collector_number: string };
 
-async function fetchCollection(identifiers: Identifier[], signal?: AbortSignal): Promise<ScryfallCard[]> {
+interface CollectionAnswer {
+  data: ScryfallCard[];
+  notFound: Identifier[];
+}
+
+function identifierKey(ident: Identifier): string {
+  return 'id' in ident
+    ? `id:${ident.id.toLowerCase()}`
+    : `sn:${ident.set.toLowerCase()}/${ident.collector_number.toLowerCase()}`;
+}
+
+/**
+ * Pair each returned card with the request key it answers. Scryfall returns the found cards in
+ * request order and echoes the identifiers it could not find, so the found requests and the
+ * returned cards line up by position. When the counts disagree, only the card's own id and
+ * set/number are used.
+ */
+export function matchCollection(
+  batch: [string, Identifier][],
+  answer: CollectionAnswer,
+): { found: [string | null, ScryfallCard][]; missing: string[] } {
+  const notFound = new Set(answer.notFound.map(identifierKey));
+  const missing = batch.filter(([, ident]) => notFound.has(identifierKey(ident))).map(([key]) => key);
+  const asked = batch.filter(([, ident]) => !notFound.has(identifierKey(ident)));
+  const byPosition = asked.length === answer.data.length;
+  const found = answer.data.map((c, i): [string | null, ScryfallCard] => [byPosition ? asked[i]![0] : null, c]);
+  return { found, missing };
+}
+
+async function fetchCollection(identifiers: Identifier[], signal?: AbortSignal): Promise<CollectionAnswer> {
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     const res = await fetch('https://api.scryfall.com/cards/collection', {
       method: 'POST',
@@ -118,8 +148,8 @@ async function fetchCollection(identifiers: Identifier[], signal?: AbortSignal):
       continue;
     }
     if (!res.ok) throw new Error(`Scryfall answered ${res.status}`);
-    const body = (await res.json()) as { data?: ScryfallCard[] };
-    return body.data ?? [];
+    const body = (await res.json()) as { data?: ScryfallCard[]; not_found?: Identifier[] };
+    return { data: body.data ?? [], notFound: body.not_found ?? [] };
   }
   throw new Error('Scryfall kept answering 429 (too many requests)');
 }
@@ -153,6 +183,7 @@ export function localPrintings(
     const key = printingKey(r);
     if (!key || printings.has(key) || todo.has(key)) continue;
     const hit = known.get(key) ?? cache[key];
+    if (hit === null) continue; // Scryfall did not know it last time.
     if (hit) {
       printings.set(key, hit);
     } else if (r.scryfall_id) {
@@ -187,17 +218,19 @@ export async function resolvePrintings(
       if (i > 0) await sleep(GAP_MS);
       if (signal?.aborted) return { printings: out, error: null, aborted: true };
       const batch = entries.slice(i, i + BATCH);
-      const cards = await fetchCollection(batch.map(([, ident]) => ident), signal);
+      const answer = await fetchCollection(batch.map(([, ident]) => ident), signal);
+      const { found, missing } = matchCollection(batch, answer);
       const fresh: Cache = {};
-      for (const c of cards) {
+      for (const [asked, c] of found) {
         const resolved = toResolved(c);
         const byId = c.id.toLowerCase();
         const bySet = `${c.set.toLowerCase()}/${c.collector_number.toLowerCase()}`;
-        for (const key of [byId, bySet]) {
+        for (const key of asked ? [asked, byId, bySet] : [byId, bySet]) {
           if (todo.has(key)) out.set(key, resolved);
           fresh[key] = resolved;
         }
       }
+      for (const key of missing) fresh[key] = null;
       saveCache(fresh);
     } catch (e) {
       if (isAbort(e) || signal?.aborted) return { printings: out, error: null, aborted: true };

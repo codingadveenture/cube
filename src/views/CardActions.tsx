@@ -157,10 +157,10 @@ function SuggestForm({ card, onDone }: { card: Card; onDone: () => void }) {
       {type === 'printing' && (
         <div className="inline-fields">
           <Field label="Set code">
-            <input type="text" value={set} onChange={(e) => setSet(e.target.value)} required autoCapitalize="characters" size={6} />
+            <input type="text" value={set} onChange={(e) => setSet(e.target.value)} required autoCapitalize="characters" autoCorrect="off" spellCheck={false} size={6} />
           </Field>
           <Field label="Collector number">
-            <input type="text" value={num} onChange={(e) => setNum(e.target.value)} required size={6} />
+            <input type="text" value={num} onChange={(e) => setNum(e.target.value)} required autoCorrect="off" spellCheck={false} size={6} />
           </Field>
         </div>
       )}
@@ -223,10 +223,10 @@ function BoxPrintingForm({ card, cards, onDone }: { card: Card; cards: Card[]; o
       <p className="muted">Records the Printing that is physically in the box. The Wanted Printing stays as it is, so a difference becomes a reprint.</p>
       <div className="inline-fields">
         <Field label="Set code">
-          <input type="text" value={set} onChange={(e) => setSet(e.target.value)} required autoCapitalize="characters" size={6} />
+          <input type="text" value={set} onChange={(e) => setSet(e.target.value)} required autoCapitalize="characters" autoCorrect="off" spellCheck={false} size={6} />
         </Field>
         <Field label="Collector number">
-          <input type="text" value={num} onChange={(e) => setNum(e.target.value)} required size={6} />
+          <input type="text" value={num} onChange={(e) => setNum(e.target.value)} required autoCorrect="off" spellCheck={false} size={6} />
         </Field>
       </div>
       {error && <p className="status error">{error}</p>}

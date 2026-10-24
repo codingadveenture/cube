@@ -167,3 +167,14 @@ export function markPrintedPatches(cards: Card[], lines: BatchLine[]): CardPatch
   }
   return out;
 }
+
+/**
+ * The names for the print history: the lines whose In-box Printing the patches change. Extras
+ * are printed too but change no In-box Printing, so they are left out.
+ */
+export function printedHistoryNames(lines: BatchLine[], patches: CardPatchFor[]): string[] {
+  const patched = new Set(patches.map((p) => p.oracle_id));
+  return lines
+    .filter((l) => (l.source === 'reprint' || l.source === 'new') && l.oracle_id && patched.has(l.oracle_id))
+    .map((l) => l.name);
+}

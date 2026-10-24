@@ -16,7 +16,7 @@ import {
   type DocumentData,
   type Firestore,
 } from 'firebase/firestore';
-import { chunk, withoutExisting } from './baseline';
+import { baselineCubeDoc, chunk, withoutExisting } from './baseline';
 import { cardBatches, cardPatchWrite, listChangeWrite, markPrintedWrites, type CardWrite } from './writes';
 import { ownerFromDoc } from './owner';
 import { guardNewCards, updateBatches } from '../upstream/update';
@@ -29,7 +29,6 @@ import {
   type CardPatchFor,
   type CycleAcks,
   type CardState,
-  type CubeDoc,
   type LogEntry,
   type ListChange,
   type LogEntryInput,
@@ -220,14 +219,7 @@ export class FirestoreStore implements Store {
     // Which docs exist is asked of the server, never the local cache, so nothing stored is replaced.
     const onServer = await getDocsFromServer(this.col('cards'));
     const docs = withoutExisting(all, new Set(onServer.docs.map((d) => d.id)));
-    const t = now();
-    const cube: CubeDoc = {
-      name: 'Vintage Cube',
-      cubecobraId: 'MTGVintageCube',
-      upstreamId: 'modovintage',
-      baselineImportedAt: t,
-      updatedAt: t,
-    };
+    const cube = baselineCubeDoc(now(), onServer.size);
     const chunks = chunk(docs);
     if (chunks.length === 0) chunks.push([]);
     const commits: Promise<void>[] = [];

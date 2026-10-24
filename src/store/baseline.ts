@@ -1,6 +1,6 @@
 // The baseline: card state documents built from cards.json, and the join back into Cards.
 import type { Card, Flag, InBoxPrinting, PrintingBase, WantedPrinting } from '../types';
-import type { CardState, InBoxState, WantedState } from './types';
+import type { CardState, CubeDoc, InBoxState, WantedState } from './types';
 import { pngImage, smallImage } from '../printings/images';
 import { cycleTagMap, deriveCycles } from './lifecycle';
 
@@ -12,6 +12,20 @@ export function chunk<T>(items: T[], size = BATCH_LIMIT): T[][] {
   const out: T[][] = [];
   for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
   return out;
+}
+
+/**
+ * The cubes/main fields an import writes (merged). baselineImportedAt records the first import
+ * only: a top-up import, made while the server already holds card docs, leaves it alone.
+ */
+export function baselineCubeDoc(now: string, docsOnServer: number): Omit<CubeDoc, 'baselineImportedAt'> & Partial<Pick<CubeDoc, 'baselineImportedAt'>> {
+  return {
+    name: 'Vintage Cube',
+    cubecobraId: 'MTGVintageCube',
+    upstreamId: 'modovintage',
+    ...(docsOnServer === 0 ? { baselineImportedAt: now } : {}),
+    updatedAt: now,
+  };
 }
 
 export function cardStateOf(card: Card, now: string): CardState {

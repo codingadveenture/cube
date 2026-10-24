@@ -52,7 +52,7 @@ export function Account() {
       <ul>
         <li>Accept or reject Suggestions.</li>
         <li>Flag art directly, set the In-box Printing, and clear Art flags.</li>
-        <li>Add and edit Log entries, import the log from a file, and import the baseline.</li>
+        <li>Add and edit Log entries, import the log from a file, and import the baseline (Import baseline appears at the top of the Cube page while the shared card state is empty).</li>
         <li>Delete any shared pile.</li>
         <li>Save print settings and printer profiles for everyone, and mark a Print batch as printed.</li>
         <li>Decide on the Upstream feed, apply Updates, mark cards Out or pulled, and export the List for CubeCobra.</li>

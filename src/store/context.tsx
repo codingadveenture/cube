@@ -2,7 +2,7 @@
 // renders from cards.json at once; when Firebase cannot start, the app stays local-only and says so.
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { AuthUser, Backend } from './firebase';
-import { isOwnerUid } from './owner';
+import { isOwnerUid, nextOwnerState, type OwnerState } from './owner';
 import { ANON_SIGN_IN_FAILED } from './signin';
 import {
   EMPTY_CYCLE_ACKS,
@@ -91,7 +91,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [unavailableReason, setUnavailableReason] = useState<string | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
-  const [owner, setOwner] = useState<{ loaded: boolean; config: OwnerConfig | null }>({ loaded: false, config: null });
+  const [owner, setOwner] = useState<OwnerState>({ loaded: false, config: null });
   const [online, setOnline] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine));
   const [notice, setNotice] = useState<Notice | null>(null);
   const noticeTimer = useRef<number | undefined>(undefined);
@@ -124,8 +124,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     });
     backend.ensureSignedIn().catch((e: unknown) => setAuthError(errorText(e)));
     const stopOwner = backend.store.subscribeOwner(
-      (s) => setOwner({ loaded: true, config: s.data }),
-      () => setOwner((o) => ({ ...o, loaded: true })),
+      (s) => setOwner((o) => nextOwnerState(o, s)),
+      // An error leaves the Owner unknown: Claim Owner stays hidden.
+      () => undefined,
     );
     return () => {
       stopUser();

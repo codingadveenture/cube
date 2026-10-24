@@ -36,13 +36,37 @@ export function CycleSheet({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
+      if (e.key === 'Tab' && ref.current) {
+        // Keep Tab inside the dialog.
+        const focusable = [...ref.current.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), [tabindex="0"]')];
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (!first || !last) return;
+        // Focus on the heading (tabIndex -1) or outside the sheet is not a trap stop, so wrap from there too.
+        const active = document.activeElement;
+        const onStop = active instanceof HTMLElement && focusable.includes(active);
+        if (e.shiftKey && (active === first || !onStop)) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && (active === last || !onStop)) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
+  // Focus returns to whatever opened the sheet when it closes.
   useEffect(() => {
-    ref.current?.querySelector<HTMLElement>('button')?.focus();
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    return () => opener?.focus();
+  }, []);
+
+  // The heading takes focus on each step, so focus never falls to the body behind a disabled button.
+  useEffect(() => {
+    ref.current?.querySelector<HTMLElement>('#sheet-title')?.focus();
   }, [step.kind]);
 
   const label = printingLine(printing);
@@ -64,7 +88,7 @@ export function CycleSheet({
   return (
     <div className="sheet-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" ref={ref}>
-        <h2 id="sheet-title">Set Wanted to {label}</h2>
+        <h2 id="sheet-title" tabIndex={-1}>Set Wanted to {label}</h2>
         {failed && step.kind !== 'done' && (
           <p className="status error" role="alert">
             Could not save the Wanted Printing. Nothing was changed; check the connection and try again.
@@ -83,7 +107,7 @@ export function CycleSheet({
                 disabled={busy || !store}
                 onClick={() =>
                   void write(
-                    [{ oracle_id: card.oracle_id, patch: { kind: 'wanted', wanted: wantedFromPrinting(printing, card.name, reason) } }],
+                    [{ oracle_id: card.oracle_id, patch: { kind: 'wanted', wanted: wantedFromPrinting(printing, null, reason) } }],
                     `Wanted Printing set to ${label}.`,
                   )
                 }
@@ -182,7 +206,7 @@ function CyclePreview({
               oracle_id: m.oracle_id,
               patch: {
                 kind: 'wanted' as const,
-                wanted: wantedFromPrinting(m.printing, m.name, m.oracle_id === card.oracle_id ? reason : 'cycle'),
+                wanted: wantedFromPrinting(m.printing, null, m.oracle_id === card.oracle_id ? reason : 'cycle'),
               },
             }));
             onConfirm(patches, patches.length);

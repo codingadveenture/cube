@@ -1,5 +1,5 @@
 // #/cycles: every Cycle with its status; #/cycles/<name>: one Cycle and its candidate Print runs.
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import type { Card } from '../../types';
 import { useCardStates, useStore } from '../../store/context';
 import type { CardPatchFor } from '../../store/types';
@@ -27,9 +27,49 @@ function Strip({ cards }: { cards: Card[] }) {
   );
 }
 
+/** True once the element has come near the viewport (always true without IntersectionObserver). */
+function useSeen(ref: RefObject<HTMLElement | null>): boolean {
+  const [seen, setSeen] = useState(() => typeof IntersectionObserver === 'undefined');
+  useEffect(() => {
+    const el = ref.current;
+    if (seen || !el) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) setSeen(true);
+      },
+      { rootMargin: '200px 0px' },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [ref, seen]);
+  return seen;
+}
+
+/** One Cycle in the list. Its members' printings files load only once it scrolls into view. */
+function CycleItem({ cards, name }: { cards: Card[]; name: string }) {
+  const ref = useRef<HTMLLIElement>(null);
+  const seen = useSeen(ref);
+  const names = useMemo(() => [name], [name]);
+  const { analyses, loading, errors } = useCycleAnalysis(cards, names, seen);
+  const a = analyses[0]!;
+  return (
+    <li ref={ref} className="cycle-item">
+      <a className="cycle-link" href={cycleHash(a.name)}>
+        <span className="row-name">
+          {a.label} <span className="count num">{a.members.length}</span>
+        </span>
+        <span className="printing">
+          <StatusChip shown={loading ? 'unknown' : a.shown} loading={loading} /> {!loading && <span>{a.status.summary}</span>}
+        </span>
+      </a>
+      {errors.length > 0 && <p className="status error">Could not load the Printings of {errors.length} cards; the status may be unknown.</p>}
+      <Strip cards={a.members} />
+    </li>
+  );
+}
+
 function CycleList({ cards }: { cards: Card[] }) {
   const names = useMemo(() => cyclesOf(cards).map((c) => c.name), [cards]);
-  const { analyses, loading, errors } = useCycleAnalysis(cards, names);
   return (
     <div className="cycles">
       <h1>Cycles</h1>
@@ -37,23 +77,12 @@ function CycleList({ cards }: { cards: Card[] }) {
         A Cycle should share one Print run. Uniform: one set and style. Styled: the same frame, border and style from different sets.
         Split: anything else.
       </p>
-      {errors.length > 0 && <p className="status error">Could not load the Printings of {errors.length} cards; their status may be unknown.</p>}
       <ul className="items">
-        {analyses.map((a) => (
-          <li key={a.name} className="cycle-item">
-            <a className="cycle-link" href={cycleHash(a.name)}>
-              <span className="row-name">
-                {a.label} <span className="count num">{a.members.length}</span>
-              </span>
-              <span className="printing">
-                <StatusChip shown={a.shown} loading={loading} /> <span>{a.status.summary}</span>
-              </span>
-            </a>
-            <Strip cards={a.members} />
-          </li>
+        {names.map((name) => (
+          <CycleItem key={name} cards={cards} name={name} />
         ))}
       </ul>
-      {analyses.length === 0 && <p className="status">No card belongs to a Cycle.</p>}
+      {names.length === 0 && <p className="status">No card belongs to a Cycle.</p>}
     </div>
   );
 }
@@ -68,7 +97,8 @@ function CyclePage({ cards, cycle }: { cards: Card[]; cycle: string }) {
   const [preview, setPreview] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [busy, setBusy] = useState(false);
-  const ownerReady = auth.isOwner && !!store && states.status === 'ready';
+  // Not from a cache-only snapshot: a stale In-box Printing must not become the new Wanted.
+  const ownerReady = auth.isOwner && !!store && states.status === 'ready' && !states.fromCache;
 
   if (a.members.length === 0) {
     return (
@@ -94,7 +124,7 @@ function CyclePage({ cards, cycle }: { cards: Card[]; cycle: string }) {
   function writeRun(run: CandidateRun) {
     const patches = run.picks.map((p) => ({
       oracle_id: p.oracle_id,
-      patch: { kind: 'wanted' as const, wanted: wantedFromPrinting(p.printing, p.name, 'cycle') },
+      patch: { kind: 'wanted' as const, wanted: wantedFromPrinting(p.printing, null, 'cycle') },
     }));
     void write(patches, `Wanted Printing set on ${patches.length} cards in ${a.label}.`);
   }

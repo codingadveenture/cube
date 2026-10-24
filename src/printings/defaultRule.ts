@@ -15,6 +15,12 @@ export function todayIso(now: Date = new Date()): string {
   return now.toISOString().slice(0, 10);
 }
 
+/** The local calendar date as YYYY-MM-DD, for dates people read (print sheets, history). */
+export function localDateIso(now: Date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
 /** True when the Printing's set is out on `today` (YYYY-MM-DD). */
 export function isReleased(p: Pick<IndexPrinting, 'released_at'>, today: string): boolean {
   return !p.released_at || p.released_at <= today;

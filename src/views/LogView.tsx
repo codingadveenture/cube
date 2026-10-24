@@ -28,7 +28,13 @@ export function LogView() {
       )}
       {adding && <EntryForm initial={EMPTY_ENTRY} onDone={() => setAdding(false)} />}
       <LiveStatus live={live} what="log entries" />
-      {live.status === 'ready' && entries.length === 0 && <p className="status">No Winner&rsquo;s Picks or Bans yet.</p>}
+      {live.status === 'ready' && entries.length === 0 && (
+        <p className="status">
+          {auth.isOwner
+            ? 'No entries yet. Use Add entry or Import log from file.'
+            : 'No entries yet. The Owner records Winner’s Picks and Bans here.'}
+        </p>
+      )}
       <ul className="items">
         {entries.map((e) => (
           <LogItem key={e.id} entry={e} />

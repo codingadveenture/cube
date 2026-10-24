@@ -3,11 +3,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Card } from '../../types';
 import { usePrintMetaDoc, useStore } from '../../store/context';
-import { todayIso } from '../../printings/defaultRule';
+import { localDateIso } from '../../printings/defaultRule';
 import { smallImage } from '../../printings/images';
 import {
   composeSlips,
   markPrintedPatches,
+  printedHistoryNames,
   mtgprintList,
   proxyGeneratorList,
   newCardLines,
@@ -150,7 +151,7 @@ export default function PrintView({ cards, section }: { cards: Card[]; section: 
   }, [section]);
 
   async function makePdf(testOnly: boolean) {
-    const date = todayIso();
+    const date = localDateIso();
     const these: Slip[] = testOnly ? [] : slips;
     const ctl = new AbortController();
     abort.current = ctl;
@@ -195,8 +196,8 @@ export default function PrintView({ cards, section }: { cards: Card[]; section: 
     if (!store) return;
     // In-box comes from the lines that went on the sheet, not the cards' current Wanted.
     const patches = markPrintedPatches(cards, g.lines);
-    const names = g.lines.map((l) => l.name);
-    const entry = { date: todayIso(), at: new Date().toISOString(), count: names.length, printer: settings.profile.name, names };
+    const names = printedHistoryNames(g.lines, patches);
+    const entry = { date: localDateIso(), at: new Date().toISOString(), count: names.length, printer: settings.profile.name, names };
     // The entry is appended with arrayUnion, so a stale or empty snapshot never replaces the
     // stored history; old entries are trimmed only from what the server last said.
     const trim = metaLive.status === 'ready' && !metaLive.fromCache ? historyTrim(metaLive.data?.history) : [];
@@ -351,17 +352,18 @@ export default function PrintView({ cards, section }: { cards: Card[]; section: 
           settings={settings}
           isOwner={isOwner}
           onSave={async (profile) => {
-            const next = { ...settings, profile };
             if (isOwner && store) {
+              // Only the factors: other unsaved changes in the draft stay unsaved.
               const ok = await save(
-                () => store.setMeta('print', { profiles: { [profile.name]: profile }, settings: next }),
+                () => store.setMeta('print', { profiles: { [profile.name]: profile }, settings: { ...shared, profile } }),
                 `Factors saved for ${profile.name}.`,
               );
-              if (ok) setOwnerDraft(null);
-            } else {
-              setLocalProfiles({ ...localProfiles, [profile.name]: profile });
-              setSettings(next);
+              if (ok) setOwnerDraft((d) => (d ? { ...d, profile } : null));
+              return ok;
             }
+            setLocalProfiles({ ...localProfiles, [profile.name]: profile });
+            setSettings({ ...settings, profile });
+            return true;
           }}
         />
 
@@ -707,11 +709,30 @@ function SettingsForm({
   );
 }
 
-function Calibration({ settings, isOwner, onSave }: { settings: PrintSettings; isOwner: boolean; onSave: (p: PrinterProfile) => void }) {
+function Calibration({
+  settings,
+  isOwner,
+  onSave,
+}: {
+  settings: PrintSettings;
+  isOwner: boolean;
+  onSave: (p: PrinterProfile) => Promise<boolean>;
+}) {
   const [mx, setMx] = useState('');
   const [my, setMy] = useState('');
   const [name, setName] = useState(settings.profile.name);
+  const [kept, setKept] = useState<string | null>(null);
   const verdict = mx && my ? calibrate(mx, my) : null;
+
+  async function keep(profile: PrinterProfile) {
+    const ok = await onSave(profile);
+    // The Owner gets a toast; a visitor's factors change nothing visible, so say it here.
+    if (ok && !isOwner) {
+      setKept(`Factors kept on this device for ${profile.name}.`);
+      setMx('');
+      setMy('');
+    }
+  }
   return (
     <div className="panel calibration">
       <h3>Calibration</h3>
@@ -722,13 +743,24 @@ function Calibration({ settings, isOwner, onSave }: { settings: PrintSettings; i
       <div className="settings-grid">
         <label className="field">
           <span>180 mm line measured (mm)</span>
-          <input type="text" inputMode="decimal" value={mx} onChange={(e) => setMx(e.target.value)} />
+          <input type="text" inputMode="decimal" value={mx} onChange={(e) => {
+              setMx(e.target.value);
+              setKept(null);
+            }} />
         </label>
         <label className="field">
           <span>260 mm line measured (mm)</span>
-          <input type="text" inputMode="decimal" value={my} onChange={(e) => setMy(e.target.value)} />
+          <input type="text" inputMode="decimal" value={my} onChange={(e) => {
+              setMy(e.target.value);
+              setKept(null);
+            }} />
         </label>
       </div>
+      {kept && (
+        <p className="status" role="status">
+          {kept}
+        </p>
+      )}
       {verdict && <p className={verdict.kind === 'ok' ? '' : 'status error'}>{verdict.message}</p>}
       {verdict?.kind === 'ok' && (
         <div className="inline-fields">
@@ -737,7 +769,7 @@ function Calibration({ settings, isOwner, onSave }: { settings: PrintSettings; i
             <input type="text" value={name} maxLength={60} onChange={(e) => setName(e.target.value)} />
           </label>
           <div className="actions">
-            <button type="button" className="primary" disabled={!name.trim()} onClick={() => onSave({ name: name.trim(), fx: verdict.fx, fy: verdict.fy })}>
+            <button type="button" className="primary" disabled={!name.trim()} onClick={() => void keep({ name: name.trim(), fx: verdict.fx, fy: verdict.fy })}>
               {isOwner ? 'Save factors for everyone' : 'Keep factors on this device'}
             </button>
           </div>

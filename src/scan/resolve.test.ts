@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ResolvedPrinting } from './diff';
 import type { ScannedRow } from './parse';
-import { CACHE_KEY, loadCache, localPrintings, resolvePrintings, saveCache } from './resolve';
+import { CACHE_KEY, loadCache, localPrintings, matchCollection, resolvePrintings, saveCache } from './resolve';
 
 function memoryStorage() {
   const data = new Map<string, string>();
@@ -100,6 +100,49 @@ describe('resolvePrintings', () => {
     expect(result.aborted).toBe(true);
     expect(calls.length).toBe(1);
     expect(result.printings.size).toBe(75);
+  });
+});
+
+describe('not found and renamed identifiers', () => {
+  function setRow(set: string, collector_number: string): ScannedRow {
+    return { name: 'x', quantity: 1, scryfall_id: null, set, collector_number, foil: null, language: null };
+  }
+
+  it('remembers not_found keys and maps a renumbered answer back to the typed key', async () => {
+    const fn = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          data: [{ id: 'abc', name: 'Card', set: 'mh2', collector_number: '263', illustration_id: 'ill' }],
+          not_found: [{ set: 'zzz', collector_number: '1' }],
+        }),
+        { status: 200 },
+      ),
+    );
+    vi.stubGlobal('fetch', fn);
+    const rows = [setRow('MH2', '0263'), setRow('zzz', '1')];
+    const result = await resolvePrintings(rows, new Map());
+    expect(result.printings.get('mh2/0263')?.illustration_id).toBe('ill');
+    expect(result.printings.has('zzz/1')).toBe(false);
+    expect(loadCache()['zzz/1']).toBeNull();
+    // Second run: both keys are settled from the cache, nothing is fetched.
+    const { printings, todo } = localPrintings(rows, new Map());
+    expect(todo.size).toBe(0);
+    expect(printings.has('mh2/0263')).toBe(true);
+    await resolvePrintings(rows, new Map());
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to the card id and set/number when the counts disagree', () => {
+    const card = { id: 'x1', name: 'x', set: 'lea', collector_number: '1' };
+    const { found, missing } = matchCollection(
+      [
+        ['a', { id: 'x1' }],
+        ['b', { id: 'x2' }],
+      ],
+      { data: [card], notFound: [] },
+    );
+    expect(found).toEqual([[null, card]]);
+    expect(missing).toEqual([]);
   });
 });
 

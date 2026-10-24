@@ -219,8 +219,8 @@ function CardRow({ card, action }: { card: Card; action?: ReactNode }) {
             {(life === 'retired' && card.retired_printing ? card.retired_printing : printing).set.toUpperCase()}{' '}
             {(life === 'retired' && card.retired_printing ? card.retired_printing : printing).collector_number.toUpperCase()}
             {differs && (
-              <span className="marker" title={`Wanted: ${card.wanted.set.toUpperCase()} ${card.wanted.collector_number}`}>
-                Wanted differs
+              <span className="marker">
+                Wanted {card.wanted.set.toUpperCase()} {card.wanted.collector_number.toUpperCase()}
               </span>
             )}
           </span>

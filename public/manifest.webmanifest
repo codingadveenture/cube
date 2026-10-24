@@ -11,7 +11,8 @@
   "icons": [
     { "src": "/cube/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
     { "src": "/cube/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/cube/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+    { "src": "/cube/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/cube/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "share_target": {
     "action": "/cube/share-target",
@@ -21,7 +22,7 @@
       "files": [
         {
           "name": "csv",
-          "accept": ["text/csv", "text/comma-separated-values", ".csv", "text/plain"]
+          "accept": ["text/csv", "text/comma-separated-values", ".csv", "text/plain", "application/csv", "text/x-csv", "application/vnd.ms-excel"]
         }
       ]
     }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { diffScan, printingKey, type ExpectedCard, type ResolvedPrinting } from './diff';
+import { diffScan, printingKey, scannedPrintings, type ExpectedCard, type ResolvedPrinting } from './diff';
 import type { ScannedRow } from './parse';
 
 function card(name: string, ill: string, set = 'lea', num = '1', front = name.split(' // ')[0]!): ExpectedCard {
@@ -69,12 +69,21 @@ describe('art verdicts', () => {
     expect(d.present[0]?.verdict).toBe('match');
   });
 
-  it('match wins when one of several rows matches', () => {
+  it('a second copy with different art is not hidden by a matching first copy', () => {
     const p = new Map([
-      ['id-1', printing('ill-other', 'm10', '146')],
       ['id-2', printing('ill-bolt', 'lea', '161')],
+      ['id-1', printing('ill-other', 'm10', '146')],
     ]);
-    const d = diffScan(one, [row('Lightning Bolt', 1, 'id-1'), row('Lightning Bolt', 1, 'id-2')], p);
+    const d = diffScan(one, [row('Lightning Bolt', 1, 'id-2'), row('Lightning Bolt', 1, 'id-1')], p);
+    expect(d.duplicates[0]?.verdict).toBe('different-art');
+    expect(d.duplicates[0]?.scanned?.set).toBe('m10');
+    expect(d.totals.differentArt).toBe(1);
+    expect(scannedPrintings(d.duplicates[0]!.rows)).toEqual(['LEA 161', 'M10 146']);
+  });
+
+  it('match when every resolved copy matches', () => {
+    const p = new Map([['id-2', printing('ill-bolt', 'lea', '161')]]);
+    const d = diffScan(one, [row('Lightning Bolt', 1, 'id-2'), row('Lightning Bolt', 1, 'id-2')], p);
     expect(d.duplicates[0]?.verdict).toBe('match');
   });
 

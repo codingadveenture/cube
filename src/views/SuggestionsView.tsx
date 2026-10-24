@@ -32,7 +32,7 @@ export function SuggestionsView({ cards }: { cards: Card[] }) {
         All Suggestions <span className="count num">{openCount} open</span>
       </h2>
       <LiveStatus live={live} what="Suggestions" />
-      {live.status === 'ready' && sorted.length === 0 && <p className="status">No Suggestions yet.</p>}
+      {live.status === 'ready' && sorted.length === 0 && <p className="status">No Suggestions yet. Open New Suggestion above to send one.</p>}
       <ul className="items">
         {sorted.map((s) => (
           <SuggestionItem
@@ -146,10 +146,10 @@ function NewSuggestion({ cards }: { cards: Card[] }) {
         {type === 'printing' && (
           <div className="inline-fields">
             <Field label="Set code">
-              <input type="text" value={set} onChange={(e) => setSet(e.target.value)} required size={6} />
+              <input type="text" value={set} onChange={(e) => setSet(e.target.value)} required autoCapitalize="characters" autoCorrect="off" spellCheck={false} size={6} />
             </Field>
             <Field label="Collector number">
-              <input type="text" value={num} onChange={(e) => setNum(e.target.value)} required size={6} />
+              <input type="text" value={num} onChange={(e) => setNum(e.target.value)} required autoCorrect="off" spellCheck={false} size={6} />
             </Field>
           </div>
         )}
@@ -264,6 +264,7 @@ function SuggestionItem({
 
   async function reject() {
     if (!store || busy) return;
+    if (!window.confirm(`Reject this Suggestion for ${s.card_name || 'no card'}? This cannot be undone here.`)) return;
     setBusy(true);
     try {
       await save(() => store.resolveSuggestion(s.id, 'rejected', note.trim() || null, null), 'Suggestion rejected.');

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import type { Card } from '../types';
 import { normalizeName } from '../lib/normalize';
 import { replaceHash } from '../router';
@@ -9,6 +9,7 @@ import {
   type ExpectedCard,
   type ResolvedPrinting,
   type UnexpectedResult,
+  scannedPrintings,
 } from '../scan/diff';
 import { knownPrintings, localPrintings, resolvePrintings, type ResolveProgress } from '../scan/resolve';
 import { expectedCards } from '../scan/expected';
@@ -99,7 +100,10 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
         }
         replaceHash('#/scan');
       })
-      .catch((e: unknown) => setError(`Could not read the shared file: ${String(e)}`));
+      .catch((e: unknown) => {
+        console.warn('Could not read the shared file', e);
+        setError('Could not read the shared file. Try Choose files instead.');
+      });
   }, [sharedFlag]);
 
   // Resolve scanned Printings whenever the piles change. What cards.json and the cache already
@@ -118,7 +122,8 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
       setPrintings(result.printings);
       setProgress(null);
       if (result.error) {
-        setError(`Could not reach Scryfall to check all art: ${result.error}. Names are still compared.`);
+        console.warn('Scryfall lookup stopped:', result.error);
+        setError('Could not reach Scryfall (no connection?). Names are still compared; art will be checked next time.');
       }
     });
     return () => controller.abort();
@@ -195,7 +200,8 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
         `In-box Printing of ${card.name} set to ${s.set.toUpperCase()} ${s.collector_number}.`,
       );
     } catch (e) {
-      setError(String(e instanceof Error ? e.message : e));
+      console.warn('Box has this printing failed', e);
+      setError(`Could not look up ${s.set.toUpperCase()} ${s.collector_number} (no connection?). Try again.`);
     }
   }
 
@@ -272,6 +278,21 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
     { id: 'other-set', label: 'Other set', count: t.sameArtOtherSet },
     { id: 'unknown', label: 'Unknown art', count: t.unknown },
   ];
+  // Tabs pattern: arrow keys, Home and End move the selection and the focus.
+  function onTabKey(e: KeyboardEvent) {
+    const i = tabs.findIndex((x) => x.id === tab);
+    const next =
+      e.key === 'ArrowRight' ? (i + 1) % tabs.length
+      : e.key === 'ArrowLeft' ? (i - 1 + tabs.length) % tabs.length
+      : e.key === 'Home' ? 0
+      : e.key === 'End' ? tabs.length - 1
+      : -1;
+    if (next < 0) return;
+    e.preventDefault();
+    const id = tabs[next]!.id;
+    setTab(id);
+    document.getElementById(`scan-tab-${id}`)?.focus();
+  }
   const hasPiles = diffPiles.length > 0;
   const hasLocalPiles = session.piles.length > 0;
   const sharedIds = new Set(scans.data.map((s) => s.id));
@@ -312,6 +333,7 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
         <label className="paste">
           <span>Or paste a list</span>
           <textarea
+            className="scan-paste"
             rows={4}
             value={paste}
             onChange={(e) => setPaste(e.target.value)}
@@ -382,7 +404,7 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
       {hasPiles && (
         <>
           <dl className="totals num">
-            <Total label="Expected" value={t.expected} />
+            <Total label="On the List" value={t.expected} />
             <Total label="Scanned rows" value={t.scannedRows} />
             <Total label="Scanned names" value={t.scannedUniqueNames} />
             <Total label="Missing" value={t.missing} warn />
@@ -400,13 +422,16 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
             <button type="button" className="danger" onClick={clearAll}>Clear session</button>
           </div>
 
-          <div className="tabs" role="tablist" aria-label="Diff">
+          <div className="tabs" role="tablist" aria-label="Diff" onKeyDown={onTabKey}>
             {tabs.map((x) => (
               <button
                 key={x.id}
+                id={`scan-tab-${x.id}`}
                 type="button"
                 role="tab"
                 aria-selected={tab === x.id}
+                aria-controls="scan-panel"
+                tabIndex={tab === x.id ? 0 : -1}
                 className="tab"
                 onClick={() => setTab(x.id)}
               >
@@ -415,7 +440,7 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
             ))}
           </div>
 
-          <div role="tabpanel">
+          <div role="tabpanel" id="scan-panel" aria-labelledby={`scan-tab-${tab}`} tabIndex={0}>
             <p className="muted">{TAB_HINT[tab]}</p>
             {tab === 'missing' && (
               <ItemList empty="Nothing missing.">
@@ -454,7 +479,7 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
                 {diff.duplicates.map((r) => (
                   <Item key={r.card.oracle_id} k={`duplicates:${r.card.oracle_id}`} session={session} toggle={toggle}>
                     <Thumb src={imageOf(r.card)} />
-                    <ItemText card={r.card} note={`Scanned ${r.count} times, expected once`} />
+                    <ItemText card={r.card} note={duplicateNote(r)} />
                   </Item>
                 ))}
               </ItemList>
@@ -485,6 +510,11 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
       )}
     </div>
   );
+}
+
+function duplicateNote(r: CardResult): string {
+  const seen = scannedPrintings(r.rows);
+  return `Scanned ${r.count} times, expected once${seen.length > 0 ? ` · ${seen.join(', ')}` : ''}`;
 }
 
 function Total({ label, value, warn }: { label: string; value: number; warn?: boolean }) {

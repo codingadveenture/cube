@@ -132,7 +132,7 @@ function Picker({ card, cards, printings }: { card: Card; cards: Card[]; printin
     setBusy(true);
     try {
       await save(
-        () => store.updateCard(card.oracle_id, { kind: 'wanted', wanted: wantedFromPrinting(p, card.name, reason) }),
+        () => store.updateCard(card.oracle_id, { kind: 'wanted', wanted: wantedFromPrinting(p, null, reason) }),
         `Wanted Printing set to ${printingLine(p)}.`,
       );
     } finally {
@@ -170,8 +170,10 @@ function Picker({ card, cards, printings }: { card: Card; cards: Card[]; printin
         </button>
       );
     }
+    // Without shared data a visitor has nothing to do here; the notice above says so.
+    if (!store) return null;
     return (
-      <button type="button" disabled={!store || busy || !by.trim()} onClick={() => void suggest(p)}>
+      <button type="button" disabled={busy || !by.trim()} onClick={() => void suggest(p)}>
         Suggest this Printing
       </button>
     );

@@ -1,6 +1,6 @@
 /// <reference types="node" />
 import { readFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { Card, CardsFile } from '../types';
 import { cardStateOf, mergeCards } from '../store/baseline';
 import { parseHash } from '../router';
@@ -11,6 +11,7 @@ import {
   composeSlips,
   frontImage,
   markPrintedPatches,
+  printedHistoryNames,
   mtgprintList,
   proxyGeneratorList,
   reprintLines,
@@ -19,6 +20,7 @@ import {
 import { DEFAULT_SETTINGS, appendHistory, effectiveSettings, historyTrim, mergeSettings, parseSetting, toPrintMeta, type PrintSettings } from './settings';
 import { fromScryfall, mergeExtras, resolveExtras, toExtras, type ExtraDeps } from './extras';
 import { plainError } from './errors';
+import { defaultFetch } from './pdf';
 import { markPrintedWrites, MARK_PRINTED_MAX } from '../store/writes';
 
 const root = new URL('../../', import.meta.url);
@@ -287,6 +289,10 @@ describe('batch composition', () => {
     const extra: BatchLine = { ...lineOf(byName('Fiery Islet')), key: 'x:1', source: 'extra' };
     const patches = markPrintedPatches(merged, [...lines, extra]);
     expect(patches).toHaveLength(lines.length);
+    // The history counts the reprints only, not the extra.
+    const names = printedHistoryNames([...lines, extra], patches);
+    expect(names).toEqual(lines.map((l) => l.name));
+    expect(names).toHaveLength(patches.length);
     const p = patches.find((x) => x.oracle_id === aang.oracle_id)!;
     expect(p.patch).toEqual({
       kind: 'in_box',
@@ -528,6 +534,27 @@ describe('mark as printed write', () => {
     const many = Array.from({ length: MARK_PRINTED_MAX + 1 }, (_, i) => patch(`c${i}`, 'x'));
     expect(() => markPrintedWrites(many, NOW)).toThrow(/Too many cards/);
     expect(markPrintedWrites(many.slice(1), NOW)).toHaveLength(MARK_PRINTED_MAX);
+  });
+});
+
+describe('image fetch timeout', () => {
+  it('gives up on a hung request after the timeout', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        (_url: string, init: { signal: AbortSignal }) =>
+          new Promise((_resolve, reject) => init.signal.addEventListener('abort', () => reject(init.signal.reason))),
+      ),
+    );
+    try {
+      await expect(defaultFetch('https://x/img.jpg', undefined, 20)).rejects.toBeTruthy();
+      const user = new AbortController();
+      const pending = defaultFetch('https://x/img.jpg', user.signal, 60_000);
+      user.abort();
+      await expect(pending).rejects.toBeTruthy();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 

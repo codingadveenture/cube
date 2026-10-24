@@ -24,11 +24,14 @@ export interface CycleAnalysis {
   ack: string | undefined;
 }
 
-/** Status of each named Cycle from the live cards, with the members' printings files loaded. */
-export function useCycleAnalysis(cards: Card[], cycles: readonly string[]) {
+/**
+ * Status of each named Cycle from the live cards, with the members' printings files loaded.
+ * With `load` false nothing is fetched yet (and the result counts as loading).
+ */
+export function useCycleAnalysis(cards: Card[], cycles: readonly string[], load = true) {
   const acks = useCycleAcks();
   const byCycle = useMemo(() => cycles.map((c) => ({ name: c, members: cycleMembers(cards, c) })), [cards, cycles]);
-  const ids = useMemo(() => byCycle.flatMap((c) => c.members.map((m) => m.oracle_id)), [byCycle]);
+  const ids = useMemo(() => (load ? byCycle.flatMap((c) => c.members.map((m) => m.oracle_id)) : []), [byCycle, load]);
   const many = useManyPrintings(ids);
   const analyses = useMemo<CycleAnalysis[]>(
     () =>
@@ -39,7 +42,7 @@ export function useCycleAnalysis(cards: Card[], cycles: readonly string[]) {
       }),
     [byCycle, many.files, acks.data],
   );
-  return { analyses, files: many.files, loading: many.loading, errors: many.errors };
+  return { analyses, files: many.files, loading: many.loading || !load, errors: many.errors };
 }
 
 export function StatusChip({ shown, loading }: { shown: CycleAnalysis['shown']; loading?: boolean }) {

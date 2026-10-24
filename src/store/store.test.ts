@@ -7,9 +7,9 @@ import { diffScan } from '../scan/diff';
 import { expectedCards } from '../scan/expected';
 import { mergedRows } from '../scan/session';
 import { applySuggestion, ApplyError } from './apply';
-import { BATCH_LIMIT, baselineDocs, cardStateOf, chunk, mergeCard, mergeCards, withoutExisting } from './baseline';
+import { BATCH_LIMIT, baselineCubeDoc, baselineDocs, cardStateOf, chunk, mergeCard, mergeCards, withoutExisting } from './baseline';
 import { newLogEntries, parseLogFile, sortLog } from './logImport';
-import { isOwnerUid, ownerFromDoc } from './owner';
+import { isOwnerUid, nextOwnerState, ownerFromDoc } from './owner';
 import { addsText, bansText, cubecobraPasteText } from './paste';
 import { pilesForDiff, sharedPileInput } from './piles';
 import { singleFlight } from './signin';
@@ -280,7 +280,25 @@ describe('Owner detection', () => {
   });
 });
 
+describe('Owner state from snapshots', () => {
+  it('counts the Owner as known only after a server snapshot', () => {
+    const start = { loaded: false, config: null };
+    const cached = nextOwnerState(start, { data: null, fromCache: true });
+    expect(cached.loaded).toBe(false);
+    const server = nextOwnerState(cached, { data: { uid: 'o' }, fromCache: false });
+    expect(server).toEqual({ loaded: true, config: { uid: 'o' } });
+    expect(nextOwnerState(server, { data: { uid: 'o' }, fromCache: true }).loaded).toBe(true);
+  });
+});
+
 describe('baseline import', () => {
+  it('records baselineImportedAt on the first import only', () => {
+    expect(baselineCubeDoc(NOW, 0).baselineImportedAt).toBe(NOW);
+    const topUp = baselineCubeDoc(NOW, 12);
+    expect('baselineImportedAt' in topUp).toBe(false);
+    expect(topUp.updatedAt).toBe(NOW);
+  });
+
   it('chunks into batches of at most 400', () => {
     const docs = baselineDocs(cards, new Set(), NOW);
     expect(docs.length).toBe(cards.length);

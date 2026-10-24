@@ -5,7 +5,7 @@ import type { Card, CardsFile } from '../types';
 import { mergeCard, cardStateOf } from '../store/baseline';
 import { cardBatches } from '../store/writes';
 import { parseHash, printingsHash, cycleHash } from '../router';
-import { defaultPrinting } from './defaultRule';
+import { defaultPrinting, localDateIso } from './defaultRule';
 import { pngImage, smallImage } from './images';
 import { artKey, runKey, runLabel } from './style';
 import {
@@ -23,6 +23,7 @@ import {
 import { DEFAULT_FILTERS, badges, filterPrintings, groupByArt } from './picker';
 import { wantedFromInBox, wantedFromPrinting } from './wanted';
 import type { IndexPrinting, PrintingsFile } from './types';
+import { createLimiter } from './load';
 
 const root = new URL('../../', import.meta.url);
 const cards = (JSON.parse(readFileSync(new URL('public/data/cards.json', root), 'utf8')) as CardsFile).cards;
@@ -65,6 +66,35 @@ function pr(over: Partial<IndexPrinting>): IndexPrinting {
     ...over,
   };
 }
+
+describe('local date', () => {
+  it('uses the local calendar day, not the UTC one', () => {
+    expect(localDateIso(new Date(2026, 0, 1, 0, 30))).toBe('2026-01-01');
+    expect(localDateIso(new Date(2026, 11, 31, 23, 59))).toBe('2026-12-31');
+  });
+});
+
+describe('load limiter', () => {
+  it('runs at most the given number of tasks at once, in order', async () => {
+    const run = createLimiter(2);
+    let active = 0;
+    let peak = 0;
+    const order: number[] = [];
+    const task = (n: number) => async () => {
+      active++;
+      peak = Math.max(peak, active);
+      await new Promise((r) => setTimeout(r, 5));
+      order.push(n);
+      active--;
+      if (n === 3) throw new Error('boom');
+      return n;
+    };
+    const results = await Promise.allSettled([1, 2, 3, 4, 5].map((n) => run(task(n))));
+    expect(peak).toBe(2);
+    expect(results.map((r) => r.status)).toEqual(['fulfilled', 'fulfilled', 'rejected', 'fulfilled', 'fulfilled']);
+    expect(order.sort()).toEqual([1, 2, 3, 4, 5]);
+  });
+});
 
 describe('default Printing rule', () => {
   it('picks the newest qualifying Printing', () => {

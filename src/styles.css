@@ -225,9 +225,11 @@ textarea {
   color: var(--text);
   font: inherit;
 }
-textarea {
+/* The Scan paste field holds card lists, so it is monospace; note fields keep the body font.
+   1rem keeps phones from zooming in on focus. */
+textarea.scan-paste {
   font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
-  font-size: 0.9rem;
+  font-size: 1rem;
 }
 
 /* Cube view */
@@ -1175,4 +1177,44 @@ button.tile-button {
 }
 .upstream .error {
   color: var(--warn);
+}
+
+/* display:flex drops the native disclosure triangle from these summaries; draw a chevron instead
+   that turns when the details are open. */
+details.panel > summary,
+.token-body details summary,
+.print details > summary,
+.retired > summary,
+.upstream details > summary {
+  list-style: none;
+}
+details.panel > summary::-webkit-details-marker,
+.token-body details summary::-webkit-details-marker,
+.print details > summary::-webkit-details-marker,
+.retired > summary::-webkit-details-marker,
+.upstream details > summary::-webkit-details-marker {
+  display: none;
+}
+details.panel > summary::before,
+.token-body details summary::before,
+.print details > summary::before,
+.retired > summary::before,
+.upstream details > summary::before {
+  content: '';
+  flex: none;
+  width: 0.45em;
+  height: 0.45em;
+  margin: 0 0.6em 0 0.15em;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 0.15s ease;
+}
+details[open] > summary::before {
+  transform: rotate(45deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  details > summary::before {
+    transition: none;
+  }
 }

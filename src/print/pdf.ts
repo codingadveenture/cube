@@ -26,7 +26,7 @@ export interface PdfInput {
   settings: PrintSettings;
   /** YYYY-MM-DD, printed on the test page and in the metadata. */
   date: string;
-  fetchImage?: (url: string) => Promise<Uint8Array>;
+  fetchImage?: (url: string, signal?: AbortSignal) => Promise<Uint8Array>;
   onProgress?: (p: PdfProgress) => void;
   /** Pause between image requests, in ms (default 50). */
   gapMs?: number;
@@ -46,8 +46,25 @@ export function pdfFileName(date: string): string {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function defaultFetch(url: string): Promise<Uint8Array> {
-  const res = await fetch(url);
+/** How long one image request may take before it counts as failed (and is retried once). */
+export const IMAGE_TIMEOUT_MS = 15_000;
+
+/** The caller's signal and a timeout, as one signal. */
+export function withTimeout(signal: AbortSignal | undefined, ms: number): AbortSignal {
+  const timeout = AbortSignal.timeout(ms);
+  if (!signal) return timeout;
+  if (typeof AbortSignal.any === 'function') return AbortSignal.any([signal, timeout]);
+  const ctl = new AbortController();
+  const stop = () => ctl.abort();
+  signal.addEventListener('abort', stop, { once: true });
+  timeout.addEventListener('abort', stop, { once: true });
+  if (signal.aborted) ctl.abort();
+  return ctl.signal;
+}
+
+export async function defaultFetch(url: string, signal?: AbortSignal, timeoutMs = IMAGE_TIMEOUT_MS): Promise<Uint8Array> {
+  // A hung request would otherwise stop the sequential loop for good.
+  const res = await fetch(url, { signal: withTimeout(signal, timeoutMs) });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return new Uint8Array(await res.arrayBuffer());
 }
@@ -146,11 +163,11 @@ export async function buildPrintPdf(input: PdfInput): Promise<PdfResult> {
     onProgress?.({ done: i, total: urls.length, current: name });
     if (i > 0) await sleep(gap);
     try {
-      images.set(url, await fetchImage(url));
+      images.set(url, await fetchImage(url, signal));
     } catch {
       await sleep(Math.max(gap, 500));
       try {
-        images.set(url, await fetchImage(url));
+        images.set(url, await fetchImage(url, signal));
       } catch {
         failedUrls.add(url);
       }
