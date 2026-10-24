@@ -101,7 +101,10 @@ function CyclePage({ cards, cycle }: { cards: Card[]; cycle: string }) {
 
   function resetToBox() {
     if (!window.confirm(`Set the Wanted Printing of all ${a.members.length} cards in ${a.label} back to their In-box Printing?`)) return;
-    const patches = a.members.map((m) => ({ oracle_id: m.oracle_id, patch: { kind: 'wanted' as const, wanted: wantedFromInBox(m) } }));
+    const patches = a.members.flatMap((m) => {
+      const wanted = wantedFromInBox(m);
+      return wanted ? [{ oracle_id: m.oracle_id, patch: { kind: 'wanted' as const, wanted } }] : [];
+    });
     void write(patches, `${a.label} reset to the In-box Printings.`);
   }
 
@@ -213,7 +216,7 @@ function MemberList({ a }: { a: CycleAnalysis }) {
               <span className="row-name">{m.name}</span>
               <span className="printing num">
                 Wanted {printingLine(m.wanted)}
-                {m.wanted.scryfall_id !== m.in_box.scryfall_id && <span className="marker">Reprint pending</span>}
+                {!m.in_box ? <span className="marker">To print</span> : m.wanted.scryfall_id !== m.in_box.scryfall_id && <span className="marker">Reprint pending</span>}
               </span>
             </span>
           </a>

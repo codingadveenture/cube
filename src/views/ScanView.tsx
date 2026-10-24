@@ -279,7 +279,7 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
   const checking = progress !== null && progress.done < progress.total;
   const artEmpty = (text: string) => (checking ? 'Checking art…' : text);
 
-  const imageOf = (c: ExpectedCard) => byOracle.get(c.oracle_id)?.in_box.image_small ?? c.in_box.image_small;
+  const imageOf = (c: ExpectedCard) => byOracle.get(c.oracle_id)?.in_box?.image_small ?? c.in_box.image_small;
 
   return (
     <div className="scan">

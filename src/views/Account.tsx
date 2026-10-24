@@ -55,6 +55,7 @@ export function Account() {
         <li>Add and edit Log entries, import the log from a file, and import the baseline.</li>
         <li>Delete any shared pile.</li>
         <li>Save print settings and printer profiles for everyone, and mark a Print batch as printed.</li>
+        <li>Decide on the Upstream feed, apply Updates, mark cards Out or pulled, and export the List for CubeCobra.</li>
       </ul>
     </section>
   );

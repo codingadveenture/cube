@@ -124,7 +124,8 @@ async function resolveRow(r: ScannedRow, cards: Card[], deps: ExtraDeps): Promis
   if (!p || !p.scryfall_id) return null;
   const owner = card ?? cubeCardFor(p.name, cards);
   if (owner || !p.name.includes(' // ')) {
-    const doubleFaced = !!owner?.in_box.back_image_normal;
+    const face = owner ? (owner.in_box ?? owner.wanted) : null;
+    const doubleFaced = !!face?.back_image_normal;
     return {
       key: `x:${id}`,
       source: 'extra',
@@ -137,7 +138,7 @@ async function resolveRow(r: ScannedRow, cards: Card[], deps: ExtraDeps): Promis
       illustration_id: p.illustration_id,
       image_normal: p.image_small ? p.image_small.replace('/small/', '/normal/') : scryfallImage(p.scryfall_id, 'normal'),
       back_image_normal: doubleFaced ? scryfallImage(p.scryfall_id, 'normal', 'back') : null,
-      back_name: doubleFaced ? owner!.in_box.back_name : null,
+      back_name: doubleFaced ? face!.back_name : null,
       quantity: r.quantity,
     };
   }

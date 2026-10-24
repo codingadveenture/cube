@@ -18,6 +18,8 @@ const PickerView = lazy(() => import('./views/printings/PickerView'));
 const CyclesView = lazy(() => import('./views/printings/CyclesView'));
 // The Print view (and jsPDF, which it imports on demand) stays out of the main chunk.
 const PrintView = lazy(() => import('./views/print/PrintView'));
+// The Update view (CubeCobra, Scryfall and the CSV export) loads on demand too.
+const UpstreamView = lazy(() => import('./views/upstream/UpstreamView'));
 
 const NAV = [
   { view: 'cube', href: '#/cube', label: 'Cube' },
@@ -25,7 +27,7 @@ const NAV = [
   { view: 'scan', href: '#/scan', label: 'Scan' },
   { view: 'print', href: '#/print', label: 'Print' },
   { view: 'suggestions', href: '#/suggestions', label: 'Suggest' },
-  { view: 'log', href: '#/log', label: 'Log' },
+  { view: 'upstream', href: '#/upstream', label: 'Update' },
 ] as const;
 
 export function App() {
@@ -40,9 +42,11 @@ function Shell() {
   const route = useRoute();
   const cards = useCards();
   const states = useCardStates();
+  const { auth } = useStore();
   const base = cards.status === 'ready' ? cards.data.cards : null;
   // The stored card state laid over cards.json; cards.json alone until the store has answered.
   const merged = useMemo(() => (base ? mergeCards(base, states.data) : null), [base, states.data]);
+  const onList = useMemo(() => merged?.filter((c) => c.in_list) ?? null, [merged]);
 
   const detailId = route.view === 'cube' || route.view === 'printings' ? route.oracleId : route.view === 'cycles' ? route.cycle : null;
   useEffect(() => {
@@ -66,11 +70,16 @@ function Shell() {
   } else if (route.view === 'printings') {
     body = <PickerView key={route.oracleId} cards={merged} oracleId={route.oracleId} />;
   } else if (route.view === 'cycles') {
-    body = <CyclesView cards={merged} cycle={route.cycle} />;
+    // Cycles are planned for the cards on the List; retired cards and cards to pull are left out.
+    body = <CyclesView cards={onList ?? merged} cycle={route.cycle} />;
   } else if (route.view === 'print') {
     body = <PrintView cards={merged} section={route.query.get('section')} />;
   } else if (route.view === 'suggestions') {
     body = <SuggestionsView cards={merged} />;
+  } else if (route.view === 'upstream') {
+    // Only a server snapshot of the card state counts: on cards.json alone (loading, error, cache) the
+    // Update would treat stored cards as new and the CSV would roll the List back.
+    body = <UpstreamView cards={merged} cardsReady={states.status === 'ready' && !states.fromCache && auth.ownerLoaded} />;
   } else if (route.oracleId) {
     body = <CardDetail cards={merged} oracleId={route.oracleId} />;
   } else {
@@ -105,9 +114,9 @@ function Shell() {
   );
 }
 
-/** The nav entry a view belongs to: the picker is part of the Cube; About has no bar entry (it is in the account menu). */
+/** The nav entry a view belongs to: the picker is part of the Cube; About and Log have no bar entry (they are in the account menu). */
 function navView(view: string): string | null {
-  if (view === 'about') return null;
+  if (view === 'about' || view === 'log') return null;
   return view === 'printings' ? 'cube' : view;
 }
 
@@ -130,10 +139,12 @@ function CardSource({ states, base }: { states: Live<Map<string, CardState>>; ba
   );
 }
 
-/** The account chip in the header: a small menu with About and Sign in as Owner or Sign out. */
+/** The account chip in the header: a small menu with Log, About and Sign in as Owner or Sign out. */
 function AccountChip() {
   const { auth, connection, signInAsOwner, signOut } = useStore();
-  const onAbout = useRoute().view === 'about';
+  const view = useRoute().view;
+  const onAbout = view === 'about';
+  const onLog = view === 'log';
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
@@ -161,11 +172,14 @@ function AccountChip() {
   const label = auth.isOwner ? 'Owner' : auth.provider === 'google' ? 'Signed in' : 'Account';
   return (
     <div className="account-wrap" ref={box}>
-      <button ref={button} type="button" className={onAbout ? 'account current' : 'account'} aria-expanded={open} aria-controls="account-menu" onClick={() => setOpen((o) => !o)}>
+      <button ref={button} type="button" className={onAbout || onLog ? 'account current' : 'account'} aria-expanded={open} aria-controls="account-menu" onClick={() => setOpen((o) => !o)}>
         {label}
       </button>
       {open && (
         <div className="account-menu" id="account-menu">
+          <a href="#/log" aria-current={onLog ? 'page' : undefined} onClick={() => setOpen(false)}>
+            Log
+          </a>
           <a href="#/about" aria-current={onAbout ? 'page' : undefined} onClick={() => setOpen(false)}>
             About
           </a>

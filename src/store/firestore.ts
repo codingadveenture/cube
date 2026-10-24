@@ -5,7 +5,9 @@ import {
   arrayUnion,
   collection,
   deleteDoc,
+  deleteField,
   doc,
+  getDocFromServer,
   getDocsFromServer,
   onSnapshot,
   setDoc,
@@ -17,6 +19,7 @@ import {
 import { chunk, withoutExisting } from './baseline';
 import { cardBatches, cardPatchWrite, listChangeWrite, markPrintedWrites, type CardWrite } from './writes';
 import { ownerFromDoc } from './owner';
+import { guardNewCards, updateBatches } from '../upstream/update';
 import {
   CUBE_ID,
   EMPTY_CYCLE_ACKS,
@@ -38,6 +41,7 @@ import {
   type Store,
   type Suggestion,
   type SuggestionInput,
+  type UpdateWrites,
 } from './types';
 
 const now = () => new Date().toISOString();
@@ -356,6 +360,44 @@ export class FirestoreStore implements Store {
 
   setOverrides(o: Overrides): Promise<void> {
     return setDoc(this.overridesRef(), { adds: o.adds, bans: o.bans, updatedAt: now() });
+  }
+
+  async applyUpdate(input: UpdateWrites): Promise<void> {
+    let w = input;
+    const fresh = w.cards.filter((p) => p.patch.kind === 'new_card').map((p) => p.oracle_id);
+    if (fresh.length) {
+      // A new card doc is only written where the server has none; whether one exists is asked of
+      // the server, never the local cache, so a stored In-box is never reset.
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        throw new Error('An Update with new cards needs a connection to the server. Try again when online.');
+      }
+      const snaps = await Promise.all(fresh.map((id) => getDocFromServer(doc(this.col('cards'), id))));
+      const existing = new Map<string, CardState>();
+      for (const snap of snaps) if (snap.exists()) existing.set(snap.id, snap.data() as CardState);
+      if (existing.size) w = { ...w, cards: guardNewCards(w.cards, existing) };
+    }
+    const t = now();
+    const trim = w.trim ?? [];
+    // Committed in order without waiting between batches, so an offline Update is queued whole;
+    // Firestore applies one client's batches in the order they were committed.
+    const commits = updateBatches(w, t).map((part) => {
+      const batch = writeBatch(this.db);
+      for (const { oracle_id, write } of part.cards) batch.set(doc(this.col('cards'), oracle_id), writeData(write), { merge: true });
+      if (part.meta) {
+        if (Object.keys(w.decisions).length) batch.set(this.metaRef('upstream'), { decisions: w.decisions, updatedAt: t }, { merge: true });
+        // Two writes to one doc: Firestore allows one transform per field per write.
+        if (trim.length) batch.set(this.metaRef('updates'), { history: arrayRemove(...trim) }, { merge: true });
+        batch.set(this.metaRef('updates'), { history: arrayUnion(w.history), updatedAt: t }, { merge: true });
+      }
+      return batch.commit();
+    });
+    await Promise.all(commits);
+  }
+
+  saveUpstreamSnapshot(snapshot: { fetched_at: string; list_names: string[]; upstream_names: string[] }, dropDecisions: string[]): Promise<void> {
+    const data: Record<string, unknown> = { ...snapshot, updatedAt: now() };
+    if (dropDecisions.length) data.decisions = Object.fromEntries(dropDecisions.map((name) => [name, deleteField()]));
+    return setDoc(this.metaRef('upstream'), data, { merge: true });
   }
 
   claimOwner(): Promise<void> {

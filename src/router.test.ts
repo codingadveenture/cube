@@ -24,6 +24,11 @@ describe('router', () => {
     expect(parseHash('#/about').view).toBe('about');
   });
 
+  it('knows the Update view and keeps #/log working', () => {
+    expect(parseHash('#/upstream').view).toBe('upstream');
+    expect(parseHash('#/log').view).toBe('log');
+  });
+
   it('remembers the previous hash, and a replace does not count as a step', () => {
     recordNavigation('#/cube');
     recordNavigation('#/cube?q=b', true);

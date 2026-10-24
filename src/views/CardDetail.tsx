@@ -3,7 +3,10 @@ import { wantedDiffers } from '../cube/order';
 import { TOKENS_HASH, cycleHash, isListHash, previousHash, printingsHash } from '../router';
 import { humanizeCycle } from '../printings/cycles';
 import { reasonLabel } from '../printings/wanted';
-import { useStore } from '../store/context';
+import { useStore, useUpdatesMetaDoc } from '../store/context';
+import { historyTrim } from '../print/settings';
+import { LIFECYCLE_LABEL, lifecycleOf, pullPatches } from '../store/lifecycle';
+import { buildUpdateWrites } from '../upstream/update';
 import { CardActions } from './CardActions';
 
 function scryfallUrl(p: PrintingBase): string {
@@ -111,20 +114,33 @@ export function CardDetail({ cards, oracleId }: { cards: Card[]; oracleId: strin
     );
   }
   const differs = wantedDiffers(card);
+  const life = lifecycleOf(card);
+  let line: string;
+  if (life === 'to_print') line = `Not printed yet: Wanted ${card.wanted.set.toUpperCase()} ${card.wanted.collector_number} is in the Print batch.`;
+  else if (life === 'to_pull') line = 'Off the List: take it out of the box, then mark it pulled.';
+  else if (life === 'retired')
+    line = card.retired_printing
+      ? `Retired: off the List and out of the box. It was ${card.retired_printing.set.toUpperCase()} ${card.retired_printing.collector_number}.`
+      : 'Retired: off the List and never printed.';
+  else if (differs && card.in_box)
+    line = `Reprint pending: Wanted ${card.wanted.set.toUpperCase()} ${card.wanted.collector_number} differs from In-box ${card.in_box.set.toUpperCase()} ${card.in_box.collector_number}.`;
+  else line = 'Wanted is the In-box Printing.';
   return (
     <article className="detail">
       <p>
         <BackToCube />
       </p>
       <h1>{card.name}</h1>
+      {life !== 'in_box' && (
+        <p className="chips">
+          <span className="chip chip-mark">{LIFECYCLE_LABEL[life]}</span>
+        </p>
+      )}
       <p className="muted">
         {card.type_line} {card.mana_cost && <span className="num">· {card.mana_cost}</span>}
       </p>
-      <p className={differs ? 'marker-line' : 'muted'}>
-        {differs
-          ? `Reprint pending: Wanted ${card.wanted.set.toUpperCase()} ${card.wanted.collector_number} differs from In-box ${card.in_box.set.toUpperCase()} ${card.in_box.collector_number}.`
-          : 'Wanted is the In-box Printing.'}
-      </p>
+      <p className={differs || life !== 'in_box' ? 'marker-line' : 'muted'}>{line}</p>
+      <LifecycleActions card={card} cards={cards} />
       {card.produces_tokens.length > 0 && (
         <p className="makes">
           Makes:{' '}
@@ -148,14 +164,21 @@ export function CardDetail({ cards, oracleId }: { cards: Card[]; oracleId: strin
       )}
       <CardActions card={card} cards={cards} />
       <div className="side-by-side">
-        <PrintingPanel
-          title="In-box"
-          printing={card.in_box}
-          extra={[
-            ['Source', card.in_box.source],
-            ['Confidence', card.in_box.confidence],
-          ]}
-        />
+        {card.in_box ? (
+          <PrintingPanel
+            title="In-box"
+            printing={card.in_box}
+            extra={[
+              ['Source', card.in_box.source],
+              ['Confidence', card.in_box.confidence],
+            ]}
+          />
+        ) : (
+          <section className="panel">
+            <h2>In-box</h2>
+            <p className="muted">{life === 'retired' ? 'Not in the box.' : 'Not in the box yet.'}</p>
+          </section>
+        )}
         <PrintingPanel title="Wanted" printing={card.wanted} extra={[['Reason', reasonLabel(card.wanted.reason)]]} />
       </div>
       {card.cycles.length > 0 && (
@@ -187,4 +210,49 @@ export function CardDetail({ cards, oracleId }: { cards: Card[]; oracleId: strin
       )}
     </article>
   );
+}
+
+/** Owner: Mark Out (the same Out path as an Update) and Mark pulled. */
+function LifecycleActions({ card, cards }: { card: Card; cards: Card[] }) {
+  const { auth, store, save } = useStore();
+  const updatesLive = useUpdatesMetaDoc();
+  if (!auth.isOwner || !store) return null;
+  const life = lifecycleOf(card);
+  // meta/updates.history stays bounded, as print history: trimmed only from a server snapshot.
+  const trim = updatesLive.status === 'ready' && !updatesLive.fromCache ? historyTrim(updatesLive.data?.history) : [];
+  if (life === 'in_box' || life === 'to_print') {
+    return (
+      <div className="actions">
+        <button
+          type="button"
+          onClick={() => {
+            const what = life === 'in_box' ? 'It stays in the box until you mark it pulled.' : 'It leaves the Print batch.';
+            if (!window.confirm(`Take ${card.name} off the List? ${what}`)) return;
+            const writes = buildUpdateWrites({ ins: [], outs: [card.oracle_id], cards, decisions: {}, source: 'manual', now: new Date().toISOString() });
+            void save(() => store.applyUpdate({ ...writes, trim }), `${card.name} is Out.`);
+          }}
+        >
+          Mark Out
+        </button>
+      </div>
+    );
+  }
+  if (life === 'to_pull') {
+    return (
+      <div className="actions">
+        <button
+          type="button"
+          className="primary"
+          onClick={() => {
+            // Nothing in the app puts a card back in the box, so a stray tap is confirmed.
+            if (!window.confirm(`Mark ${card.name} as pulled from the box?`)) return;
+            void save(() => store.updateCards(pullPatches([card], new Date().toISOString())), `${card.name} marked pulled.`);
+          }}
+        >
+          Mark pulled
+        </button>
+      </div>
+    );
+  }
+  return null;
 }

@@ -1,12 +1,13 @@
-// Turn a Card from cards.json into the ExpectedCard the Scan diff matches against.
-import type { Card, PrintingBase } from '../types';
+// Turn a Card into the ExpectedCard the Scan diff matches against. A Scan expects every card that
+// is physically in the box: on the List, or waiting to be pulled.
+import type { Card, InBoxPrinting, PrintingBase } from '../types';
 import type { ExpectedCard } from './diff';
 
 function keysOf(p: PrintingBase): string[] {
   return [p.scryfall_id.toLowerCase(), `${p.set.toLowerCase()}/${p.collector_number.toLowerCase()}`];
 }
 
-export function toExpectedCard(card: Card): ExpectedCard {
+export function toExpectedCard(card: Card & { in_box: InBoxPrinting }): ExpectedCard {
   // A paper Printing can carry another name than the card (Through the Omenpaths cards are
   // printed as Spider-Man cards), and scanners report that printed name.
   const aliases = [card.in_box.name, card.wanted.name].filter(
@@ -27,6 +28,7 @@ export function toExpectedCard(card: Card): ExpectedCard {
   };
 }
 
+/** The cards a Scan expects: exactly the cards with an In-box Printing. */
 export function expectedCards(cards: Card[]): ExpectedCard[] {
-  return cards.filter((c) => c.in_list).map(toExpectedCard);
+  return cards.filter((c): c is Card & { in_box: InBoxPrinting } => c.in_box !== null).map(toExpectedCard);
 }

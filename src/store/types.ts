@@ -1,6 +1,8 @@
 // The shared data model in Firestore and the Store interface the views use.
 // Paths: config/owner, cubes/main, cubes/main/{cards,suggestions,scans,log}/{id},
-// cubes/main/meta/overrides. Immutable card facts stay in public/data/cards.json.
+// cubes/main/meta/overrides. Immutable card facts stay in public/data/cards.json, except for cards
+// that came In with an Update, whose facts are on their doc.
+import type { ColorCategory, TypeCategory } from '../types';
 
 export const CUBE_ID = 'main';
 
@@ -41,7 +43,7 @@ export interface WantedState {
 }
 
 /** Why the Owner set a Wanted Printing in the app. */
-export type WantedReason = 'picked' | 'cycle' | 'default-rule' | 'reset-to-box';
+export type WantedReason = 'picked' | 'cycle' | 'default-rule' | 'reset-to-box' | 'upstream-pick';
 
 /** cubes/main/meta/cycles: the splits the Owner accepted, Cycle name to signature. */
 export interface CycleAcks {
@@ -63,14 +65,44 @@ export interface FlagState {
   createdAt: string | null;
 }
 
+/**
+ * The static facts of a card that is not in cards.json, stored on its doc when it comes In with an
+ * Update. Cards in cards.json take their facts from there.
+ */
+export interface CardFacts {
+  name: string;
+  type_line: string;
+  mana_cost: string;
+  cmc: number;
+  colors: string[];
+  color_identity: string[];
+  color_category: ColorCategory;
+  type_category: TypeCategory;
+  layout: string;
+  rarity?: string;
+  image_normal: string | null;
+  back_name: string | null;
+  back_image_normal: string | null;
+  oracle_cycle_tags: string[];
+  produces_tokens: { name: string; scryfall_id: string }[];
+}
+
 /** cubes/main/cards/{oracle_id}: the mutable state of one card. */
 export interface CardState {
   name: string;
-  in_box: InBoxState;
+  /** null: not printed yet, or pulled. A doc without the field keeps the cards.json In-box. */
+  in_box: InBoxState | null;
   wanted: WantedState;
   flags: FlagState[];
   in_list: boolean;
   list_source: string;
+  /** Only for cards that are not in cards.json. */
+  facts?: CardFacts | null;
+  oracle_cycle_tags?: string[];
+  /** The In-box Printing before a pull, or null. */
+  retired_printing?: InBoxState | null;
+  added_at?: string | null;
+  retired_at?: string | null;
   updatedAt: string;
 }
 
@@ -178,7 +210,15 @@ export type CardPatch =
   | { kind: 'wanted'; wanted: WantedState }
   /** seedFlags: the cards.json flags, only when the card has no stored doc yet; null otherwise. */
   | { kind: 'add_flag'; flag: FlagState; seedFlags: FlagState[] | null }
-  | { kind: 'clear_flags' };
+  | { kind: 'clear_flags' }
+  /** A card that comes In and has no doc yet: the whole doc. */
+  | { kind: 'new_card'; state: Omit<CardState, 'updatedAt'> }
+  /** A card that has a doc (or is in cards.json) comes In again; wanted null keeps its Wanted. */
+  | { kind: 'list_in'; list_source: string; added_at: string; wanted: WantedState | null }
+  /** A card goes Out: off the List; it stays in the box until it is pulled. */
+  | { kind: 'list_out' }
+  /** The card was taken out of the box. */
+  | { kind: 'pull'; retired_printing: InBoxState; at: string };
 
 /**
  * A change to the pending List changes: `name` joins `field` and every name in `drop` leaves the
@@ -236,5 +276,55 @@ export interface Store {
   addLogEntries(entries: LogEntryInput[]): Promise<void>;
   updateLogEntry(id: string, entry: LogEntryInput): Promise<void>;
   setOverrides(o: Overrides): Promise<void>;
+  /**
+   * Owner only: apply an Update. The card writes go in writeBatches of at most 400, committed in
+   * order; the decisions (meta/upstream) and the history entry (meta/updates) go in the last batch.
+   */
+  applyUpdate(writes: UpdateWrites): Promise<void>;
+  /**
+   * Owner only: store a Refresh snapshot in meta/upstream and delete the named decisions (stale
+   * ones, whose item is no longer in the feed).
+   */
+  saveUpstreamSnapshot(snapshot: { fetched_at: string; list_names: string[]; upstream_names: string[] }, dropDecisions: string[]): Promise<void>;
   claimOwner(): Promise<void>;
+}
+
+/** An Owner's decision on one Upstream feed item, in cubes/main/meta/upstream.decisions by name. */
+export type DecisionStatus = 'accepted' | 'rejected' | 'later';
+
+export interface Decision {
+  status: DecisionStatus;
+  /** Which side of the feed the decision was made on. */
+  side: 'add' | 'cut';
+  at: string;
+  note: string;
+  /** Set when an accepted item went into an applied Update. */
+  applied_at?: string | null;
+}
+
+/** One entry of cubes/main/meta/updates.history. */
+export interface UpdateHistoryEntry {
+  date: string;
+  at: string;
+  in: string[];
+  out: string[];
+  source: 'upstream' | 'manual';
+}
+
+/** Everything one Update writes. */
+export interface UpdateWrites {
+  cards: CardPatchFor[];
+  /** Merged into meta/upstream.decisions, key by key. */
+  decisions: Record<string, Decision>;
+  history: UpdateHistoryEntry;
+  /** Stored history entries to remove (arrayRemove) so meta/updates.history stays bounded. */
+  trim?: unknown[];
+}
+
+/** cubes/main/meta/upstream: the last fetch of the List and Upstream, and the decisions. */
+export interface UpstreamMeta {
+  fetched_at: string | null;
+  list_names: string[];
+  upstream_names: string[];
+  decisions: Record<string, Decision>;
 }

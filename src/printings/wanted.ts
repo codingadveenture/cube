@@ -15,9 +15,10 @@ export function wantedFromPrinting(p: IndexPrinting, name: string | null, reason
   };
 }
 
-/** Reset Wanted to the In-box Printing. */
-export function wantedFromInBox(card: Card): WantedState {
+/** Reset Wanted to the In-box Printing; null for a card that is not in the box. */
+export function wantedFromInBox(card: Card): WantedState | null {
   const b = card.in_box;
+  if (!b) return null;
   return {
     scryfall_id: b.scryfall_id,
     set: b.set,
@@ -38,6 +39,7 @@ const REASON_LABEL: Record<string, string> = {
   'non-paper-replacement': 'replaces an In-box Printing that is not on paper',
   'unresolved-no-paper-printing': 'no paper Printing found',
   'reset-to-box': 'reset to the In-box Printing',
+  'upstream-pick': 'the Printing Upstream uses',
 };
 
 export function reasonLabel(reason: string): string {

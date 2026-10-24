@@ -24,6 +24,7 @@ export function knownPrintings(cards: Card[]): Map<string, ResolvedPrinting> {
   const map = new Map<string, ResolvedPrinting>();
   for (const c of cards) {
     for (const p of [c.in_box, c.wanted]) {
+      if (!p) continue;
       const resolved: ResolvedPrinting = {
         scryfall_id: p.scryfall_id,
         illustration_id: p.illustration_id,

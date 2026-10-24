@@ -341,13 +341,13 @@ describe('Wanted writes', () => {
     const merged = mergeCard(card, { ...cardStateOf(card, NOW), wanted: w });
     expect(merged.wanted.image_normal).toBe(p.image_normal);
     expect(merged.wanted.image_small).toBe(smallImage(p.image_normal));
-    expect(merged.in_box.scryfall_id).toBe(card.in_box.scryfall_id);
+    expect(merged.in_box!.scryfall_id).toBe(card.in_box!.scryfall_id);
   });
 
   it('reset to In-box copies the In-box Printing', () => {
     const card = cards[0]!;
-    const w = wantedFromInBox(card);
-    expect([w.scryfall_id, w.reason]).toEqual([card.in_box.scryfall_id, 'reset-to-box']);
+    const w = wantedFromInBox(card)!;
+    expect([w.scryfall_id, w.reason]).toEqual([card.in_box!.scryfall_id, 'reset-to-box']);
   });
 
   it('batch several cards in chunks of 400, one write per card', () => {

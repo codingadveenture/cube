@@ -1,8 +1,10 @@
-import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Card } from '../types';
-import { COLOR_LABEL, groupCards, summarize, wantedDiffers } from '../cube/order';
+import { COLOR_LABEL, compareCards, groupCards, summarize, wantedDiffers } from '../cube/order';
 import { cubeHash, isDetailHash, previousHash, replaceHash } from '../router';
 import { humanizeCycle } from '../printings/cycles';
+import { lifecycleOf, partitionCards, physicallyPresent, pullPatches, shownPrinting } from '../store/lifecycle';
+import { useStore } from '../store/context';
 
 // Scroll position of the list when a card was opened from it, restored on the way back.
 let savedScroll: { hash: string; y: number } | null = null;
@@ -43,20 +45,27 @@ export function CubeView({ cards, initialQuery }: { cards: Card[]; initialQuery:
     };
   }, []);
   const deferred = useDeferredValue(query);
-  const summary = useMemo(() => summarize(cards), [cards]);
+  // The count is what is physically in the box: on the List, or waiting to be pulled.
+  const present = useMemo(() => physicallyPresent(cards), [cards]);
+  const summary = useMemo(() => summarize(present), [present]);
+  const parts = useMemo(() => partitionCards(cards), [cards]);
   const keys = useMemo(() => new Map(cards.map((c) => [c.oracle_id, searchKey(c.name)])), [cards]);
 
-  const sections = useMemo(() => {
+  const view = useMemo(() => {
     const q = searchKey(deferred);
-    const filtered = q ? cards.filter((c) => keys.get(c.oracle_id)?.includes(q)) : cards;
-    return groupCards(filtered);
-  }, [cards, keys, deferred]);
-  const shown = sections.reduce((s, x) => s + x.count, 0);
+    const match = (list: Card[]) => (q ? list.filter((c) => keys.get(c.oracle_id)?.includes(q)) : [...list]).sort(compareCards);
+    return { sections: groupCards(match(parts.inBox)), toPrint: match(parts.toPrint), toPull: match(parts.toPull), retired: match(parts.retired) };
+  }, [parts, keys, deferred]);
+  const sections = view.sections;
+  const shown = sections.reduce((s, x) => s + x.count, 0) + view.toPrint.length + view.toPull.length;
+  const listed = parts.inBox.length + parts.toPrint.length + parts.toPull.length;
 
   return (
     <div className="cube">
       <p className="summary num">
-        <span>{summary.total} cards</span>
+        <span>{summary.total} cards in the box</span>
+        {parts.toPrint.length > 0 && <span>{parts.toPrint.length} to print</span>}
+        {parts.toPull.length > 0 && <span>{parts.toPull.length} to pull</span>}
         <span>{summary.wantedDiffers} Wanted differs from In-box</span>
         <span>{summary.flagged} with an Art flag</span>
         <span>{summary.nonPaper} In-box not on paper</span>
@@ -74,9 +83,11 @@ export function CubeView({ cards, initialQuery }: { cards: Card[]; initialQuery:
       </label>
       {query && (
         <p className="muted num" aria-live="polite">
-          {shown} of {cards.length} cards
+          {shown} of {listed} cards
         </p>
       )}
+      {view.toPrint.length > 0 && <ToPrint cards={view.toPrint} />}
+      {view.toPull.length > 0 && <ToPull cards={view.toPull} />}
       {sections.map((section) => (
         <section key={section.color} className="section" aria-labelledby={`sec-${section.color}`}>
           <h2 id={`sec-${section.color}`} className="section-head">
@@ -96,29 +107,117 @@ export function CubeView({ cards, initialQuery }: { cards: Card[]; initialQuery:
           ))}
         </section>
       ))}
-      {shown === 0 && <p className="status">No card matches “{query}”.</p>}
+      {shown === 0 && query && <p className="status">No card matches “{query}”.</p>}
+      {view.retired.length > 0 && (
+        <details className="retired">
+          <summary>
+            <span className="num">{view.retired.length}</span> retired {view.retired.length === 1 ? 'card' : 'cards'}: off the List and out of
+            the box
+          </summary>
+          <ul className="rows">
+            {view.retired.map((c) => (
+              <CardRow key={c.oracle_id} card={c} />
+            ))}
+          </ul>
+        </details>
+      )}
     </div>
   );
 }
 
-function CardRow({ card }: { card: Card }) {
-  const differs = wantedDiffers(card);
+function ToPrint({ cards }: { cards: Card[] }) {
   return (
-    <li>
+    <section className="section lifecycle" aria-labelledby="sec-to-print">
+      <h2 id="sec-to-print" className="section-head">
+        To print <span className="count num">{cards.length}</span>
+      </h2>
+      <p className="muted">
+        On the List but not in the box yet. They are in the <a href="#/print">Print batch</a>; Mark as printed puts them in the box.
+      </p>
+      <ul className="rows">
+        {cards.map((c) => (
+          <CardRow key={c.oracle_id} card={c} />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function ToPull({ cards }: { cards: Card[] }) {
+  const { auth, store, save } = useStore();
+  const [busy, setBusy] = useState(false);
+  async function pull(list: Card[]) {
+    if (!store || busy) return;
+    const patches = pullPatches(list, new Date().toISOString());
+    if (patches.length === 0) return;
+    setBusy(true);
+    try {
+      await save(() => store.updateCards(patches), `Marked ${patches.length} ${patches.length === 1 ? 'card' : 'cards'} as pulled.`);
+    } finally {
+      setBusy(false);
+    }
+  }
+  const owner = auth.isOwner && !!store;
+  return (
+    <section className="section lifecycle" aria-labelledby="sec-to-pull">
+      <h2 id="sec-to-pull" className="section-head">
+        To pull <span className="count num">{cards.length}</span>
+      </h2>
+      <p className="muted">Off the List but still in the box. Take them out, then mark them pulled.</p>
+      {owner && cards.length > 1 && (
+        <div className="actions">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              if (window.confirm(`Mark all ${cards.length} cards as pulled from the box?`)) void pull(cards);
+            }}
+          >
+            Mark all pulled
+          </button>
+        </div>
+      )}
+      <ul className="rows">
+        {cards.map((c) => (
+          <CardRow
+            key={c.oracle_id}
+            card={c}
+            action={
+              owner ? (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => {
+                    // Nothing in the app puts a card back in the box, so a stray tap is confirmed.
+                    if (window.confirm(`Mark ${c.name} as pulled from the box?`)) void pull([c]);
+                  }}
+                >
+                  Mark pulled
+                </button>
+              ) : null
+            }
+          />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function CardRow({ card, action }: { card: Card; action?: ReactNode }) {
+  const differs = wantedDiffers(card);
+  const printing = shownPrinting(card);
+  const life = lifecycleOf(card);
+  return (
+    <li className={action ? 'row-with-action' : undefined}>
       <a className="row" href={`#/cube/${encodeURIComponent(card.oracle_id)}`}>
-        <img
-          className="thumb"
-          src={card.in_box.image_small}
-          alt=""
-          loading="lazy"
-          decoding="async"
-          width={146}
-          height={204}
-        />
+        <img className="thumb" src={printing.image_small} alt="" loading="lazy" decoding="async" width={146} height={204} />
         <span className="row-text">
           <span className="row-name">{card.name}</span>
           <span className="printing num">
-            {card.in_box.set.toUpperCase()} {card.in_box.collector_number.toUpperCase()}
+            {life === 'to_print' && 'Wanted '}
+            {life === 'retired' && card.retired_printing ? 'Was ' : ''}
+            {(life === 'retired' && card.retired_printing ? card.retired_printing : printing).set.toUpperCase()}{' '}
+            {(life === 'retired' && card.retired_printing ? card.retired_printing : printing).collector_number.toUpperCase()}
             {differs && (
               <span className="marker" title={`Wanted: ${card.wanted.set.toUpperCase()} ${card.wanted.collector_number}`}>
                 Wanted differs
@@ -141,7 +240,7 @@ function CardRow({ card }: { card: Card }) {
           )}
         </span>
       </a>
+      {action}
     </li>
   );
 }
-

@@ -55,10 +55,28 @@ describe('a perfect Scan of the whole Cube', () => {
     const expected = expectedCards(cards).map((c) => ({ ...c, aliases: [] }));
     const d = diffScan(
       expected,
-      [{ name: 'Some Scanner Typo', quantity: 1, scryfall_id: ademi.in_box.scryfall_id, set: null, collector_number: null, foil: null, language: null }],
+      [{ name: 'Some Scanner Typo', quantity: 1, scryfall_id: ademi.in_box!.scryfall_id, set: null, collector_number: null, foil: null, language: null }],
       knownPrintings(cards),
     );
     expect(d.unexpected).toEqual([]);
     expect(d.present.map((r) => r.card.name)).toEqual(['Ademi of the Silkchutes']);
+  });
+});
+
+describe('what a Scan expects', () => {
+  const cards = cardsFile.cards;
+  it('is exactly the cards with an In-box Printing, on the List or not', () => {
+    const [a, b, c] = cards;
+    const changed = [
+      { ...a!, in_list: false }, // to pull: still in the box
+      { ...b!, in_box: null }, // to print: not in the box yet
+      { ...c!, in_box: null, in_list: false }, // retired
+      ...cards.slice(3),
+    ];
+    const ids = new Set(expectedCards(changed).map((e) => e.oracle_id));
+    expect(ids.size).toBe(cards.length - 2);
+    expect(ids.has(a!.oracle_id)).toBe(true);
+    expect(ids.has(b!.oracle_id)).toBe(false);
+    expect(ids.has(c!.oracle_id)).toBe(false);
   });
 });

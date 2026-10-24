@@ -72,8 +72,9 @@ export function groupCards(cards: Card[]): Section[] {
   return sections;
 }
 
+/** A reprint: the card is in the box and its Wanted Printing differs from its In-box Printing. */
 export function wantedDiffers(c: Card): boolean {
-  return c.wanted.scryfall_id !== c.in_box.scryfall_id;
+  return c.in_box !== null && c.wanted.scryfall_id !== c.in_box.scryfall_id;
 }
 
 export function summarize(cards: Card[]) {
@@ -81,6 +82,6 @@ export function summarize(cards: Card[]) {
     total: cards.length,
     wantedDiffers: cards.filter(wantedDiffers).length,
     flagged: cards.filter((c) => c.flags.length > 0).length,
-    nonPaper: cards.filter((c) => !c.in_box.paper).length,
+    nonPaper: cards.filter((c) => c.in_box && !c.in_box.paper).length,
   };
 }

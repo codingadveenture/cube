@@ -7,11 +7,11 @@ import type { SlipGroup } from './layout';
 import type { Quality } from './settings';
 import type { CardPatchFor } from '../store/types';
 
-/** One card line of the batch: a reprint (Wanted differs from In-box) or an extra line. */
+/** One card line of the batch: a new card (to print), a reprint (Wanted differs from In-box) or an extra line. */
 export interface BatchLine {
-  /** 'r:<oracle_id>' for a reprint, 'x:<id>' for an extra line. */
+  /** 'n:<oracle_id>' for a new card, 'r:<oracle_id>' for a reprint, 'x:<id>' for an extra line. */
   key: string;
-  source: 'reprint' | 'extra';
+  source: 'new' | 'reprint' | 'extra';
   oracle_id: string | null;
   /** The display name (the front face for a double-faced card). */
   name: string;
@@ -46,29 +46,40 @@ export interface Slip {
   url: string;
 }
 
+/** The batch line of a card's Wanted Printing. */
+function wantedLine(c: Card, source: 'new' | 'reprint'): BatchLine {
+  const w = c.wanted;
+  return {
+    key: `${source === 'new' ? 'n' : 'r'}:${c.oracle_id}`,
+    source,
+    oracle_id: c.oracle_id,
+    name: c.name,
+    list_name: w.name ?? c.name,
+    set: w.set,
+    collector_number: w.collector_number,
+    scryfall_id: w.scryfall_id,
+    illustration_id: w.illustration_id,
+    image_normal: w.image_normal,
+    back_image_normal: w.back_image_normal,
+    back_name: w.back_name,
+    quantity: 1,
+  };
+}
+
+/** Every card on the List that is not in the box yet (to print), as a new slip of its Wanted Printing, in Cube order. */
+export function newCardLines(cards: Card[]): BatchLine[] {
+  return cards
+    .filter((c) => c.in_list && c.in_box === null)
+    .sort(compareCards)
+    .map((c) => wantedLine(c, 'new'));
+}
+
 /** Every card whose Wanted Printing differs from its In-box Printing, in Cube order. */
 export function reprintLines(cards: Card[]): BatchLine[] {
   return cards
     .filter((c) => c.in_list && wantedDiffers(c))
     .sort(compareCards)
-    .map((c) => {
-      const w = c.wanted;
-      return {
-        key: `r:${c.oracle_id}`,
-        source: 'reprint',
-        oracle_id: c.oracle_id,
-        name: c.name,
-        list_name: w.name ?? c.name,
-        set: w.set,
-        collector_number: w.collector_number,
-        scryfall_id: w.scryfall_id,
-        illustration_id: w.illustration_id,
-        image_normal: w.image_normal,
-        back_image_normal: w.back_image_normal,
-        back_name: w.back_name,
-        quantity: 1,
-      };
-    });
+    .map((c) => wantedLine(c, 'reprint'));
 }
 
 /** The image of a card face in the chosen quality: Scryfall large JPEG or png. */
@@ -125,15 +136,16 @@ export function proxyGeneratorList(lines: BatchLine[]): string {
 }
 
 /**
- * Mark as printed: for every given reprint line, In-box := the Printing on that line (the one that
- * went on the sheet, not the card's current Wanted) with source "printed" and confidence "high".
- * Lines that are not reprints, or whose card is gone, are skipped.
+ * Mark as printed: for every given reprint or new-card line, In-box := the Printing on that line
+ * (the one that went on the sheet, not the card's current Wanted) with source "printed" and
+ * confidence "high". A new card is in the box from then on. Extra lines, and lines whose card is
+ * gone, are skipped.
  */
 export function markPrintedPatches(cards: Card[], lines: BatchLine[]): CardPatchFor[] {
   const byId = new Map(cards.map((c) => [c.oracle_id, c]));
   const out: CardPatchFor[] = [];
   for (const l of lines) {
-    if (l.source !== 'reprint' || !l.oracle_id) continue;
+    if ((l.source !== 'reprint' && l.source !== 'new') || !l.oracle_id) continue;
     const card = byId.get(l.oracle_id);
     if (!card) continue;
     out.push({

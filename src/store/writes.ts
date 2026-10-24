@@ -24,6 +24,36 @@ export function cardPatchWrite(patch: CardPatch, now: string): CardWrite {
       return { fields: { flags: [], updatedAt: now }, unionFlags: null };
     case 'add_flag':
       return { fields: { updatedAt: now }, unionFlags: [...(patch.seedFlags ?? []), patch.flag] };
+    case 'new_card': {
+      const st = patch.state;
+      return {
+        fields: { ...st, wanted: { ...st.wanted, image_normal: st.wanted.image_normal ?? null }, updatedAt: now },
+        unionFlags: null,
+      };
+    }
+    case 'list_in': {
+      const fields: Record<string, unknown> = {
+        in_list: true,
+        list_source: patch.list_source,
+        added_at: patch.added_at,
+        retired_at: null,
+        updatedAt: now,
+      };
+      if (patch.wanted) fields.wanted = { ...patch.wanted, image_normal: patch.wanted.image_normal ?? null };
+      return { fields, unionFlags: null };
+    }
+    case 'list_out':
+      return { fields: { in_list: false, updatedAt: now }, unionFlags: null };
+    case 'pull':
+      return {
+        fields: {
+          in_box: null,
+          retired_printing: { ...patch.retired_printing, image_normal: patch.retired_printing.image_normal ?? null },
+          retired_at: patch.at,
+          updatedAt: now,
+        },
+        unionFlags: null,
+      };
   }
 }
 

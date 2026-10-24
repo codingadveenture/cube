@@ -51,12 +51,30 @@ export interface Flag {
   createdAt?: string | null;
 }
 
+/** Where a card's place on the List comes from. */
+export type ListSource = 'cubecobra' | 'sheet-adds' | 'winner_pick' | 'upstream';
+
+/**
+ * Where a card stands, from In-box and in_list: in the box and on the List ('in_box'), on the
+ * List but not printed yet ('to_print'), in the box but off the List ('to_pull'), or neither
+ * ('retired', hidden from the Cube).
+ */
+export type Lifecycle = 'in_box' | 'to_print' | 'to_pull' | 'retired';
+
+/** The In-box Printing a card had before it was pulled. */
+export interface RetiredPrinting {
+  scryfall_id: string;
+  set: string;
+  collector_number: string;
+  name: string | null;
+}
+
 export interface Card {
   name: string;
   front_name: string;
   oracle_id: string;
   in_list: boolean;
-  list_source: 'cubecobra' | 'sheet-adds';
+  list_source: ListSource;
   cubecobra_card_id: string | null;
   layout: string;
   type_line: string;
@@ -69,11 +87,18 @@ export interface Card {
   rarity: string;
   keywords: string[];
   produces_tokens: { name: string; scryfall_id: string }[];
-  in_box: InBoxPrinting;
+  /** The Printing physically in the box; null for a card not printed yet or pulled. Never null in cards.json. */
+  in_box: InBoxPrinting | null;
   wanted: WantedPrinting;
   cycles: string[];
   oracle_cycle_tags: string[];
   flags: Flag[];
+  // Lifecycle fields from the card doc; absent in cards.json.
+  retired_printing?: RetiredPrinting | null;
+  added_at?: string | null;
+  retired_at?: string | null;
+  /** True for a card that is not in cards.json and is drawn from the facts on its doc. */
+  from_facts?: boolean;
 }
 
 export interface CardsFile {

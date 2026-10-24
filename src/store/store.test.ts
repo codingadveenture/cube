@@ -145,7 +145,7 @@ describe('card writes', () => {
   const flag = { type: 'art', by: 'Owner', note: '', createdAt: NOW };
 
   it('writes only the In-box Printing', () => {
-    const in_box = { ...cardStateOf(card, NOW).in_box, scryfall_id: 'xyz' };
+    const in_box = { ...cardStateOf(card, NOW).in_box!, scryfall_id: 'xyz' };
     expect(cardPatchWrite({ kind: 'in_box', in_box }, NOW)).toEqual({ fields: { in_box, updatedAt: NOW }, unionFlags: null });
   });
 
@@ -307,18 +307,18 @@ describe('baseline import', () => {
   it('round-trips through the merge', () => {
     const states = new Map(baselineDocs(cards, new Set(), NOW));
     const merged = mergeCards(cards, states);
-    expect(merged.map((c) => c.in_box.scryfall_id)).toEqual(cards.map((c) => c.in_box.scryfall_id));
-    expect(merged.map((c) => c.in_box.image_small)).toEqual(cards.map((c) => c.in_box.image_small));
+    expect(merged.map((c) => c.in_box!.scryfall_id)).toEqual(cards.map((c) => c.in_box!.scryfall_id));
+    expect(merged.map((c) => c.in_box!.image_small)).toEqual(cards.map((c) => c.in_box!.image_small));
     expect(merged.map((c) => c.flags.length)).toEqual(cards.map((c) => c.flags.length));
   });
 
   it('derives images for a Printing cards.json does not know', () => {
     const card = cards[1]!;
     const state = cardStateOf(card, NOW);
-    state.in_box = { ...state.in_box, scryfall_id: 'abcdef', set: 'lea', collector_number: '7' };
+    state.in_box = { ...state.in_box!, scryfall_id: 'abcdef', set: 'lea', collector_number: '7' };
     const m = mergeCard(card, state);
-    expect(m.in_box.image_small).toBe('https://cards.scryfall.io/small/front/a/b/abcdef.jpg');
-    expect(m.in_box.set).toBe('lea');
+    expect(m.in_box!.image_small).toBe('https://cards.scryfall.io/small/front/a/b/abcdef.jpg');
+    expect(m.in_box!.set).toBe('lea');
     expect(m.wanted.scryfall_id).toBe(card.wanted.scryfall_id);
   });
 });

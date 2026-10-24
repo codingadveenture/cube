@@ -278,6 +278,8 @@ const subLog: Subscribe<LogEntry[]> = (s, n, e) => s.subscribeLog(n, e);
 const subOverrides: Subscribe<Overrides> = (s, n, e) => s.subscribeOverrides(n, e);
 const subCycleAcks: Subscribe<CycleAcks> = (s, n, e) => s.subscribeCycleAcks(n, e);
 const subPrintMeta: Subscribe<Record<string, unknown> | null> = (s, n, e) => s.subscribeMetaDoc('print', n, e);
+const subUpstreamMeta: Subscribe<Record<string, unknown> | null> = (s, n, e) => s.subscribeMetaDoc('upstream', n, e);
+const subUpdatesMeta: Subscribe<Record<string, unknown> | null> = (s, n, e) => s.subscribeMetaDoc('updates', n, e);
 
 export const useCardStates = () => useLive(subCards, EMPTY_CARDS);
 export const useSuggestions = () => useLive<Suggestion[]>(subSuggestions, NONE);
@@ -287,3 +289,7 @@ export const useOverrides = () => useLive(subOverrides, EMPTY_OVERRIDES);
 export const useCycleAcks = () => useLive(subCycleAcks, EMPTY_CYCLE_ACKS);
 /** cubes/main/meta/print as stored: print settings, printer profiles and the print history. */
 export const usePrintMetaDoc = () => useLive<Record<string, unknown> | null>(subPrintMeta, null);
+/** cubes/main/meta/upstream as stored: the last List and Upstream fetch, and the feed decisions. */
+export const useUpstreamMetaDoc = () => useLive<Record<string, unknown> | null>(subUpstreamMeta, null);
+/** cubes/main/meta/updates as stored: the history of applied Updates. */
+export const useUpdatesMetaDoc = () => useLive<Record<string, unknown> | null>(subUpdatesMeta, null);

@@ -10,6 +10,7 @@ import {
   markPrintedPatches,
   mtgprintList,
   proxyGeneratorList,
+  newCardLines,
   reprintLines,
   type BatchLine,
   type Slip,
@@ -106,7 +107,8 @@ export default function PrintView({ cards, section }: { cards: Card[]; section: 
   const meta = useMemo(() => toPrintMeta(metaLive.data), [metaLive.data]);
 
   // Batch.
-  const reprints = useMemo(() => reprintLines(cards), [cards]);
+  // New cards (on the List, not printed yet) first, then reprints.
+  const reprints = useMemo(() => [...newCardLines(cards), ...reprintLines(cards)], [cards]);
   const [unchecked, setUnchecked] = usePersisted<string[]>(UNCHECKED_KEY, () => {
     const v = readLocal<unknown>(UNCHECKED_KEY, []);
     return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
@@ -227,13 +229,13 @@ export default function PrintView({ cards, section }: { cards: Card[]; section: 
       <section aria-labelledby="batch-head">
         <h2 id="batch-head">Print batch</h2>
         <p className="muted">
-          Every card whose Wanted Printing differs from its In-box Printing is here, ticked. Back faces of double-faced cards go to the Back pool
-          automatically.
+          Every new card from an Update (to print) and every card whose Wanted Printing differs from its In-box Printing is here, ticked. Back
+          faces of double-faced cards go to the Back pool automatically.
         </p>
         <h3 className="batch-group">
           Fronts: {checkedLines.length} of {reprints.length + extras.length} ticked
         </h3>
-        {reprints.length + extras.length === 0 && <p className="status">No reprints pending. Add more below.</p>}
+        {reprints.length + extras.length === 0 && <p className="status">No new cards or reprints pending. Add more below.</p>}
         <ul className="batch-list">
           {[...reprints, ...extras].map((l) => (
             <li key={l.key}>
@@ -251,7 +253,7 @@ export default function PrintView({ cards, section }: { cards: Card[]; section: 
                   </span>
                   <span className="num">
                     {l.set.toUpperCase()} {l.collector_number}
-                    {l.source === 'extra' ? ' · extra' : ''}
+                    {l.source === 'extra' ? ' · extra' : l.source === 'new' ? ' · new card' : ''}
                     {l.back_image_normal ? ' · double-faced' : ''}
                   </span>
                 </span>
@@ -420,8 +422,8 @@ export default function PrintView({ cards, section }: { cards: Card[]; section: 
               ))}
             {isOwner && generated.lines.length > 0 && (
               <p className="muted">
-                Sets the In-box Printing to the Printing on this sheet for the {generated.lines.filter((l) => l.source === 'reprint').length} reprints and
-                removes the extras and tokens from the batch.
+                Sets the In-box Printing to the Printing on this sheet for the {generated.lines.filter((l) => l.source === 'new').length} new cards and{' '}
+                {generated.lines.filter((l) => l.source === 'reprint').length} reprints and removes the extras and tokens from the batch.
               </p>
             )}
           </div>

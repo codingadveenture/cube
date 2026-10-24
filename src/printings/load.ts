@@ -1,4 +1,6 @@
-// Lazy loading of public/data/printings/<oracle_id>.json, cached in memory for the session.
+// Lazy loading of public/data/printings/<oracle_id>.json, cached in memory for the session. A card
+// that came In with an Update has no file (the index covers the cards.json cards only); its
+// Printings come from a Scryfall search instead.
 import { useEffect, useMemo, useState } from 'react';
 import type { IndexPrinting, PrintingsFile } from './types';
 
@@ -11,7 +13,11 @@ export function printingsUrl(oracleId: string): string {
 export function loadPrintings(oracleId: string): Promise<PrintingsFile> {
   let p = cache.get(oracleId);
   if (!p) {
-    p = fetch(printingsUrl(oracleId)).then((res) => {
+    p = fetch(printingsUrl(oracleId)).then(async (res) => {
+      if (res.status === 404) {
+        const { searchPrintings } = await import('../upstream/scryfall');
+        return { name: '', oracle_id: oracleId, printings: await searchPrintings(oracleId) };
+      }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json() as Promise<PrintingsFile>;
     });

@@ -1117,3 +1117,62 @@ button.tile-button {
   cursor: pointer;
   color: var(--accent);
 }
+
+/* Slice 4: the card lifecycle and the Update view. */
+.row-with-action {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+.row-with-action .row {
+  flex: 1 1 16rem;
+  border-bottom: none;
+}
+.lifecycle {
+  border-left: 3px solid var(--warn);
+  padding-left: 0.75rem;
+}
+.retired,
+.upstream details,
+.preview details {
+  margin: 1rem 0;
+}
+.retired > summary,
+.upstream details > summary {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 44px;
+  cursor: pointer;
+  color: var(--accent);
+}
+.upstream h3 {
+  margin: 1rem 0 0.25rem;
+}
+.upstream textarea {
+  width: 100%;
+  font: inherit;
+}
+.feed-item .row-text {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+.feed-item .decide {
+  flex: 1 1 100%;
+}
+@media (min-width: 720px) {
+  .feed-item .decide {
+    flex: 0 0 auto;
+  }
+}
+.upstream button[aria-pressed='true'],
+.upstream .actions button[aria-pressed='true'] {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+  font-weight: 600;
+}
+.upstream .error {
+  color: var(--warn);
+}

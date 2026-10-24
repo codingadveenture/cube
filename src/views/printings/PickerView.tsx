@@ -62,7 +62,7 @@ export default function PickerView({ cards, oracleId }: { cards: Card[]; oracleI
       </p>
       <h1>Printings of {card.name}</h1>
       <p className="muted num">
-        Wanted: {printingLine(card.wanted)} · In-box: {printingLine(card.in_box)}
+        Wanted: {printingLine(card.wanted)} · In-box: {card.in_box ? printingLine(card.in_box) : 'none (not printed yet)'}
       </p>
       {state.status === 'loading' && <p className="status">Loading the Printings…</p>}
       {state.status === 'error' && (
@@ -115,7 +115,8 @@ function Picker({ card, cards, printings }: { card: Card; cards: Card[]; printin
 
   const isOwner = auth.isOwner;
   const ownerReady = isOwner && !!store && states.status === 'ready';
-  const pinned = useMemo(() => new Set([card.wanted.scryfall_id, card.in_box.scryfall_id]), [card.wanted.scryfall_id, card.in_box.scryfall_id]);
+  const boxId = card.in_box?.scryfall_id ?? null;
+  const pinned = useMemo(() => new Set([card.wanted.scryfall_id, ...(boxId ? [boxId] : [])]), [card.wanted.scryfall_id, boxId]);
   const shown = useMemo(() => filterPrintings(printings, filters, pinned), [printings, filters, pinned]);
   const groups = useMemo(() => groupByArt(shown, pinned), [shown, pinned]);
   const today = todayIso();
@@ -273,7 +274,7 @@ function Picker({ card, cards, printings }: { card: Card; cards: Card[]; printin
                         </span>
                         <span className="chips">
                           {p.id === card.wanted.scryfall_id && <span className="chip chip-mark">Wanted</span>}
-                          {p.id === card.in_box.scryfall_id && <span className="chip chip-mark">In-box</span>}
+                          {p.id === card.in_box?.scryfall_id && <span className="chip chip-mark">In-box</span>}
                           {!isReleased(p, today) && <span className="chip chip-mark">not released yet</span>}
                           {badges(p).map((b) => (
                             <span key={b} className="chip">
@@ -300,7 +301,7 @@ function Picker({ card, cards, printings }: { card: Card; cards: Card[]; printin
 function marksFor(printings: IndexPrinting[], card: Card): string[] {
   const out: string[] = [];
   if (printings.some((p) => p.id === card.wanted.scryfall_id)) out.push('Wanted');
-  if (printings.some((p) => p.id === card.in_box.scryfall_id)) out.push('In-box');
+  if (card.in_box && printings.some((p) => p.id === card.in_box!.scryfall_id)) out.push('In-box');
   return out;
 }
 

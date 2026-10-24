@@ -16,8 +16,8 @@ matters. The app will:
 
 Status: slice 1 (the Cube view and the Scan diff), slice 2 (shared state in Firestore:
 Suggestions, shared Scan piles, the Log and the Owner's confirmations), slice 3a (the Printing
-picker and Cycles) and slice 3b (Print batches and print sheets) are built; the rest is in
-design. `GLOSSARY.md`
+picker and Cycles), slice 3b (Print batches and print sheets) and slice 4 (Updates from the MTGO
+Vintage Cube) are built; the rest is in design. `GLOSSARY.md`
 holds the vocabulary the code follows.
 
 Card data and images come from [Scryfall](https://scryfall.com/docs/api). This project is not
@@ -112,6 +112,15 @@ Enter both lengths in the Calibration box: if either is off by more than about 2
 The Owner saves the factors under a printer name in Firestore (`cubes/main/meta/print`, next to the print settings and history) for everyone, while a visitor keeps them on their own device.
 For other print tools, "Copy mtgprint list" gives `1 Name (SET) number` lines for mtgprint.net and "Copy MTG Proxy Generator list" gives `1 SET/number -cd` lines, both without tokens or back faces.
 
+## Updates from the MTGO Vintage Cube
+
+On the Update page (`#/upstream`) press "Refresh from CubeCobra" to read the List (`MTGVintageCube`) and Upstream (`modovintage`); the Owner's fetch is saved for everyone.
+The feed shows Upstream's adds and cuts after the sticky Winner's Picks and Bans, and the Owner decides each one with Accept, Reject or Later (or accepts all remaining), while cards outside the feed can be typed in by name.
+"Build the Update" turns the accepted adds into In cards with facts and a Wanted Printing (the default rule on a Scryfall search, else the Printing Upstream uses) and the accepted cuts into Out cards, and shows the preview.
+"Apply Update" writes the new card docs and takes the Out cards off the List, so new cards are "to print" and Out cards still in the box are "to pull".
+The Print batch now includes every card to print, Mark as printed puts it in the box, and the Cube view's "To pull" group has "Mark pulled" for the cards you have taken out.
+Finally push the List back to CubeCobra by hand: download `cubecobra-YYYY-MM-DD.csv` for "Replace with CSV" (it also carries every Wanted Printing) or copy the paste text for the bulk upload.
+
 ## Development
 
 Needs Node 22 or later.
@@ -141,7 +150,8 @@ The app icons are drawn by `node scripts/make-icons.mjs`.
 Every push to `main` runs `.github/workflows/deploy.yml`: `npm ci`, the tests, `npm run build`,
 and a deploy of `dist/` to GitHub Pages (repository settings: Pages, source "GitHub Actions").
 The site lives under `/cube/`, so Vite's `base` is `/cube/` and routes are hash based
-(`#/cube`, `#/cycles`, `#/scan`, `#/print`, `#/suggestions`, `#/log`, `#/about`). The service worker in `public/sw.js` only receives files shared
+(`#/cube`, `#/cycles`, `#/scan`, `#/print`, `#/suggestions`, `#/upstream`, `#/log`, `#/about`; Log and About
+are in the account menu). The service worker in `public/sw.js` only receives files shared
 to the app; it caches nothing else.
 
 ## Licence

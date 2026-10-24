@@ -239,14 +239,14 @@ describe('batch composition', () => {
   const aang = byName('Aang, Swift Savior');
   // Make Aang a reprint: the box holds another Printing than the Wanted one.
   const state = cardStateOf(aang, NOW);
-  state.in_box = { ...state.in_box, scryfall_id: '00000000-0000-0000-0000-000000000000', set: 'xxx', collector_number: '1' };
+  state.in_box = { ...state.in_box!, scryfall_id: '00000000-0000-0000-0000-000000000000', set: 'xxx', collector_number: '1' };
   const merged = mergeCards(cards, new Map([[aang.oracle_id, state]]));
 
   it('finds every card whose Wanted Printing differs from its In-box Printing', () => {
     const lines = reprintLines(merged);
-    const expected = merged.filter((c) => c.wanted.scryfall_id !== c.in_box.scryfall_id).map((c) => c.oracle_id);
+    const expected = merged.filter((c) => c.wanted.scryfall_id !== c.in_box!.scryfall_id).map((c) => c.oracle_id);
     expect(lines.map((l) => l.oracle_id).sort()).toEqual([...expected].sort());
-    expect(lines.length).toBe(cards.filter((c) => c.wanted.scryfall_id !== c.in_box.scryfall_id).length + 1);
+    expect(lines.length).toBe(cards.filter((c) => c.wanted.scryfall_id !== c.in_box!.scryfall_id).length + 1);
     expect(lines.every((l) => l.source === 'reprint' && l.quantity === 1)).toBe(true);
   });
 

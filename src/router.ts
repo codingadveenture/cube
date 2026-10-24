@@ -1,5 +1,6 @@
 // A tiny hash router: #/cube (default), #/cube?q=<search>, #/cube/<oracle_id>, #/scan,
-// #/cube/<oracle_id>/printings, #/cycles, #/cycles/<name>, #/print, #/print?section=tokens, #/suggestions, #/log, #/about.
+// #/cube/<oracle_id>/printings, #/cycles, #/cycles/<name>, #/print, #/print?section=tokens, #/suggestions, #/upstream,
+// #/log, #/about.
 import { useEffect, useState } from 'react';
 
 export type Route =
@@ -9,6 +10,7 @@ export type Route =
   | { view: 'scan'; query: URLSearchParams }
   | { view: 'print'; query: URLSearchParams }
   | { view: 'suggestions' }
+  | { view: 'upstream' }
   | { view: 'log' }
   | { view: 'about' };
 
@@ -20,6 +22,7 @@ export function parseHash(hash: string): Route {
   if (parts[0] === 'about') return { view: 'about' };
   if (parts[0] === 'print') return { view: 'print', query: new URLSearchParams(query) };
   if (parts[0] === 'suggestions') return { view: 'suggestions' };
+  if (parts[0] === 'upstream') return { view: 'upstream' };
   if (parts[0] === 'log') return { view: 'log' };
   if (parts[0] === 'cycles') return { view: 'cycles', cycle: parts[1] ? decodeURIComponent(parts[1]) : null };
   if (parts[0] === 'cube' && parts[1] && parts[2] === 'printings') return { view: 'printings', oracleId: decodeURIComponent(parts[1]) };
