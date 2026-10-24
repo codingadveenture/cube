@@ -1,6 +1,6 @@
 import type { Card, PrintingBase } from '../types';
 import { wantedDiffers } from '../cube/order';
-import { cycleHash, isListHash, previousHash, printingsHash } from '../router';
+import { TOKENS_HASH, cycleHash, isListHash, previousHash, printingsHash } from '../router';
 import { humanizeCycle } from '../printings/cycles';
 import { reasonLabel } from '../printings/wanted';
 import { useStore } from '../store/context';
@@ -125,6 +125,12 @@ export function CardDetail({ cards, oracleId }: { cards: Card[]; oracleId: strin
           ? `Reprint pending: Wanted ${card.wanted.set.toUpperCase()} ${card.wanted.collector_number} differs from In-box ${card.in_box.set.toUpperCase()} ${card.in_box.collector_number}.`
           : 'Wanted is the In-box Printing.'}
       </p>
+      {card.produces_tokens.length > 0 && (
+        <p className="makes">
+          Makes:{' '}
+          <a href={TOKENS_HASH}>{[...new Set(card.produces_tokens.map((t) => t.name))].join(', ')}</a>
+        </p>
+      )}
       <p>
         <a className="button" href={printingsHash(card.oracle_id)}>
           {auth.isOwner ? 'Choose Wanted Printing' : 'Suggest a Printing'}

@@ -72,3 +72,19 @@ export function listChangeWrite(c: ListChange): ListWrite {
     remove: { field: c.field === 'adds' ? 'bans' : 'adds', values: c.drop },
   };
 }
+
+/** Firestore allows 500 writes per batch; Mark as printed keeps room for the history writes. */
+export const MARK_PRINTED_MAX = 490;
+
+/**
+ * The card writes of Mark as printed, for one writeBatch together with the history entry. A card
+ * named twice keeps its last patch. Throws when the batch is too large for one atomic write.
+ */
+export function markPrintedWrites(patches: CardPatchFor[], now: string): { oracle_id: string; write: CardWrite }[] {
+  const parts = cardBatches(patches, now, Number.MAX_SAFE_INTEGER);
+  const all = parts[0] ?? [];
+  if (all.length > MARK_PRINTED_MAX) {
+    throw new Error(`Too many cards to mark at once (${all.length}). Untick some and mark them in two goes.`);
+  }
+  return all;
+}

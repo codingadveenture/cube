@@ -15,7 +15,7 @@ import {
   type Firestore,
 } from 'firebase/firestore';
 import { chunk, withoutExisting } from './baseline';
-import { cardBatches, cardPatchWrite, listChangeWrite, type CardWrite } from './writes';
+import { cardBatches, cardPatchWrite, listChangeWrite, markPrintedWrites, type CardWrite } from './writes';
 import { ownerFromDoc } from './owner';
 import {
   CUBE_ID,
@@ -260,6 +260,28 @@ export class FirestoreStore implements Store {
         next({ data: toCycleAcks(snap.data()), fromCache: snap.metadata.fromCache, hasPendingWrites: snap.metadata.hasPendingWrites }),
       error,
     );
+  }
+
+  subscribeMetaDoc(docId: string, next: (s: Snapshot<Record<string, unknown> | null>) => void, error: OnError) {
+    return onSnapshot(
+      this.metaRef(docId),
+      META,
+      (snap) =>
+        next({ data: (snap.data() as Record<string, unknown> | undefined) ?? null, fromCache: snap.metadata.fromCache, hasPendingWrites: snap.metadata.hasPendingWrites }),
+      error,
+    );
+  }
+
+  markPrinted(patches: CardPatchFor[], entry: Record<string, unknown> | null, trim: unknown[]): Promise<void> {
+    const t = now();
+    const batch = writeBatch(this.db);
+    for (const { oracle_id, write } of markPrintedWrites(patches, t)) batch.set(doc(this.col('cards'), oracle_id), writeData(write), { merge: true });
+    if (entry) {
+      // Two writes to one doc: Firestore allows one transform per field per write.
+      if (trim.length) batch.set(this.metaRef('print'), { history: arrayRemove(...trim) }, { merge: true });
+      batch.set(this.metaRef('print'), { history: arrayUnion(entry), updatedAt: t }, { merge: true });
+    }
+    return batch.commit();
   }
 
   setMeta(docId: string, data: Record<string, unknown>): Promise<void> {

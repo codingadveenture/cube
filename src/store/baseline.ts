@@ -63,8 +63,9 @@ function printingFor(card: Card, s: InBoxState | WantedState): PrintingBase {
   const known = [card.in_box, card.wanted].find((p) => p.scryfall_id === s.scryfall_id);
   if (known) return { ...known, illustration_id: s.illustration_id ?? known.illustration_id };
   const hasBack = !!card.in_box.back_image_normal;
-  // A Wanted Printing written from the printings index carries its own image URL.
-  const stored = 'image_normal' in s && s.image_normal ? s.image_normal : null;
+  // A Wanted Printing written from the printings index (or an In-box one marked as printed) carries its own image URL.
+  // Only an image of this very Printing counts: a merge-write can leave an older Printing's image behind.
+  const stored = 'image_normal' in s && s.image_normal && s.image_normal.includes(s.scryfall_id) ? s.image_normal : null;
   return {
     scryfall_id: s.scryfall_id,
     name: s.name,

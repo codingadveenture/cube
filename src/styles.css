@@ -573,6 +573,7 @@ button.primary {
 
 input[type='text'],
 input[type='date'],
+input[type='number'],
 select {
   min-height: 44px;
   padding: 0.4rem 0.6rem;
@@ -920,10 +921,199 @@ button.tile-button {
   margin-top: 0.5rem;
 }
 
-/* Six entries in the bottom bar: 60 px each at 360 px, still 44 px tall. */
+/* Six entries in the bottom bar (About is in the account menu): 60 px each at 360 px, still 44 px tall. */
 @media (max-width: 400px) {
   .nav a {
     padding: 0 2px;
     font-size: 0.82rem;
   }
+}
+
+/* Slice 3b: account menu, Print view */
+
+.account-wrap {
+  margin-left: auto;
+  position: relative;
+}
+.account-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  min-width: 12rem;
+  padding: 0.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.15);
+}
+.account-menu a,
+.account-menu button {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 0.75rem;
+  border: 0;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--text);
+  text-decoration: none;
+  text-align: left;
+  font: inherit;
+}
+.account-menu a:hover,
+.account-menu button:hover {
+  background: var(--chip);
+}
+.account-menu p {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+}
+.makes a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+.print h2 {
+  margin-top: 1.5rem;
+}
+.print section {
+  scroll-margin-top: 1rem;
+}
+.batch-list,
+.token-list {
+  list-style: none;
+  margin: 0.5rem 0;
+  padding: 0;
+}
+.batch-list li,
+.token-list > li {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.batch-list label {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+  min-height: 44px;
+  cursor: pointer;
+}
+.batch-list input[type='checkbox'] {
+  width: 22px;
+  height: 22px;
+  flex: none;
+}
+.batch-list img,
+.token-list img {
+  width: 48px;
+  height: auto;
+  border-radius: 3px;
+  flex: none;
+}
+.batch-group {
+  margin: 1rem 0 0.25rem;
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+.line-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.line-main .num {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.token-body {
+  flex: 1;
+  min-width: 0;
+}
+.token-body details summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+.token-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+.token-controls input {
+  width: 5rem;
+  min-height: 44px;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+.field-hint {
+  font-size: 0.85rem;
+  color: var(--warn);
+}
+/* While on About (reached from the account menu), the chip shows where you are. */
+.account.current {
+  background: var(--chip);
+  font-weight: 600;
+}
+.rec {
+  display: inline-block;
+  padding: 0 0.5rem;
+  border-radius: 999px;
+  background: var(--chip);
+  font-size: 0.85rem;
+}
+.rec-buy {
+  color: var(--warn);
+}
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: 0.5rem 1rem;
+}
+.settings-grid input,
+.settings-grid select,
+.calibration input {
+  width: 100%;
+  min-height: 44px;
+  font: inherit;
+}
+.check-field {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 44px;
+}
+.check-field input {
+  width: 22px;
+  height: 22px;
+}
+.print textarea {
+  width: 100%;
+  min-height: 6rem;
+  font: inherit;
+}
+.failed-list {
+  color: var(--warn);
+}
+.list-note {
+  margin-top: 0.25rem;
+  font-size: 0.9rem;
+}
+.print details > summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  cursor: pointer;
+  color: var(--accent);
 }

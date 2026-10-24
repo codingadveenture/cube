@@ -46,6 +46,7 @@ export function Account() {
         <li>See the Cube, the Log and every Suggestion.</li>
         <li>Send Suggestions: Art flags, Bans, Winner&rsquo;s Picks, Printings, adds and anything else.</li>
         <li>Scan piles, share them with the group, and run the diff over shared piles.</li>
+        <li>Build a Print batch, calibrate a printer and generate the print sheet PDF.</li>
       </ul>
       <h3>What the Owner can do</h3>
       <ul>
@@ -53,6 +54,7 @@ export function Account() {
         <li>Flag art directly, set the In-box Printing, and clear Art flags.</li>
         <li>Add and edit Log entries, import the log from a file, and import the baseline.</li>
         <li>Delete any shared pile.</li>
+        <li>Save print settings and printer profiles for everyone, and mark a Print batch as printed.</li>
       </ul>
     </section>
   );

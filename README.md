@@ -14,8 +14,9 @@ matters. The app will:
 - produce print sheets that come out at the right physical size on the first try;
 - keep the winners and bans log.
 
-Status: slice 1 (the Cube view and the Scan diff) and slice 2 (shared state in Firestore:
-Suggestions, shared Scan piles, the Log and the Owner's confirmations) are built; the rest is in
+Status: slice 1 (the Cube view and the Scan diff), slice 2 (shared state in Firestore:
+Suggestions, shared Scan piles, the Log and the Owner's confirmations), slice 3a (the Printing
+picker and Cycles) and slice 3b (Print batches and print sheets) are built; the rest is in
 design. `GLOSSARY.md`
 holds the vocabulary the code follows.
 
@@ -102,6 +103,15 @@ When the Owner sets Wanted on a card in a Cycle, a sheet offers "This card only"
 The Cycles view (`#/cycles`) shows each Cycle as uniform, styled (same frame, border and style from different sets) or split, and a Cycle page ranks the Print runs that cover all members, or all but one, so a whole Cycle can be set or reset to its In-box Printings at once.
 The Owner can accept a split; the accepted arrangement is stored in `cubes/main/meta/cycles` and shows as a quiet "accepted split" until any member changes.
 
+## Printing
+
+The Print batch on the Print page starts with every card whose Wanted Printing differs from its In-box Printing, plus any extra lines and tokens you add, and the back faces of double-faced cards go to a Back pool automatically.
+Generate PDF builds one file in the browser with nine slips per A4 page at the target size, and page 1 is always a test page, which "Print the test page" also gives on its own.
+Print the test page from a computer at 100 percent or Actual size and measure its two lines: the 180 mm line across and the 260 mm line down.
+Enter both lengths in the Calibration box: if either is off by more than about 2 percent the print dialog is still scaling, otherwise the box gives the correction factors fx and fy.
+The Owner saves the factors under a printer name in Firestore (`cubes/main/meta/print`, next to the print settings and history) for everyone, while a visitor keeps them on their own device.
+For other print tools, "Copy mtgprint list" gives `1 Name (SET) number` lines for mtgprint.net and "Copy MTG Proxy Generator list" gives `1 SET/number -cd` lines, both without tokens or back faces.
+
 ## Development
 
 Needs Node 22 or later.
@@ -131,7 +141,7 @@ The app icons are drawn by `node scripts/make-icons.mjs`.
 Every push to `main` runs `.github/workflows/deploy.yml`: `npm ci`, the tests, `npm run build`,
 and a deploy of `dist/` to GitHub Pages (repository settings: Pages, source "GitHub Actions").
 The site lives under `/cube/`, so Vite's `base` is `/cube/` and routes are hash based
-(`#/cube`, `#/cycles`, `#/scan`, `#/suggestions`, `#/log`, `#/about`). The service worker in `public/sw.js` only receives files shared
+(`#/cube`, `#/cycles`, `#/scan`, `#/print`, `#/suggestions`, `#/log`, `#/about`). The service worker in `public/sw.js` only receives files shared
 to the app; it caches nothing else.
 
 ## Licence

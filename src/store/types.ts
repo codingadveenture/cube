@@ -24,6 +24,8 @@ export interface InBoxState {
   name: string | null;
   source: string;
   confidence: string;
+  /** Scryfall's normal image, written when a Wanted Printing is marked as printed. */
+  image_normal?: string | null;
 }
 
 export interface WantedState {
@@ -214,6 +216,14 @@ export interface Store {
   /** Owner only: merge-write several card docs, in writeBatches of at most 400. */
   updateCards(patches: CardPatchFor[]): Promise<void>;
   subscribeCycleAcks(next: (s: Snapshot<CycleAcks>) => void, error: OnError): Unsubscribe;
+  /** A meta doc as stored (null when it does not exist), for example cubes/main/meta/print. */
+  subscribeMetaDoc(docId: string, next: (s: Snapshot<Record<string, unknown> | null>) => void, error: OnError): Unsubscribe;
+  /**
+   * Owner only: Mark as printed in one atomic writeBatch: the In-box patches, the history entry
+   * appended to cubes/main/meta/print with arrayUnion, and `trim` (stored entries) removed with
+   * arrayRemove. Queued locally at once when offline.
+   */
+  markPrinted(patches: CardPatchFor[], entry: Record<string, unknown> | null, trim: unknown[]): Promise<void>;
   /** Owner only: merge fields into cubes/main/meta/{docId}; nested maps merge key by key. */
   setMeta(docId: string, data: Record<string, unknown>): Promise<void>;
   createSuggestion(input: SuggestionInput): Promise<void>;

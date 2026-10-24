@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useMemo, type ReactNode } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useRoute } from './router';
 import { useCards } from './data';
 import type { Card } from './types';
@@ -16,14 +16,16 @@ import { BaselinePanel } from './views/BaselinePanel';
 // The Printing picker and the Cycles view load on demand, in their own chunks.
 const PickerView = lazy(() => import('./views/printings/PickerView'));
 const CyclesView = lazy(() => import('./views/printings/CyclesView'));
+// The Print view (and jsPDF, which it imports on demand) stays out of the main chunk.
+const PrintView = lazy(() => import('./views/print/PrintView'));
 
 const NAV = [
   { view: 'cube', href: '#/cube', label: 'Cube' },
   { view: 'cycles', href: '#/cycles', label: 'Cycles' },
   { view: 'scan', href: '#/scan', label: 'Scan' },
+  { view: 'print', href: '#/print', label: 'Print' },
   { view: 'suggestions', href: '#/suggestions', label: 'Suggest' },
   { view: 'log', href: '#/log', label: 'Log' },
-  { view: 'about', href: '#/about', label: 'About' },
 ] as const;
 
 export function App() {
@@ -65,6 +67,8 @@ function Shell() {
     body = <PickerView key={route.oracleId} cards={merged} oracleId={route.oracleId} />;
   } else if (route.view === 'cycles') {
     body = <CyclesView cards={merged} cycle={route.cycle} />;
+  } else if (route.view === 'print') {
+    body = <PrintView cards={merged} section={route.query.get('section')} />;
   } else if (route.view === 'suggestions') {
     body = <SuggestionsView cards={merged} />;
   } else if (route.oracleId) {
@@ -101,8 +105,9 @@ function Shell() {
   );
 }
 
-/** The nav entry a view belongs to: the picker is part of the Cube. */
-function navView(view: string): string {
+/** The nav entry a view belongs to: the picker is part of the Cube; About has no bar entry (it is in the account menu). */
+function navView(view: string): string | null {
+  if (view === 'about') return null;
   return view === 'printings' ? 'cube' : view;
 }
 
@@ -125,27 +130,71 @@ function CardSource({ states, base }: { states: Live<Map<string, CardState>>; ba
   );
 }
 
+/** The account chip in the header: a small menu with About and Sign in as Owner or Sign out. */
 function AccountChip() {
-  const { auth, connection, signInAsOwner } = useStore();
-  if (connection !== 'ready') return null;
-  if (auth.isOwner) {
-    return (
-      <a className="account" href="#/about">
-        Owner
-      </a>
-    );
-  }
-  if (auth.provider === 'google') {
-    return (
-      <a className="account" href="#/about">
-        Signed in
-      </a>
-    );
-  }
+  const { auth, connection, signInAsOwner, signOut } = useStore();
+  const onAbout = useRoute().view === 'about';
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  const button = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => {
+      if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setOpen(false);
+        button.current?.focus();
+      }
+    };
+    const onHash = () => setOpen(false);
+    document.addEventListener('pointerdown', onDown);
+    document.addEventListener('keydown', onKey);
+    window.addEventListener('hashchange', onHash);
+    return () => {
+      document.removeEventListener('pointerdown', onDown);
+      document.removeEventListener('keydown', onKey);
+      window.removeEventListener('hashchange', onHash);
+    };
+  }, [open]);
+  const label = auth.isOwner ? 'Owner' : auth.provider === 'google' ? 'Signed in' : 'Account';
   return (
-    <button type="button" className="account" onClick={() => void signInAsOwner()}>
-      Sign in as Owner
-    </button>
+    <div className="account-wrap" ref={box}>
+      <button ref={button} type="button" className={onAbout ? 'account current' : 'account'} aria-expanded={open} aria-controls="account-menu" onClick={() => setOpen((o) => !o)}>
+        {label}
+      </button>
+      {open && (
+        <div className="account-menu" id="account-menu">
+          <a href="#/about" aria-current={onAbout ? 'page' : undefined} onClick={() => setOpen(false)}>
+            About
+          </a>
+          {connection === 'ready' && auth.provider === 'google' && (
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                void signOut();
+              }}
+            >
+              Sign out
+            </button>
+          )}
+          {connection === 'ready' && auth.provider !== 'google' && (
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                void signInAsOwner();
+              }}
+            >
+              Sign in as Owner
+            </button>
+          )}
+          {connection !== 'ready' && <p className="muted">{connection === 'connecting' ? 'Connecting…' : 'Sign-in is not available on this device.'}</p>}
+        </div>
+      )}
+    </div>
   );
 }
 

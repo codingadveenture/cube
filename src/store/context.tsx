@@ -277,6 +277,7 @@ const subScans: Subscribe<SharedPile[]> = (s, n, e) => s.subscribeScans(n, e);
 const subLog: Subscribe<LogEntry[]> = (s, n, e) => s.subscribeLog(n, e);
 const subOverrides: Subscribe<Overrides> = (s, n, e) => s.subscribeOverrides(n, e);
 const subCycleAcks: Subscribe<CycleAcks> = (s, n, e) => s.subscribeCycleAcks(n, e);
+const subPrintMeta: Subscribe<Record<string, unknown> | null> = (s, n, e) => s.subscribeMetaDoc('print', n, e);
 
 export const useCardStates = () => useLive(subCards, EMPTY_CARDS);
 export const useSuggestions = () => useLive<Suggestion[]>(subSuggestions, NONE);
@@ -284,3 +285,5 @@ export const useScans = () => useLive<SharedPile[]>(subScans, NONE);
 export const useLog = () => useLive<LogEntry[]>(subLog, NONE);
 export const useOverrides = () => useLive(subOverrides, EMPTY_OVERRIDES);
 export const useCycleAcks = () => useLive(subCycleAcks, EMPTY_CYCLE_ACKS);
+/** cubes/main/meta/print as stored: print settings, printer profiles and the print history. */
+export const usePrintMetaDoc = () => useLive<Record<string, unknown> | null>(subPrintMeta, null);
