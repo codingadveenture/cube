@@ -2,6 +2,6 @@
  "name": "Fresh Start",
  "oracle_id": "77f1734d-ea0b-4344-8a9e-9d1a34eb6164",
  "printings": [
-  {"id":"96f7af08-ac05-45d0-979f-282943130c61","set":"tdm","set_name":"Tarkir: Dragonstorm","set_type":"expansion","collector_number":"46","released_at":"2025-04-11","frame":"2015","frame_effects":["enchantment"],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil","foil"],"highres":false,"illustration_id":"ef7fb705-d893-4660-b569-2805e85e1ef1","artist":"Joe Slucher","image_normal":"https://cards.scryfall.io/normal/front/9/6/96f7af08-ac05-45d0-979f-282943130c61.jpg?1783907395","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":false,"variation":false,"booster":true,"digital":false}
+  {"id":"96f7af08-ac05-45d0-979f-282943130c61","set":"tdm","set_name":"Tarkir: Dragonstorm","set_type":"expansion","collector_number":"46","released_at":"2025-04-11","frame":"2015","frame_effects":["enchantment"],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil","foil"],"highres":false,"illustration_id":"ef7fb705-d893-4660-b569-2805e85e1ef1","artist":"Joe Slucher","image_normal":"https://cards.scryfall.io/normal/front/9/6/96f7af08-ac05-45d0-979f-282943130c61.jpg?1783907395","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":false,"variation":false,"booster":true,"digital":false,"games":["paper","arena","mtgo"]}
  ]
 }

@@ -2,6 +2,6 @@
  "name": "Shallow Grave",
  "oracle_id": "9843d8a6-bcbf-40c2-8c41-316e97db9c62",
  "printings": [
-  {"id":"d5c782cc-c951-4c6f-a93f-774ae6c1c214","set":"mir","set_name":"Mirage","set_type":"expansion","collector_number":"141","released_at":"1996-10-08","frame":"1997","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil"],"highres":true,"illustration_id":"8932e789-1d1c-4750-837e-e0b45a81c1c7","artist":"John Coulthart","image_normal":"https://cards.scryfall.io/normal/front/d/5/d5c782cc-c951-4c6f-a93f-774ae6c1c214.jpg?1783947088","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":false,"variation":false,"booster":true,"digital":false}
+  {"id":"d5c782cc-c951-4c6f-a93f-774ae6c1c214","set":"mir","set_name":"Mirage","set_type":"expansion","collector_number":"141","released_at":"1996-10-08","frame":"1997","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil"],"highres":true,"illustration_id":"8932e789-1d1c-4750-837e-e0b45a81c1c7","artist":"John Coulthart","image_normal":"https://cards.scryfall.io/normal/front/d/5/d5c782cc-c951-4c6f-a93f-774ae6c1c214.jpg?1783947088","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":false,"variation":false,"booster":true,"digital":false,"games":["paper","mtgo"]}
  ]
 }

@@ -2,6 +2,6 @@
  "name": "Descendant of Storms",
  "oracle_id": "ca773c52-ca64-463c-99cf-e71b59d2cff7",
  "printings": [
-  {"id":"f632be90-9e7f-41f8-a52e-a2952354d730","set":"tdm","set_name":"Tarkir: Dragonstorm","set_type":"expansion","collector_number":"8","released_at":"2025-04-11","frame":"2015","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil","foil"],"highres":false,"illustration_id":"6e678361-6bbd-4507-bf27-89879609d808","artist":"Lie Setiawan","image_normal":"https://cards.scryfall.io/normal/front/f/6/f632be90-9e7f-41f8-a52e-a2952354d730.jpg?1783907415","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":false,"variation":false,"booster":true,"digital":false}
+  {"id":"f632be90-9e7f-41f8-a52e-a2952354d730","set":"tdm","set_name":"Tarkir: Dragonstorm","set_type":"expansion","collector_number":"8","released_at":"2025-04-11","frame":"2015","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil","foil"],"highres":false,"illustration_id":"6e678361-6bbd-4507-bf27-89879609d808","artist":"Lie Setiawan","image_normal":"https://cards.scryfall.io/normal/front/f/6/f632be90-9e7f-41f8-a52e-a2952354d730.jpg?1783907415","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":false,"variation":false,"booster":true,"digital":false,"games":["paper","arena","mtgo"]}
  ]
 }

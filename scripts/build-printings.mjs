@@ -1,4 +1,5 @@
-// build-printings.mjs: list every English paper Printing of every card in public/data/cards.json
+// build-printings.mjs: list every English Printing (paper and digital-only) of every card in
+// public/data/cards.json
 // and write one file per card, public/data/printings/<oracle_id>.json, plus
 // public/data/printings-meta.json, for the printing picker. One file per card means a phone
 // loads only the cards it shows, never the whole index.
@@ -7,21 +8,25 @@
 //   node scripts/build-printings.mjs [--refresh]
 //
 // For each oracle_id, GET https://api.scryfall.com/cards/search with
-// q=oracleid:<id> game:paper lang:en, unique=prints, include_extras, include_variations,
+// q=oracleid:<id> lang:en, unique=prints, include_extras, include_variations,
 // order=released, dir=desc, following has_more/next_page. A 404 means no printings; the card
 // gets an empty list and is reported. Requests are at least 150 ms apart (after the previous
 // response) and at least 750 ms apart start to start: Scryfall's hard limit for /cards/search is
 // 2 per second, and one HTTP 429 locks the client out for 30 s, so the 2 s back-off used by
 // build-cards.mjs is not enough here. On 429 the script waits for Retry-After (60 s if absent)
 // plus 2 s, up to 3 times, then stops. Each card's pages are cached together under
-// scripts/.cache/printings-<oracle_id>.json and reused unless --refresh is given, so a stopped
-// run resumes where it left off.
+// scripts/.cache/printings-all-<oracle_id>.json and reused unless --refresh is given, so a stopped
+// run resumes where it left off. (The older printings-<oracle_id>.json files hold the paper-only
+// search and are not read.)
 //
-// A Printing is kept when it is English, has "paper" in games, its set_type is not art_series,
-// minigame or token, its border is not gold, it is not oversized, and its layout is not
+// A Printing is kept when it is English, its set_type is not art_series, minigame or token, its border is not gold, it is not oversized, and its layout is not
 // art_series, token, double_faced_token or emblem. set_type memorabilia is kept on purpose:
 // Scryfall files the 30th Anniversary Edition (30a) there, and the Owner uses 30a Printings for
-// Power and the dual lands. Printings are newest first.
+// Power and the dual lands. Digital-only Printings (MTGO and Arena sets such as vma, tpr, the
+// Arena "ha" sets and the MTGO promos in prm) are kept too: every card in the Cube is a Proxy
+// printed from Scryfall images, so a digital-only art is as printable as a paper one. Each record
+// carries "digital" and "games" (for example ["mtgo"] or ["arena"]) so the client can tell them
+// apart; the default rule never picks a digital Printing. Printings are newest first.
 //
 // Output: {"name", "oracle_id", "printings": [...]} per card. image_small, image_png and
 // back_image_png are not stored, to keep the files small. The client derives them from
@@ -85,7 +90,7 @@ async function getJson(url) {
 }
 
 function searchUrl(oracleId) {
-  const q = encodeURIComponent(`oracleid:${oracleId} game:paper lang:en`).replace(/%20/g, '+');
+  const q = encodeURIComponent(`oracleid:${oracleId} lang:en`).replace(/%20/g, '+');
   return (
     `https://api.scryfall.com/cards/search?q=${q}&unique=prints&include_extras=true` +
     '&include_variations=true&order=released&dir=desc'
@@ -94,7 +99,7 @@ function searchUrl(oracleId) {
 
 // All Scryfall card objects for one oracle_id, from the cache or from the API.
 async function loadCard(oracleId) {
-  const file = join(CACHE, `printings-${oracleId}.json`);
+  const file = join(CACHE, `printings-all-${oracleId}.json`);
   const url = searchUrl(oracleId);
   if (!REFRESH && existsSync(file)) {
     const cached = JSON.parse(await readFile(file, 'utf8'));
@@ -121,7 +126,6 @@ async function loadCard(oracleId) {
 function keep(sc) {
   return (
     sc.lang === 'en' &&
-    (sc.games || []).includes('paper') &&
     !SKIP_SET_TYPES.has(sc.set_type) &&
     sc.border_color !== 'gold' &&
     !sc.oversized &&
@@ -161,6 +165,7 @@ function printingFields(sc) {
     variation: !!sc.variation,
     booster: !!sc.booster,
     digital: !!sc.digital,
+    games: sc.games || [],
   };
 }
 
@@ -246,6 +251,14 @@ const meta = {
   by_border_color: countBy('border_color'),
   highres: countBy('highres'),
   promo: countBy('promo'),
+  digital: countBy('digital'),
+  digital_by_game: all
+    .filter((p) => p.digital)
+    .reduce((res, p) => {
+      const key = p.games.join('+') || 'none';
+      res[key] = (res[key] || 0) + 1;
+      return res;
+    }, {}),
   printings_30a: all.filter((p) => p.set === '30a').length,
   total_bytes: Object.values(fileBytes).reduce((a, b) => a + b, 0),
   largest_file: { oracle_id: largestId, name: out[largestId].name, bytes: largestBytes },

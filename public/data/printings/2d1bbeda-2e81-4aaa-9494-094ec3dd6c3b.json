@@ -2,6 +2,6 @@
  "name": "Suplex",
  "oracle_id": "2d1bbeda-2e81-4aaa-9494-094ec3dd6c3b",
  "printings": [
-  {"id":"f61693a2-7042-44e0-85ba-9bf12ab94e7e","set":"fin","set_name":"Final Fantasy","set_type":"expansion","collector_number":"164","released_at":"2025-06-13","frame":"2015","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":["ffvi","universesbeyond"],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"53b77501-97df-4ecb-9c7d-0bb821667c4d","artist":"Fang Xinyu","image_normal":"https://cards.scryfall.io/normal/front/f/6/f61693a2-7042-44e0-85ba-9bf12ab94e7e.jpg?1783906595","back_image_normal":null,"back_illustration_id":null,"security_stamp":"triangle","reprint":false,"variation":false,"booster":true,"digital":false}
+  {"id":"f61693a2-7042-44e0-85ba-9bf12ab94e7e","set":"fin","set_name":"Final Fantasy","set_type":"expansion","collector_number":"164","released_at":"2025-06-13","frame":"2015","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":["ffvi","universesbeyond"],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"53b77501-97df-4ecb-9c7d-0bb821667c4d","artist":"Fang Xinyu","image_normal":"https://cards.scryfall.io/normal/front/f/6/f61693a2-7042-44e0-85ba-9bf12ab94e7e.jpg?1783906595","back_image_normal":null,"back_illustration_id":null,"security_stamp":"triangle","reprint":false,"variation":false,"booster":true,"digital":false,"games":["paper","arena","mtgo"]}
  ]
 }

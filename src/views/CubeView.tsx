@@ -76,7 +76,7 @@ export function CubeView({ cards, initialQuery }: { cards: Card[]; initialQuery:
         {parts.toPull.length > 0 && <span>{parts.toPull.length} to pull</span>}
         <span>{summary.wantedDiffers} Wanted differs from In-box</span>
         <span>{summary.flagged} with an Art flag</span>
-        <span>{summary.nonPaper} In-box not on paper</span>
+        <span>{summary.nonPaper} In-box digital-only art</span>
       </p>
       <div className="cube-tools">
         <label className="search">

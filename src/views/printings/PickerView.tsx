@@ -1,5 +1,7 @@
 // The Printing picker, #/cube/<oracle_id>/printings: every Printing of a card, one tile per art.
-// The Owner sets the Wanted Printing; visitors send a printing Suggestion.
+// The Owner sets the Wanted Printing; visitors send a printing Suggestion. Digital-only (MTGO,
+// Arena) Printings are printable Proxies too; they show behind "Show digital-only", except the
+// current Wanted and In-box Printings, which always show.
 import { useEffect, useMemo, useState, type MouseEvent } from 'react';
 import type { Card } from '../../types';
 import { useCardStates, useStore } from '../../store/context';
@@ -17,7 +19,7 @@ import {
   type PickerFilters,
 } from '../../printings/picker';
 import { frameLabel } from '../../printings/style';
-import type { IndexPrinting } from '../../printings/types';
+import { digitalOnly, type IndexPrinting } from '../../printings/types';
 import { wantedFromPrinting } from '../../printings/wanted';
 import { previousHash, replaceHash } from '../../router';
 import { NameField, useDisplayName } from '../common';
@@ -119,6 +121,7 @@ function Picker({ card, cards, printings }: { card: Card; cards: Card[]; printin
   const pinned = useMemo(() => new Set([card.wanted.scryfall_id, ...(boxId ? [boxId] : [])]), [card.wanted.scryfall_id, boxId]);
   const shown = useMemo(() => filterPrintings(printings, filters, pinned), [printings, filters, pinned]);
   const groups = useMemo(() => groupByArt(shown, pinned), [shown, pinned]);
+  const hiddenDigital = filters.showDigital ? 0 : printings.filter((p) => p.digital && !pinned.has(p.id)).length;
   const today = todayIso();
   const rule = useMemo(() => defaultPrinting(printings, today), [printings, today]);
   const set = <K extends keyof PickerFilters>(k: K, v: PickerFilters[K]) => setFilters((f) => ({ ...f, [k]: v }));
@@ -180,7 +183,7 @@ function Picker({ card, cards, printings }: { card: Card; cards: Card[]; printin
   }
 
   if (printings.length === 0) {
-    return <p className="status">This card has no paper Printing on Scryfall.</p>;
+    return <p className="status">This card has no Printing on Scryfall.</p>;
   }
 
   return (
@@ -222,6 +225,7 @@ function Picker({ card, cards, printings }: { card: Card; cards: Card[]; printin
           <Toggle label="Hide promos" on={filters.hidePromos} set={(v) => set('hidePromos', v)} />
           <Toggle label="Hide collectors' editions" on={filters.hideCollectors} set={(v) => set('hideCollectors', v)} />
           <Toggle label="High resolution only" on={filters.highresOnly} set={(v) => set('highresOnly', v)} />
+          <Toggle label="Show digital-only" on={filters.showDigital} set={(v) => set('showDigital', v)} />
         </div>
         <div className="chips" role="radiogroup" aria-label="Frame">
           {FRAMES.map(([v, l]) => (
@@ -242,6 +246,7 @@ function Picker({ card, cards, printings }: { card: Card; cards: Card[]; printin
         {groups.map((g) => {
           const expanded = open === g.key;
           const marks = marksFor(g.printings, card);
+          const digital = digitalOnly(g.printings);
           return (
             <li key={g.key} className={expanded ? 'tile open' : 'tile'}>
               <button type="button" className="tile-button" aria-expanded={expanded} onClick={() => setOpen(expanded ? null : g.key)}>
@@ -251,13 +256,14 @@ function Picker({ card, cards, printings }: { card: Card; cards: Card[]; printin
                     {g.printings.length} {g.printings.length === 1 ? 'Printing' : 'Printings'}
                   </span>
                   <span className="muted">{g.cover.artist}</span>
-                  {marks.length > 0 && (
+                  {(marks.length > 0 || digital) && (
                     <span className="chips">
                       {marks.map((m) => (
                         <span key={m} className="chip chip-mark">
                           {m}
                         </span>
                       ))}
+                      {digital && <span className="chip">{digital}-only art</span>}
                     </span>
                   )}
                 </span>
@@ -294,7 +300,12 @@ function Picker({ card, cards, printings }: { card: Card; cards: Card[]; printin
           );
         })}
       </ul>
-      {groups.length === 0 && <p className="status">No Printing matches these filters.</p>}
+      {groups.length === 0 && (
+        <p className="status">
+          No Printing matches these filters.
+          {hiddenDigital > 0 && ` ${hiddenDigital} digital-only ${hiddenDigital === 1 ? 'Printing is' : 'Printings are'} hidden; turn on Show digital-only to see ${hiddenDigital === 1 ? 'it' : 'them'}.`}
+        </p>
+      )}
       {sheet && <CycleSheet card={card} cards={cards} printing={sheet.printing} reason={sheet.reason} onClose={() => setSheet(null)} />}
     </>
   );

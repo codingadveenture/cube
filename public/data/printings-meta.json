@@ -1,124 +1,132 @@
 {
- "generated_at": "2026-10-24T15:20:32.545Z",
+ "generated_at": "2026-10-24T18:51:45.178Z",
  "cards": 537,
- "cards_with_zero_printings": [
-  "Gleemox"
- ],
- "total_printings": 4485,
+ "cards_with_zero_printings": [],
+ "total_printings": 5082,
  "printings_per_card": {
-  "min": 0,
-  "median": 6,
-  "max": 133
+  "min": 1,
+  "median": 7,
+  "max": 138
  },
  "by_frame": {
   "1993": 280,
-  "1997": 380,
-  "2003": 359,
-  "2015": 3435,
+  "1997": 487,
+  "2003": 459,
+  "2015": 3825,
   "future": 31
  },
  "by_border_color": {
-  "black": 3464,
-  "borderless": 806,
+  "black": 4059,
+  "borderless": 808,
   "white": 208,
   "yellow": 4,
   "silver": 3
  },
  "highres": {
-  "true": 4250,
-  "false": 235
+  "true": 4639,
+  "false": 443
  },
  "promo": {
-  "true": 632,
-  "false": 3853
+  "true": 933,
+  "false": 4149
+ },
+ "digital": {
+  "false": 4485,
+  "true": 597
+ },
+ "digital_by_game": {
+  "mtgo": 465,
+  "arena": 116,
+  "arena+mtgo": 8,
+  "mtgo+arena": 8
  },
  "printings_30a": 74,
- "total_bytes": 3119702,
+ "total_bytes": 3630387,
  "largest_file": {
   "oracle_id": "6ad8011d-3471-4369-9d68-b264cc027487",
   "name": "Sol Ring",
-  "bytes": 90266
+  "bytes": 96508
  },
  "largest": [
   {
    "name": "Sol Ring",
-   "printings": 133
+   "printings": 138
   },
   {
    "name": "Swords to Plowshares",
-   "printings": 80
+   "printings": 88
   },
   {
    "name": "Counterspell",
-   "printings": 64
+   "printings": 73
   },
   {
    "name": "Lightning Bolt",
-   "printings": 61
+   "printings": 70
   },
   {
    "name": "Llanowar Elves",
-   "printings": 55
+   "printings": 59
   },
   {
    "name": "Path to Exile",
-   "printings": 55
+   "printings": 59
   },
   {
    "name": "Lightning Greaves",
-   "printings": 51
+   "printings": 55
   },
   {
    "name": "Dark Ritual",
-   "printings": 49
-  },
-  {
-   "name": "Birds of Paradise",
-   "printings": 48
-  },
-  {
-   "name": "Mind Stone",
-   "printings": 45
+   "printings": 54
   },
   {
    "name": "Brainstorm",
-   "printings": 44
+   "printings": 50
+  },
+  {
+   "name": "Birds of Paradise",
+   "printings": 49
+  },
+  {
+   "name": "Mind Stone",
+   "printings": 47
   },
   {
    "name": "Wrath of God",
-   "printings": 36
+   "printings": 40
   },
   {
    "name": "Duress",
-   "printings": 34
+   "printings": 37
   },
   {
    "name": "Ponder",
-   "printings": 31
+   "printings": 34
   },
   {
    "name": "Skullclamp",
-   "printings": 31
-  },
-  {
-   "name": "Faithless Looting",
-   "printings": 27
+   "printings": 33
   },
   {
    "name": "Abrade",
-   "printings": 26
-  },
-  {
-   "name": "Night's Whisper",
-   "printings": 25
+   "printings": 29
   },
   {
    "name": "Eternal Witness",
-   "printings": 24
+   "printings": 29
+  },
+  {
+   "name": "Faithless Looting",
+   "printings": 29
+  },
+  {
+   "name": "Demonic Tutor",
+   "printings": 25
   },
   {
    "name": "Everflowing Chalice",
-   "printings": 24
+   "printings": 25
   }
  ]
 }

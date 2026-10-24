@@ -116,7 +116,10 @@ export function factsFromScryfall(sc: ScryfallCard): FactsHit | null {
 const SKIP_SET_TYPES = new Set(['art_series', 'minigame', 'token']);
 const SKIP_LAYOUTS = new Set(['art_series', 'token', 'double_faced_token', 'emblem']);
 
-/** The Printings scripts/build-printings.mjs keeps: English paper cards, no tokens or art cards. */
+/**
+ * English paper cards, no tokens or art cards: the Printings scripts/build-printings.mjs keeps,
+ * except that the script also keeps digital-only ones.
+ */
 export function keepPrinting(sc: ScryfallCard): boolean {
   return (
     (sc.lang ?? 'en') === 'en' &&
@@ -158,6 +161,7 @@ export function indexPrinting(sc: ScryfallCard): IndexPrinting {
     variation: !!sc.variation,
     booster: !!sc.booster,
     digital: !!sc.digital,
+    games: sc.games ?? [],
   };
 }
 

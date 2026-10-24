@@ -2,6 +2,6 @@
  "name": "Carnage Interpreter",
  "oracle_id": "4bc79fb3-81bb-42ed-9bbb-93f8cede3094",
  "printings": [
-  {"id":"f6fb576e-a4a4-496b-b553-3f81cc651210","set":"clu","set_name":"Ravnica: Clue Edition","set_type":"draft_innovation","collector_number":"26","released_at":"2024-02-23","frame":"2015","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil"],"highres":true,"illustration_id":"461fd9fa-858c-45ad-a0d5-8e63362e0e3f","artist":"Justine Cruz","image_normal":"https://cards.scryfall.io/normal/front/f/6/f6fb576e-a4a4-496b-b553-3f81cc651210.jpg?1783912576","back_image_normal":null,"back_illustration_id":null,"security_stamp":"oval","reprint":false,"variation":false,"booster":false,"digital":false}
+  {"id":"f6fb576e-a4a4-496b-b553-3f81cc651210","set":"clu","set_name":"Ravnica: Clue Edition","set_type":"draft_innovation","collector_number":"26","released_at":"2024-02-23","frame":"2015","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil"],"highres":true,"illustration_id":"461fd9fa-858c-45ad-a0d5-8e63362e0e3f","artist":"Justine Cruz","image_normal":"https://cards.scryfall.io/normal/front/f/6/f6fb576e-a4a4-496b-b553-3f81cc651210.jpg?1783912576","back_image_normal":null,"back_illustration_id":null,"security_stamp":"oval","reprint":false,"variation":false,"booster":false,"digital":false,"games":["paper","mtgo","arena"]}
  ]
 }

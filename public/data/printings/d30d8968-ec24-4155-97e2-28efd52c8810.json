@@ -2,6 +2,6 @@
  "name": "Malevolent Rumble",
  "oracle_id": "d30d8968-ec24-4155-97e2-28efd52c8810",
  "printings": [
-  {"id":"a178cfe8-f9fa-4255-88d0-54a0bed079f5","set":"mh3","set_name":"Modern Horizons 3","set_type":"draft_innovation","collector_number":"161","released_at":"2024-06-14","frame":"2015","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"afa9f35e-fa07-4451-bb88-d1c3f167b280","artist":"Néstor Ossandón Leal","image_normal":"https://cards.scryfall.io/normal/front/a/1/a178cfe8-f9fa-4255-88d0-54a0bed079f5.jpg?1783911259","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":false,"variation":false,"booster":true,"digital":false}
+  {"id":"a178cfe8-f9fa-4255-88d0-54a0bed079f5","set":"mh3","set_name":"Modern Horizons 3","set_type":"draft_innovation","collector_number":"161","released_at":"2024-06-14","frame":"2015","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"afa9f35e-fa07-4451-bb88-d1c3f167b280","artist":"Néstor Ossandón Leal","image_normal":"https://cards.scryfall.io/normal/front/a/1/a178cfe8-f9fa-4255-88d0-54a0bed079f5.jpg?1783911259","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":false,"variation":false,"booster":true,"digital":false,"games":["paper","mtgo","arena"]}
  ]
 }

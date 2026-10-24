@@ -2,6 +2,6 @@
  "name": "Ivora, Insatiable Heir",
  "oracle_id": "d847542b-7522-43ec-91b0-f0aba5d7dddd",
  "printings": [
-  {"id":"2ba70366-b6ae-423a-a8d8-29d2b8afd939","set":"j25","set_name":"Foundations Jumpstart","set_type":"draft_innovation","collector_number":"50","released_at":"2024-11-15","frame":"2015","frame_effects":["legendary"],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil"],"highres":true,"illustration_id":"9048a513-1c28-4f30-849c-8ff0d8b98305","artist":"Canata Katana","image_normal":"https://cards.scryfall.io/normal/front/2/b/2ba70366-b6ae-423a-a8d8-29d2b8afd939.jpg?1783908854","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":false,"variation":false,"booster":false,"digital":false}
+  {"id":"2ba70366-b6ae-423a-a8d8-29d2b8afd939","set":"j25","set_name":"Foundations Jumpstart","set_type":"draft_innovation","collector_number":"50","released_at":"2024-11-15","frame":"2015","frame_effects":["legendary"],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil"],"highres":true,"illustration_id":"9048a513-1c28-4f30-849c-8ff0d8b98305","artist":"Canata Katana","image_normal":"https://cards.scryfall.io/normal/front/2/b/2ba70366-b6ae-423a-a8d8-29d2b8afd939.jpg?1783908854","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":false,"variation":false,"booster":false,"digital":false,"games":["paper","arena","mtgo"]}
  ]
 }

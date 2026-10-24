@@ -11,6 +11,8 @@ export interface PickerFilters {
   frame: FrameFilter;
   border: BorderFilter;
   highresOnly: boolean;
+  /** Digital-only (MTGO, Arena) Printings are hidden unless this is on. */
+  showDigital: boolean;
 }
 
 export const DEFAULT_FILTERS: PickerFilters = {
@@ -19,6 +21,7 @@ export const DEFAULT_FILTERS: PickerFilters = {
   frame: 'any',
   border: 'any',
   highresOnly: false,
+  showDigital: false,
 };
 
 function frameMatches(frame: string, f: FrameFilter): boolean {
@@ -30,7 +33,7 @@ function frameMatches(frame: string, f: FrameFilter): boolean {
 
 /**
  * The Printings the filters let through. The Printings in `keep` (the current Wanted and In-box)
- * always stay, so a filter never hides them.
+ * always stay, so a filter never hides them, digital-only ones included.
  */
 export function filterPrintings(
   printings: readonly IndexPrinting[],
@@ -44,7 +47,8 @@ export function filterPrintings(
         (!f.hideCollectors || !isCollectors(p)) &&
         frameMatches(p.frame, f.frame) &&
         (f.border === 'any' || p.border_color === f.border) &&
-        (!f.highresOnly || p.highres)),
+        (!f.highresOnly || p.highres) &&
+        (f.showDigital || !p.digital)),
   );
 }
 
@@ -76,6 +80,13 @@ export function groupByArt(printings: readonly IndexPrinting[], pinned: Readonly
 /** Short badges for a Printing variant. */
 export function badges(p: IndexPrinting): string[] {
   const out: string[] = [];
+  // "MTGO" and/or "Arena" for a digital-only Printing (from its games); a paper one gets none.
+  if (p.digital) {
+    const games = p.games ?? [];
+    if (games.includes('mtgo')) out.push('MTGO');
+    if (games.includes('arena')) out.push('Arena');
+    if (!games.includes('mtgo') && !games.includes('arena')) out.push('digital-only');
+  }
   if (p.set === '30a') out.push('30A');
   if (p.frame === '1993' || p.frame === '1997') out.push('retro');
   if (p.border_color === 'borderless') out.push('borderless');

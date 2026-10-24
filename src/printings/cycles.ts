@@ -2,7 +2,7 @@
 // Pure: printings files are passed in by the caller.
 import type { Card } from '../types';
 import { runId, runKey, runLabel, runStyle, styleLabel, type RunKey, type RunStyle } from './style';
-import { isCollectors, type IndexPrinting } from './types';
+import { digitalOnly, isCollectors, type DigitalOnly, type IndexPrinting } from './types';
 
 /** "fetchlands_allied" -> "Fetchlands allied". */
 export function humanizeCycle(name: string): string {
@@ -127,11 +127,15 @@ function byCollector(a: string, b: string): number {
   return a.localeCompare(b, 'en', { numeric: true });
 }
 
-/** The one Printing a member gets from a Print run: high resolution, not a promo, lowest number. */
+/**
+ * The one Printing a member gets from a Print run: high resolution, paper over digital-only, not a
+ * promo, lowest number.
+ */
 export function choosePrinting(printings: readonly IndexPrinting[]): IndexPrinting | null {
   const sorted = [...printings].sort(
     (a, b) =>
       Number(b.highres) - Number(a.highres) ||
+      Number(a.digital) - Number(b.digital) ||
       Number(a.promo) - Number(b.promo) ||
       byCollector(a.collector_number, b.collector_number),
   );
@@ -156,7 +160,13 @@ export interface CandidateRun {
   style: RunStyle;
   frame: string;
   border_color: string;
+  /** For example "VMA · retro frame · black border · MTGO-only art". */
   label: string;
+  /**
+   * "MTGO", "Arena" or "digital" when every pick is a digital-only Printing; null for a paper run
+   * (a run mixing paper and digital counts as paper).
+   */
+  digitalOnly: DigitalOnly | null;
   complete: boolean;
   missing: MemberRef[];
   /** One Printing per member that has one in this run, in member order. */
@@ -179,10 +189,16 @@ function inRunId(p: IndexPrinting): string {
   return runId({ set: p.set, style: runStyle(p) });
 }
 
+/** " · MTGO-only art", " · Arena-only art" or " · digital-only art"; empty for a paper run. */
+export function digitalOnlyLabel(d: DigitalOnly | null): string {
+  return d ? ` · ${d}-only art` : '';
+}
+
 /**
  * Print runs that could cover a Cycle: complete runs (every member has a Printing) and
- * near-complete runs (exactly one member missing). Runs not released yet last; then complete
- * first; then all high resolution, no promos, newest.
+ * near-complete runs (exactly one member missing), digital-only Printings included. Runs not
+ * released yet last; then complete first; then paper runs before digital-only runs of the same
+ * completeness; then all high resolution, no promos, newest.
  */
 export function candidateRuns(
   members: readonly MemberRef[],
@@ -192,7 +208,7 @@ export function candidateRuns(
   const byRun = new Map<string, Map<string, IndexPrinting[]>>();
   for (const m of members) {
     for (const p of files.get(m.oracle_id) ?? []) {
-      if (p.digital || (!opts.includeCollectors && isCollectors(p))) continue;
+      if (!opts.includeCollectors && isCollectors(p)) continue;
       const id = inRunId(p);
       let perMember = byRun.get(id);
       if (!perMember) byRun.set(id, (perMember = new Map()));
@@ -211,6 +227,7 @@ export function candidateRuns(
     const k = runKey(first);
     const highresCount = picks.filter((p) => p.printing.highres).length;
     const released_at = picks.reduce((max, p) => (p.printing.released_at > max ? p.printing.released_at : max), '');
+    const digital = digitalOnly(picks.map((p) => p.printing));
     out.push({
       id,
       set: k.set,
@@ -218,7 +235,8 @@ export function candidateRuns(
       style: k.style,
       frame: k.frame,
       border_color: k.border_color,
-      label: runLabel(k),
+      label: runLabel(k) + digitalOnlyLabel(digital),
+      digitalOnly: digital,
       complete: missing.length === 0,
       missing: missing.map((m) => ({ oracle_id: m.oracle_id, name: m.name })),
       picks,
@@ -233,6 +251,7 @@ export function candidateRuns(
     (a, b) =>
       Number(a.unreleased) - Number(b.unreleased) ||
       Number(b.complete) - Number(a.complete) ||
+      Number(a.digitalOnly !== null) - Number(b.digitalOnly !== null) ||
       Number(b.allHighres) - Number(a.allHighres) ||
       Number(a.anyPromo) - Number(b.anyPromo) ||
       b.released_at.localeCompare(a.released_at) ||
@@ -265,7 +284,7 @@ export function planCycleApply(
       plan.matched.push({ ...ref, printing: fixed.printing });
       continue;
     }
-    const printing = choosePrinting((files.get(m.oracle_id) ?? []).filter((p) => !p.digital && inRunId(p) === id));
+    const printing = choosePrinting((files.get(m.oracle_id) ?? []).filter((p) => inRunId(p) === id));
     if (printing) plan.matched.push({ ...ref, printing });
     else plan.unmatched.push(ref);
   }

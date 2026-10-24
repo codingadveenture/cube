@@ -99,6 +99,7 @@ controlled by the rules.
 ## Printings and Cycles
 
 Every card has a Printing picker ("Choose Wanted Printing" on the card, "Suggest a Printing" for visitors) that loads that card's file from `public/data/printings/` and shows one tile per art, with filters for promos, collectors' editions, frame, border and resolution, plus the Printing the default rule would pick (the newest black-bordered, non-promo paper Printing outside Secret Lair and memorabilia).
+Digital-only arts (MTGO and Arena Printings such as Vintage Masters) are as printable as paper ones, so the picker shows them, badged MTGO or Arena, behind the "Show digital-only" toggle, and Cycle Print runs may use them, labelled "MTGO-only art" or "Arena-only art" and ranked after the paper runs.
 When the Owner sets Wanted on a card in a Cycle, a sheet offers "This card only" or the whole Cycle, and a whole Cycle gets the same Print run (set and style) in one batch, listing any card with no Printing in that run.
 The Cycles view (`#/cycles`) shows each Cycle as uniform, styled (same frame, border and style from different sets) or split, and a Cycle page ranks the Print runs that cover all members, or all but one, so a whole Cycle can be set or reset to its In-box Printings at once.
 The Owner can accept a split; the accepted arrangement is stored in `cubes/main/meta/cycles` and shows as a quiet "accepted split" until any member changes.

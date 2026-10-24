@@ -14,6 +14,7 @@ import {
   cycleMembers,
   cycleStatus,
   cyclesOf,
+  digitalOnlyLabel,
   displayStatus,
   humanizeCycle,
   memberRun,
@@ -22,7 +23,7 @@ import {
 } from './cycles';
 import { DEFAULT_FILTERS, badges, filterPrintings, groupByArt } from './picker';
 import { wantedFromInBox, wantedFromPrinting } from './wanted';
-import type { IndexPrinting, PrintingsFile } from './types';
+import { digitalOnly, type IndexPrinting, type PrintingsFile } from './types';
 import { createLimiter } from './load';
 
 const root = new URL('../../', import.meta.url);
@@ -63,6 +64,7 @@ function pr(over: Partial<IndexPrinting>): IndexPrinting {
     variation: false,
     booster: true,
     digital: false,
+    games: ['paper', 'mtgo'],
     ...over,
   };
 }
@@ -144,6 +146,19 @@ describe('default Printing rule', () => {
     expect(defaultPrinting([lowNew, highOld], TODAY)?.set).toBe('high');
     const highPrevYear = pr({ set: 'prev', released_at: '2019-12-01' });
     expect(defaultPrinting([lowNew, highPrevYear], TODAY)?.set).toBe('low');
+  });
+
+  it('never picks a digital-only Printing, even the newest high-resolution one', () => {
+    const paper = pr({ set: 'ema', set_type: 'masters', released_at: '2016-06-10' });
+    const mtgo = pr({ set: 'vma', set_type: 'masters', released_at: '2026-06-16', digital: true, games: ['mtgo'] });
+    const arena = pr({ set: 'akr', set_type: 'masters', released_at: '2026-08-13', digital: true, games: ['arena'] });
+    expect(defaultPrinting([mtgo, arena, paper], TODAY)).toBe(paper);
+    expect(defaultPrinting([mtgo, arena], TODAY)).toBeNull();
+    for (const name of ['Plateau', 'Mox Pearl', "Bolas's Citadel"]) {
+      const printings = fileOf(name).printings;
+      expect(printings.some((p) => p.digital)).toBe(true);
+      expect(defaultPrinting(printings, TODAY)?.digital).toBe(false);
+    }
   });
 
   it('returns null when nothing qualifies (Gleemox)', () => {
@@ -313,6 +328,49 @@ describe('candidate Print runs', () => {
     expect(choosePrinting([a, b, c])).toBe(c);
     expect(choosePrinting([a, b])).toBe(b);
     expect(choosePrinting([])).toBeNull();
+    const digital = pr({ collector_number: '1', digital: true, games: ['mtgo'] });
+    const paper = pr({ collector_number: '2' });
+    expect(choosePrinting([digital, paper])).toBe(paper);
+  });
+
+  it('builds runs from digital-only Printings, labels them and ranks them after paper runs of the same completeness', () => {
+    const mtgo = (set: string, released_at: string) => pr({ set, released_at, digital: true, games: ['mtgo'] });
+    const arena = (set: string, released_at: string) => pr({ set, released_at, digital: true, games: ['arena'] });
+    const files = new Map<string, IndexPrinting[]>([
+      ['o1', [mtgo('vma', '2014-06-16'), arena('ha1', '2019-11-14'), pr({ set: 'old', released_at: '2001-01-01', highres: false }), pr({ set: 'mix', released_at: '2015-01-01' }), pr({ set: 'near', released_at: '2020-01-01' }), mtgo('pz1', '2021-01-01')]],
+      ['o2', [mtgo('vma', '2014-06-16'), arena('ha1', '2019-11-14'), pr({ set: 'old', released_at: '2001-01-01', highres: false }), mtgo('mix', '2015-01-01'), pr({ set: 'near', released_at: '2020-01-01' }), mtgo('pz1', '2021-01-01')]],
+      ['o3', [mtgo('vma', '2014-06-16'), arena('ha1', '2019-11-14'), pr({ set: 'old', released_at: '2001-01-01', highres: false }), mtgo('mix', '2015-01-01')]],
+    ]);
+    const runs = candidateRuns(members, files, { today: TODAY });
+    // Complete paper (mix counts as paper), complete digital-only, near paper, near digital-only.
+    expect(runs.map((r) => [r.set, r.digitalOnly])).toEqual([
+      ['mix', null],
+      ['old', null],
+      ['ha1', 'Arena'],
+      ['vma', 'MTGO'],
+      ['near', null],
+      ['pz1', 'MTGO'],
+    ]);
+    const label = (set: string) => runs.find((r) => r.set === set)!.label;
+    expect(label('vma')).toBe('VMA · regular frame · black border · MTGO-only art');
+    expect(label('ha1')).toBe('HA1 · regular frame · black border · Arena-only art');
+    expect(label('mix')).toBe('MIX · regular frame · black border');
+    expect(label('pz1')).toMatch(/ · MTGO-only art$/);
+    expect(digitalOnlyLabel(null)).toBe('');
+    expect(digitalOnlyLabel('digital')).toBe(' · digital-only art');
+  });
+
+  it('offers Vintage Masters for the duals as an MTGO-only run after every complete paper run', () => {
+    const duals = cycleMembers(cards, 'original_duals');
+    const files = new Map(duals.map((d) => [d.oracle_id, fileOf(d.name).printings]));
+    const runs = candidateRuns(duals, files, { today: TODAY });
+    const at = runs.findIndex((r) => r.set === 'vma');
+    const vma = runs[at]!;
+    expect([vma.complete, vma.digitalOnly]).toEqual([true, 'MTGO']);
+    expect(vma.label).toMatch(/^VMA · .* · MTGO-only art$/);
+    const paperComplete = runs.filter((r) => r.complete && !r.unreleased && r.digitalOnly === null);
+    expect(paperComplete.length).toBeGreaterThan(0);
+    expect(paperComplete.every((r) => runs.indexOf(r) < at)).toBe(true);
   });
 
   it('leaves out collectors editions unless asked', () => {
@@ -351,6 +409,19 @@ describe('apply to a Cycle', () => {
       ['o2', '441'],
     ]);
     expect(plan.unmatched).toEqual([{ oracle_id: 'o3', name: 'Card 3' }]);
+  });
+
+  it('applies a digital-only run too', () => {
+    const members = [1, 2].map((i) => ({ oracle_id: `o${i}`, name: `Card ${i}` }));
+    const picked = pr({ set: 'vma', collector_number: '7', digital: true, games: ['mtgo'] });
+    const o2vma = pr({ set: 'vma', collector_number: '8', digital: true, games: ['mtgo'] });
+    const files = new Map<string, IndexPrinting[]>([
+      ['o1', [picked]],
+      ['o2', [pr({ set: 'leb' }), o2vma]],
+    ]);
+    const plan = planCycleApply(members, files, { set: 'vma', style: 'regular' }, { oracle_id: 'o1', printing: picked });
+    expect(plan.matched.map((m) => m.printing)).toEqual([picked, o2vma]);
+    expect(plan.unmatched).toEqual([]);
   });
 });
 
@@ -401,6 +472,25 @@ describe('picker', () => {
     expect(filterPrintings([promo, ced, plain], DEFAULT_FILTERS, new Set([promo.id]))).toEqual([promo, plain]);
     expect(filterPrintings([pr({ frame: '1993' }), plain], { ...DEFAULT_FILTERS, frame: 'old' })).toHaveLength(1);
     expect(filterPrintings([pr({ highres: false }), plain], { ...DEFAULT_FILTERS, highresOnly: true })).toEqual([plain]);
+  });
+
+  it('hides digital-only Printings unless asked, but always keeps a digital Wanted or In-box', () => {
+    const paper = pr({});
+    const mtgo = pr({ set: 'vma', digital: true, games: ['mtgo'] });
+    const arena = pr({ set: 'ha1', digital: true, games: ['arena'] });
+    const all = [paper, mtgo, arena];
+    expect(filterPrintings(all, DEFAULT_FILTERS)).toEqual([paper]);
+    expect(filterPrintings(all, { ...DEFAULT_FILTERS, showDigital: true })).toEqual(all);
+    expect(filterPrintings(all, DEFAULT_FILTERS, new Set([arena.id]))).toEqual([paper, arena]);
+    expect(badges(mtgo)).toEqual(['MTGO']);
+    expect(badges(arena)).toEqual(['Arena']);
+    expect(badges(pr({ digital: true, games: ['mtgo', 'arena'] }))).toEqual(['MTGO', 'Arena']);
+    expect(badges(paper)).toEqual([]);
+    expect(digitalOnly([mtgo])).toBe('MTGO');
+    expect(digitalOnly([arena])).toBe('Arena');
+    expect(digitalOnly([mtgo, arena])).toBe('digital');
+    expect(digitalOnly([mtgo, paper])).toBeNull();
+    expect(digitalOnly([])).toBeNull();
   });
 
   it('groups by art, pinned art first, then newest', () => {
