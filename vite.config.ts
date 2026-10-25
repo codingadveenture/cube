@@ -10,6 +10,9 @@ export default defineConfig({
   // onnxruntime-web finds its .wasm file through import.meta.url, which the dev server's
   // dependency pre-bundling would break; the scanner imports it lazily.
   optimizeDeps: { exclude: ['onnxruntime-web'] },
+  // The recognition worker (src/scan/vision/vision.worker.ts) imports onnxruntime-web on demand,
+  // which needs code splitting, so the worker is built as an ES module.
+  worker: { format: 'es' },
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts'],

@@ -1482,3 +1482,383 @@ details[open] > summary::before {
     transition: none;
   }
 }
+
+/* Camera capture view (#/camera): a full-screen layer over the app, so the rig shows nothing else.
+   "Flip the screen" turns the whole layer 180 degrees; it scrolls inside itself, so scrolling and
+   touch work the same way round for the Owner. */
+
+a.button {
+  text-decoration: none;
+}
+.camera {
+  --tone-match: var(--ok);
+  --tone-review: var(--warn);
+  --tone-none: #8a2d2d;
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 var(--gutter) calc(1.5rem + env(safe-area-inset-bottom));
+  background: var(--bg);
+}
+@media (prefers-color-scheme: dark) {
+  .camera {
+    --tone-none: #e48a8a;
+  }
+}
+.camera.flipped {
+  transform: rotate(180deg);
+}
+.camera > * {
+  max-width: 900px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.camera-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 52px;
+  border-bottom: 1px solid var(--border);
+}
+.camera-back {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-weight: 600;
+}
+.camera-back::before {
+  content: '\2039\00a0';
+}
+.camera-counts {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 0.75rem;
+  margin: 0;
+  font-size: 0.95rem;
+}
+.camera-counts .warn {
+  color: var(--warn);
+  font-weight: 600;
+}
+.camera .flip[aria-pressed='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+.camera-tabs .tab {
+  flex: 1;
+  justify-content: center;
+}
+.camera-live.hidden {
+  display: none;
+}
+/* --frame-h caps the video's height; --art-h caps the last slip's images. */
+.camera-stage {
+  --frame-h: 58vh;
+  --art-h: 40vh;
+}
+.camera-stage.scan {
+  --frame-h: 34vh;
+}
+@media (orientation: landscape) and (max-height: 560px) {
+  .camera-stage.scan {
+    --frame-h: 70vh;
+    --art-h: 60vh;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 1rem;
+    align-items: start;
+  }
+}
+.camera-frame {
+  position: relative;
+  width: 100%;
+  margin: 0.5rem auto;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background: #000;
+  min-height: 120px;
+}
+.camera-frame video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+}
+.camera-starting {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: #fff;
+}
+.guide-layer {
+  position: absolute;
+  inset: 0;
+}
+.guide-box {
+  position: absolute;
+  border: 3px dashed #fff;
+  border-radius: 4px;
+  box-shadow: 0 0 0 9999px rgb(0 0 0 / 0.35);
+}
+.guide-box.editable {
+  cursor: move;
+  touch-action: none;
+  border-style: solid;
+}
+.guide-box.tone-empty {
+  border-color: #fff;
+}
+.guide-box.tone-settling {
+  border: 4px solid #f0b429;
+}
+.guide-box.tone-captured {
+  border: 4px solid #3fb950;
+}
+.guide-handle {
+  position: absolute;
+  width: 48px;
+  height: 48px;
+  touch-action: none;
+}
+.guide-handle::after {
+  content: '';
+  position: absolute;
+  inset: 12px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid var(--accent);
+}
+.guide-handle.nw {
+  left: -24px;
+  top: -24px;
+  cursor: nwse-resize;
+}
+.guide-handle.ne {
+  right: -24px;
+  top: -24px;
+  cursor: nesw-resize;
+}
+.guide-handle.sw {
+  left: -24px;
+  bottom: -24px;
+  cursor: nesw-resize;
+}
+.guide-handle.se {
+  right: -24px;
+  bottom: -24px;
+  cursor: nwse-resize;
+}
+.loop-phase {
+  margin: 0 0 0.5rem;
+  text-align: center;
+  font-weight: 600;
+}
+.loop-phase.tone-captured {
+  color: var(--ok);
+}
+.loop-phase.tone-settling {
+  color: var(--warn);
+}
+.camera-setup h2 {
+  margin-top: 1rem;
+}
+.camera-foot {
+  margin-top: 1.5rem;
+  font-size: 0.85rem;
+}
+.photo-button {
+  margin: 0.5rem 0;
+}
+
+/* The last slip, big enough to read from a step away. */
+.latest {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0.5rem 0 1rem;
+}
+.latest-images {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  /* Two 63:88 images no taller than --art-h. */
+  max-width: min(520px, calc(var(--art-h, 40vh) * 2 * 63 / 88 + 0.75rem));
+}
+.latest-photo,
+.latest-art {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 63 / 88;
+  object-fit: contain;
+  border-radius: 4.75% / 3.5%;
+  background: var(--chip);
+}
+.latest-name {
+  margin: 0.25rem 0 0;
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.latest-text p {
+  margin: 0.15rem 0;
+}
+.shot-photo.turned,
+.latest-photo.turned,
+.shot-thumb.turned,
+.shot-large.turned {
+  transform: rotate(180deg);
+}
+.shot-status {
+  display: inline-block;
+  padding: 0.1rem 0.6rem;
+  border-radius: 999px;
+  background: var(--chip);
+  color: var(--text);
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+.shot-status.big {
+  font-size: 1.4rem;
+  padding: 0.2rem 1rem;
+}
+.shot-status.tone-match,
+.shot-status.tone-confirmed {
+  background: var(--tone-match);
+  color: var(--bg);
+}
+.shot-status.tone-review {
+  background: var(--tone-review);
+  color: var(--bg);
+}
+.shot-status.tone-none {
+  background: var(--tone-none);
+  color: var(--bg);
+}
+
+/* Review */
+.review-filters {
+  gap: 0.4rem;
+  margin: 0.5rem 0;
+}
+.review-filters .filter-chip {
+  gap: 0.4rem;
+}
+.shot-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.6rem;
+}
+.shot-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.3rem;
+  width: 100%;
+  height: 100%;
+  padding: 0.4rem;
+  text-align: left;
+}
+.shot-thumb {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 63 / 88;
+  object-fit: contain;
+  background: var(--chip);
+}
+.shot-tile-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.shot-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.shot-detail-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin: 0.25rem 0 0.5rem;
+  font-weight: 600;
+}
+.shot-compare {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: 0.75rem;
+  align-items: start;
+}
+.shot-large {
+  display: block;
+  width: 100%;
+  max-width: 340px;
+  height: auto;
+  background: var(--chip);
+}
+.candidates,
+.printing-pick {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 0.5rem;
+}
+.candidate {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.2rem;
+  width: 100%;
+  height: 100%;
+  padding: 0.3rem;
+  text-align: left;
+  font-size: 0.85rem;
+}
+.candidates li.chosen .candidate {
+  border: 3px solid var(--tone-match);
+}
+.candidate-art {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 4.75% / 3.5%;
+}
+.candidate-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.name-search {
+  margin: 0.5rem 0;
+}
+.name-hits {
+  list-style: none;
+  margin: 0.5rem 0;
+  padding: 0;
+}
+.camera-export {
+  margin-top: 0.5rem;
+}
+.camera-export .actions {
+  margin-bottom: 0;
+}
+@media (max-width: 480px) {
+  .shot-compare {
+    grid-template-columns: 1fr;
+  }
+  .shot-large {
+    max-width: 260px;
+  }
+}

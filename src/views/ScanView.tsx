@@ -394,6 +394,11 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
             <li>Add one file per pile; the counts are added up. Then work through the tabs.</li>
           </ol>
         )}
+        <p>
+          <a className="button" href="#/camera">
+            Scan with the camera
+          </a>
+        </p>
         <label className="button">
           Choose files
           <input

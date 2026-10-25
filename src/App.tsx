@@ -20,6 +20,8 @@ const CyclesView = lazy(() => import('./views/printings/CyclesView'));
 const PrintView = lazy(() => import('./views/print/PrintView'));
 // The Update view (CubeCobra, Scryfall and the CSV export) loads on demand too.
 const UpstreamView = lazy(() => import('./views/upstream/UpstreamView'));
+// The camera capture view; the recogniser (onnxruntime-web, the model) loads from it, in a worker.
+const CameraView = lazy(() => import('./views/camera/CameraView'));
 
 const NAV = [
   { view: 'cube', href: '#/cube', label: 'Cube' },
@@ -58,6 +60,9 @@ function Shell() {
     body = <AboutView data={cards.status === 'ready' ? cards.data : null} />;
   } else if (route.view === 'log') {
     body = <LogView />;
+  } else if (route.view === 'camera') {
+    // Works before the card data has loaded; the In-box Printings join in when it has.
+    body = <CameraView cards={merged} />;
   } else if (cards.status === 'loading' || !base || !merged) {
     body =
       cards.status === 'error' ? (
@@ -114,9 +119,10 @@ function Shell() {
   );
 }
 
-/** The nav entry a view belongs to: the picker is part of the Cube; About and Log have no bar entry (they are in the account menu). */
+/** The nav entry a view belongs to: the picker is part of the Cube and the camera of Scan; About and Log have no bar entry (they are in the account menu). */
 function navView(view: string): string | null {
   if (view === 'about' || view === 'log') return null;
+  if (view === 'camera') return 'scan';
   return view === 'printings' ? 'cube' : view;
 }
 

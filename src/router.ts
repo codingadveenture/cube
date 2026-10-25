@@ -1,6 +1,6 @@
 // A tiny hash router: #/cube (default), #/cube?q=<search>, #/cube/<oracle_id>, #/scan,
 // #/cube/<oracle_id>/printings, #/cycles, #/cycles/<name>, #/print, #/print?section=tokens, #/suggestions, #/upstream,
-// #/log, #/about.
+// #/log, #/about, #/camera (the camera capture view; its state never goes into the URL).
 import { useEffect, useState } from 'react';
 
 export type Route =
@@ -8,6 +8,7 @@ export type Route =
   | { view: 'printings'; oracleId: string }
   | { view: 'cycles'; cycle: string | null }
   | { view: 'scan'; query: URLSearchParams }
+  | { view: 'camera' }
   | { view: 'print'; query: URLSearchParams }
   | { view: 'suggestions' }
   | { view: 'upstream' }
@@ -19,6 +20,7 @@ export function parseHash(hash: string): Route {
   const [path = '', query = ''] = raw.split('?');
   const parts = path.split('/').filter(Boolean);
   if (parts[0] === 'scan') return { view: 'scan', query: new URLSearchParams(query) };
+  if (parts[0] === 'camera') return { view: 'camera' };
   if (parts[0] === 'about') return { view: 'about' };
   if (parts[0] === 'print') return { view: 'print', query: new URLSearchParams(query) };
   if (parts[0] === 'suggestions') return { view: 'suggestions' };

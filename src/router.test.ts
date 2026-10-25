@@ -18,6 +18,11 @@ describe('router', () => {
     expect(isDetailHash('#/cube/abc')).toBe(true);
   });
 
+  it('knows the camera view, which keeps no state in the hash', () => {
+    expect(parseHash('#/camera')).toEqual({ view: 'camera' });
+    expect(isListHash('#/camera')).toBe(false);
+  });
+
   it('knows the Suggestions and Log views', () => {
     expect(parseHash('#/suggestions').view).toBe('suggestions');
     expect(parseHash('#/log').view).toBe('log');
