@@ -34,7 +34,8 @@ export interface Shot {
   source: 'camera' | 'photo';
   /** The winning pass's Milo embedding (128 values, L2-normalised); null until recognised. */
   embedding?: Float32Array | null;
-  /** Why the shot was skipped without the Owner: SAME_SLIP for a slip put back (sameSlipAsBefore). */
+  /** Why the shot was skipped without the Owner: SAME_SLIP for a slip put back that lost to the photo
+   *  before it, REPLACED for a photo that a better one of the same slip took over from (skipSameSlip). */
   reason?: string;
 }
 
@@ -121,9 +122,79 @@ export function sameSlipAsBefore(prev: Shot | null, next: Shot): boolean {
   return namedPrinting(prev) === namedPrinting(next);
 }
 
-/** Skips a shot as the same slip as the one before; the photo and the recognition are kept. */
-export function skipSameSlip(shot: Shot): Shot {
-  return { ...shot, status: 'skipped', chosen: null, reason: SAME_SLIP };
+/** The reason of a shot that a later, better photo of the same slip took over from. */
+export const REPLACED = 'replaced by a better photo of the same slip';
+
+const DECISION_RANK: Record<string, number> = { match: 2, review: 1, none: 0 };
+
+function decisionRank(s: Pick<Shot, 'decision'>): number {
+  return s.decision ? (DECISION_RANK[s.decision.status] ?? -1) : -1;
+}
+
+function topScore(s: Pick<Shot, 'decision' | 'candidates'>): number {
+  return s.candidates[0]?.score ?? s.decision?.score ?? 0;
+}
+
+/**
+ * The better of two photos of one slip: the one whose decision is a match over a review (over
+ * none, over no recognition), then the one with the higher top-1 score. A tie keeps `a`.
+ */
+export function betterShot(a: Shot, b: Shot): Shot {
+  const ra = decisionRank(a);
+  const rb = decisionRank(b);
+  if (ra !== rb) return rb > ra ? b : a;
+  return topScore(b) > topScore(a) ? b : a;
+}
+
+/**
+ * The shot that counts for the slip a freshly recognised camera shot repeats, or null when the
+ * shot is a new slip. The shot captured just before may itself have been skipped as the same
+ * slip; the one that counts is then further back, so the run of photos of one slip counts once.
+ */
+export function sameSlipOf(shots: readonly Shot[], next: Shot): Shot | null {
+  const prev = previousShot(shots, next);
+  if (!sameSlipAsBefore(prev, next)) return null;
+  let s: Shot | null = prev;
+  for (let hops = 0; s && s.status === 'skipped' && s.reason === SAME_SLIP && hops < shots.length; hops++) {
+    s = previousShot(shots, s);
+  }
+  // A shot already replaced belongs to a run whose photo that counts is later: leave next alone.
+  return s && !(s.status === 'skipped' && s.reason === REPLACED) ? s : null;
+}
+
+export interface SameSlipOutcome {
+  /** Which of the two photos counts for the slip. */
+  kept: 'previous' | 'next';
+  previous: Shot;
+  next: Shot;
+  /** True when the orientation lock should now see the kept shot's match (it saw none for this slip). */
+  recordOrientation: boolean;
+}
+
+function skippedAs(shot: Shot, reason: string): Shot {
+  return { ...shot, status: 'skipped', chosen: null, reason };
+}
+
+/**
+ * Settles two photos of one slip so exactly one counts: the better one (betterShot). When the new
+ * photo is better it takes over: it keeps the status its recognition gave, or the Owner's
+ * confirmed Printing of the previous photo, and the previous photo is skipped as REPLACED. Else the
+ * new photo is skipped as SAME_SLIP. A previous photo the Owner skipped stays the one that counts.
+ * Both photos and their recognitions are kept, so either can be kept as a second copy.
+ */
+export function skipSameSlip(previous: Shot, next: Shot): SameSlipOutcome {
+  const ownerSkipped = previous.status === 'skipped' && !isSameSlip(previous);
+  if (ownerSkipped || betterShot(previous, next) === previous) {
+    return { kept: 'previous', previous, next: skippedAs(next, SAME_SLIP), recordOrientation: false };
+  }
+  const { reason: _reason, ...rest } = next;
+  const taken = previous.status === 'confirmed' && previous.chosen ? confirmShot(next, previous.chosen) : rest;
+  return {
+    kept: 'next',
+    previous: skippedAs(previous, REPLACED),
+    next: taken,
+    recordOrientation: previous.decision?.status !== 'match' && next.decision?.status === 'match',
+  };
 }
 
 /** Keeps a shot skipped as the same slip as a second copy: back to what its recognition gave. */
@@ -132,9 +203,9 @@ export function keepSecondCopy(shot: Shot): Shot {
   return { ...rest, ...fromDecision(shot) };
 }
 
-/** A shot skipped automatically as the same slip as the one before (not counted as captured). */
+/** A shot skipped automatically as another photo of the slip that counts (not counted as captured). */
 export function isSameSlip(s: Shot): boolean {
-  return s.status === 'skipped' && s.reason === SAME_SLIP;
+  return s.status === 'skipped' && (s.reason === SAME_SLIP || s.reason === REPLACED);
 }
 
 export function confirmShot(shot: Shot, choice: PrintingRef): Shot {
@@ -156,7 +227,7 @@ export function needsReview(s: Shot): boolean {
 }
 
 export interface ShotCounts {
-  /** Shots that count as slips: all but those skipped as the same slip as the one before. */
+  /** Shots that count as slips: all but the extra photos of a slip skipped automatically (isSameSlip). */
   captured: number;
   matched: number;
   toReview: number;

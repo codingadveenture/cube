@@ -30,7 +30,7 @@ import {
   type CameraSessionMeta,
   type CameraSettings,
 } from '../../scan/camera/settings';
-import { applyRecognition, needsReview, newShot, previousShot, sameSlipAsBefore, shotCounts, skipSameSlip, type Shot } from '../../scan/camera/shots';
+import { applyRecognition, needsReview, newShot, sameSlipOf, shotCounts, skipSameSlip, type Shot } from '../../scan/camera/shots';
 import { createVisionClient, type VisionClient, type VisionMode } from '../../scan/vision/client';
 import type { PrepareInfo, RecogniseRequest } from '../../scan/vision/protocol';
 import { GuideOverlay } from './GuideOverlay';
@@ -234,7 +234,8 @@ export default function CameraView({ cards }: { cards: Card[] | null }) {
   /**
    * Buzz (and beep): one short buzz when a slip is photographed, one long buzz when it matched,
    * two buzzes when it needs review, one short buzz when it was the same slip as the one before
-   * (not counted). The result comes after the capture, so each slip ends with one of the last three.
+   * (counted once, whichever photo of it is kept). The result comes after the capture, so each slip
+   * ends with one of the last three.
    */
   function feedback(kind: 'capture' | 'match' | 'doubt' | 'same') {
     try {
@@ -314,17 +315,26 @@ export default function CameraView({ cards }: { cards: Card[] | null }) {
       const current = shotsRef.current.find((x) => x.id === shot.id);
       if (!current) return; // Retaken meanwhile.
       let next = applyRecognition(current, result);
-      // A slip put back (or nudged) within a few seconds is the same slip: kept, but not counted.
-      const same = from === 'camera' && current.status === 'review' && sameSlipAsBefore(previousShot(shotsRef.current, next), next);
-      if (same) next = skipSameSlip(next);
-      updateShots((cur) => cur.map((x) => (x.id === shot.id ? next : x)));
-      putShot(next).catch((e: unknown) => console.warn('Could not store the shot', e));
+      // A slip put back (or nudged) within a few seconds is the same slip: both photos are kept,
+      // and only the better one counts (a thumb over the first photo loses to a clean second one).
+      const kept = from === 'camera' && current.status === 'review' ? sameSlipOf(shotsRef.current, next) : null;
+      const same = kept ? skipSameSlip(kept, next) : null;
+      const changed = same ? [same.next, ...(same.kept === 'next' ? [same.previous] : [])] : [next];
+      if (same) next = same.next;
+      const byId = new Map(changed.map((x) => [x.id, x]));
+      updateShots((cur) => cur.map((x) => byId.get(x.id) ?? x));
+      for (const x of changed) putShot(x).catch((e: unknown) => console.warn('Could not store the shot', e));
       setScanError(null);
+      // The orientation lock sees each slip once: a better photo only adds to it when the photo it
+      // replaced was not a match.
+      const countsForLock = same ? same.recordOrientation : true;
       setSettings((cur) => ({
         ...cur,
         passMs: nextPassMs(cur.passMs, result.passMs),
         orientation:
-          from === 'camera' && !same && result.decision.status === 'match' ? recordOrientation(cur.orientation, result.orientation) : cur.orientation,
+          from === 'camera' && countsForLock && result.decision.status === 'match'
+            ? recordOrientation(cur.orientation, result.orientation)
+            : cur.orientation,
       }));
       if (from === 'camera') feedback(same ? 'same' : needsReview(next) ? 'doubt' : 'match');
     } catch (e) {

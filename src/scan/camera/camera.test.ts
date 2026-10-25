@@ -18,6 +18,7 @@ import { initialOrientation, LOCK_AFTER, parseOrientation, passesFor, recordOrie
 import { nextPassMs, parseCameraSession, parseSettings } from './settings';
 import {
   applyRecognition,
+  betterShot,
   confirmShot,
   defaultPileLabel,
   filterShots,
@@ -26,9 +27,12 @@ import {
   newShot,
   nextToReview,
   previousShot,
+  refOf,
+  REPLACED,
   reviveShot,
   SAME_SLIP,
   sameSlipAsBefore,
+  sameSlipOf,
   shotCounts,
   shotsToRows,
   skipSameSlip,
@@ -355,7 +359,9 @@ describe('same slip twice', () => {
     const a = recognised('a', 0, 'match', [bolt], unit());
     const b = recognised('b', 1.5, 'match', [bolt], unit(0.97));
     expect(sameSlipAsBefore(a, b)).toBe(true);
-    const skipped = skipSameSlip(b);
+    const out = skipSameSlip(a, b);
+    expect(out.kept).toBe('previous');
+    const skipped = out.next;
     expect(skipped.status).toBe('skipped');
     expect(skipped.reason).toBe(SAME_SLIP);
     expect(isSameSlip(skipped)).toBe(true);
@@ -398,16 +404,118 @@ describe('same slip twice', () => {
 
   it('counts a restored shot as a second copy', () => {
     const a = recognised('a', 0, 'match', [bolt], unit());
-    const skipped = skipSameSlip(recognised('b', 1, 'match', [bolt], unit()));
+    const skipped = skipSameSlip(a, recognised('b', 1, 'match', [bolt], unit())).next;
     const kept = keepSecondCopy(skipped);
     expect(kept.status).toBe('match');
     expect(kept.chosen?.scryfall_id).toBe('lea-161');
     expect(kept.reason).toBeUndefined();
     expect(shotCounts([a, kept])).toEqual({ captured: 2, matched: 2, toReview: 0, skipped: 0 });
     expect(shotsToRows([a, kept])[0]!.quantity).toBe(2);
-    const doubtful = keepSecondCopy(skipSameSlip(recognised('c', 2, 'review', [bolt], unit())));
+    const doubtful = keepSecondCopy(skipSameSlip(a, recognised('c', 2, 'review', [bolt], unit())).next);
     expect(doubtful.status).toBe('review');
     expect(doubtful.chosen).toBe(null);
+  });
+
+  it('keeps the clean second photo over a first one with a thumb in it', () => {
+    // The thumb-covered photo named the wrong card with a confident score; the clean one is better.
+    const thumb = recognised('a', 0, 'match', [{ ...ring, score: 0.56 }], unit());
+    const clean = recognised('b', 1.5, 'match', [{ ...bolt, score: 0.66 }], unit(0.98));
+    expect(sameSlipOf([clean, thumb], clean)?.id).toBe('a');
+    const out = skipSameSlip(thumb, clean);
+    expect(out.kept).toBe('next');
+    expect(out.previous.status).toBe('skipped');
+    expect(out.previous.chosen).toBe(null);
+    expect(out.previous.reason).toBe(REPLACED);
+    expect(isSameSlip(out.previous)).toBe(true);
+    expect(out.next.status).toBe('match');
+    expect(out.next.chosen?.scryfall_id).toBe('lea-161');
+    expect(out.next.reason).toBeUndefined();
+    expect(shotCounts([out.next, out.previous])).toEqual({ captured: 1, matched: 1, toReview: 0, skipped: 1 });
+    expect(shotsToRows([out.next, out.previous])).toEqual([expect.objectContaining({ name: 'Lightning Bolt', quantity: 1 })]);
+  });
+
+  it('prefers a match over a review, then the higher top-1 score', () => {
+    const review = recognised('a', 0, 'review', [{ ...bolt, score: 0.7 }], unit());
+    const match = recognised('b', 1, 'match', [{ ...bolt, score: 0.5 }], unit());
+    expect(betterShot(review, match).id).toBe('b');
+    expect(betterShot(match, review).id).toBe('b');
+    const low = recognised('c', 0, 'match', [{ ...bolt, score: 0.6 }], unit());
+    const high = recognised('d', 1, 'match', [{ ...bolt, score: 0.61 }], unit());
+    expect(betterShot(low, high).id).toBe('d');
+    // A tie keeps the first.
+    expect(betterShot(low, { ...high, candidates: [{ ...bolt, score: 0.6 }] }).id).toBe('c');
+    expect(betterShot(shot('e', at(0)), recognised('f', 1, 'none', [], unit())).id).toBe('f');
+  });
+
+  it('keeps the clean first photo over a nudged second one', () => {
+    const clean = recognised('a', 0, 'match', [{ ...bolt, score: 0.7 }], unit());
+    const nudged = recognised('b', 1, 'match', [{ ...bolt, score: 0.6 }], unit(0.95));
+    expect(sameSlipOf([nudged, clean], nudged)?.id).toBe('a');
+    const out = skipSameSlip(clean, nudged);
+    expect(out.kept).toBe('previous');
+    expect(out.previous).toBe(clean);
+    expect(out.next.status).toBe('skipped');
+    expect(out.next.reason).toBe(SAME_SLIP);
+    expect(out.recordOrientation).toBe(false);
+    expect(shotCounts([out.next, out.previous])).toEqual({ captured: 1, matched: 1, toReview: 0, skipped: 1 });
+  });
+
+  it('carries the confirmed Printing of the first photo over to a better second one', () => {
+    const first = confirmShot(recognised('a', 0, 'review', [{ ...bolt, score: 0.42 }], unit()), refOf(bolt));
+    const other = cand('Lightning Bolt', '2ed', '162', 0.7);
+    const second = recognised('b', 1, 'match', [other], unit(0.98));
+    const out = skipSameSlip(first, second);
+    expect(out.kept).toBe('next');
+    expect(out.next.status).toBe('confirmed');
+    expect(out.next.chosen?.scryfall_id).toBe('lea-161');
+    expect(out.previous.reason).toBe(REPLACED);
+    expect(out.previous.chosen).toBe(null);
+    expect(shotCounts([out.next, out.previous])).toEqual({ captured: 1, matched: 1, toReview: 0, skipped: 1 });
+    expect(shotsToRows([out.next, out.previous]).map((r) => [r.scryfall_id, r.quantity])).toEqual([['lea-161', 1]]);
+  });
+
+  it('lets the orientation lock see a slip once', () => {
+    const review = recognised('a', 0, 'review', [{ ...bolt, score: 0.4 }], unit());
+    const match = recognised('b', 1, 'match', [{ ...bolt, score: 0.7 }], unit());
+    expect(skipSameSlip(review, match).recordOrientation).toBe(true);
+    const weaker = recognised('c', 0, 'match', [{ ...bolt, score: 0.6 }], unit());
+    expect(skipSameSlip(weaker, match).kept).toBe('next');
+    expect(skipSameSlip(weaker, match).recordOrientation).toBe(false);
+  });
+
+  it('keeps a photo the Owner skipped as the one that counts', () => {
+    const skipped = skipShot(recognised('a', 0, 'review', [{ ...bolt, score: 0.4 }], unit()));
+    const out = skipSameSlip(skipped, recognised('b', 1, 'match', [{ ...bolt, score: 0.7 }], unit()));
+    expect(out.kept).toBe('previous');
+    expect(out.next.reason).toBe(SAME_SLIP);
+  });
+
+  it('restores either photo of the slip as a second copy', () => {
+    const thumb = recognised('a', 0, 'review', [{ ...bolt, score: 0.44 }], unit());
+    const clean = recognised('b', 1, 'match', [{ ...bolt, score: 0.66 }], unit());
+    const replaced = skipSameSlip(thumb, clean);
+    const first = keepSecondCopy(replaced.previous);
+    expect(first.status).toBe('review');
+    expect(first.reason).toBeUndefined();
+    expect(shotCounts([replaced.next, first])).toEqual({ captured: 2, matched: 1, toReview: 1, skipped: 0 });
+
+    const lost = skipSameSlip(clean, recognised('c', 2, 'match', [{ ...bolt, score: 0.6 }], unit()));
+    const second = keepSecondCopy(lost.next);
+    expect(second.status).toBe('match');
+    expect(shotCounts([second, lost.previous])).toEqual({ captured: 2, matched: 2, toReview: 0, skipped: 0 });
+  });
+
+  it('compares a third photo with the one that counts, past a skipped one', () => {
+    const a = recognised('a', 0, 'match', [{ ...bolt, score: 0.7 }], unit());
+    const b = skipSameSlip(a, recognised('b', 1, 'match', [{ ...bolt, score: 0.6 }], unit())).next;
+    const c = recognised('c', 2, 'match', [{ ...bolt, score: 0.8 }], unit());
+    expect(sameSlipOf([c, b, a], c)?.id).toBe('a');
+    const out = skipSameSlip(a, c);
+    expect(out.kept).toBe('next');
+    expect(shotCounts([out.next, b, out.previous])).toEqual({ captured: 1, matched: 1, toReview: 0, skipped: 2 });
+    // A different slip is not compared at all.
+    const d = recognised('d', 3, 'match', [ring], unit(0.5));
+    expect(sameSlipOf([d, c, b, a], d)).toBe(null);
   });
 
   it('finds the camera shot captured just before', () => {
@@ -420,7 +528,7 @@ describe('same slip twice', () => {
   });
 
   it('keeps the embedding and the reason in the store', () => {
-    const s = skipSameSlip(recognised('a', 0, 'match', [bolt], unit()));
+    const s = skipSameSlip(recognised('p', 0, 'match', [bolt], unit()), recognised('a', 1, 'match', [bolt], unit())).next;
     const back = reviveShot(structuredClone(s));
     expect(back?.reason).toBe(SAME_SLIP);
     expect(back?.embedding).toBeInstanceOf(Float32Array);

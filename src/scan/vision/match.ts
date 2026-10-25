@@ -13,7 +13,8 @@
 //   paper one (plainnessRank), for the decision and for every candidate;
 // - below `accept` (or without the margin) the slip goes to review with the top candidates, and
 //   below `floor` the frame is treated as holding no card at all.
-// The default thresholds come from the offline eval, research/art-catalog-eval.md.
+// The default thresholds came from the offline eval, research/art-catalog-eval.md; the rig run of
+// real photos superseded them (DEFAULT_DECIDE_OPTIONS).
 // Pure: no imports at run time, so node scripts can load this file directly.
 import type { Hit } from './types';
 
@@ -37,14 +38,17 @@ export interface DecideOptions {
 }
 
 // From research/art-catalog-eval.md (60 slips, 20 impostors, clean, rig and refined inputs): the
-// middle of the settings that name no wrong card and accept the most slips. A starting point, to
-// be checked against photos from the real rig.
+// middle of the settings that name no wrong card and accept the most slips. A starting point,
+// superseded by the rig run below.
 export const DEFAULT_DECIDE_OPTIONS: DecideOptions = {
-  // From scripts/eval-art-catalog.mjs (research/art-catalog-eval.md, 2026-10-25): the setting that
-  // names no wrong card on 400 test inputs and 20 impostors with the most slack to the nearest
-  // wrong one. The floor sits below every real input, so a slip is never dropped as "no card".
-  accept: 0.3,
-  margin: 0.18,
+  // The eval (scripts/eval-art-catalog.mjs, 2026-10-25) chose accept 0.3, margin 0.18. The rig run
+  // of 2026-10-25 (71 real slip photos, Owner-verified, top-1 right on 69) superseded it: real
+  // photos score median 0.61 (p10 0.46) with a lead of median 0.23 (p10 0.08), so margin 0.18 sent
+  // 22 of 71 to review for nothing. A wrong top-1 under a thumb scored 0.56 with a 0.13 lead, so no
+  // threshold separates it; that is left to the same-slip rule (shots.ts) and to review.
+  // The floor sits below every real input, so a slip is never dropped as "no card".
+  accept: 0.45,
+  margin: 0.08,
   printingMargin: 0.02,
   floor: 0.37,
 };
