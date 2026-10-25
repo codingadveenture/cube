@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { loadPhotoPlan, savePhotoPlan, setPhotosPending, type PhotoPlan } from '../../store/scanPrefs';
 import { progressText } from '../../store/shotChunks';
-import type { SharedShot, Store } from '../../store/types';
+import type { SharedPileInput, SharedShot, Store } from '../../store/types';
 import type { Pile } from '../parse';
-import { PhotosGoneError, resumeCameraPhotos } from './sharePhotos';
+import { isPermissionError, PhotosGoneError, resumeCameraPhotos, shareCameraPile } from './sharePhotos';
 import type { Shot } from './shots';
 
 function memoryStorage() {
@@ -75,6 +75,69 @@ describe('photo plan', () => {
   it('without a kept plan, needs every photo of the pile', async () => {
     const { store } = storeWith([]);
     await expect(resumeCameraPhotos(store, 'shared', pile, [shot('a'), shot('c')], () => {})).rejects.toThrow('1 photo of this pile is no longer');
+  });
+});
+
+describe('sharing without the new rules', () => {
+  it('tells a refused write from other failures', () => {
+    expect(isPermissionError({ code: 'permission-denied' })).toBe(true);
+    expect(isPermissionError(Object.assign(new Error('x'), { code: 'firestore/permission-denied' }))).toBe(true);
+    expect(isPermissionError(new Error('7 PERMISSION_DENIED: no'))).toBe(true);
+    expect(isPermissionError(new Error('Missing or insufficient permissions.'))).toBe(true);
+    expect(isPermissionError(new Error('The photo upload stopped (no connection?).'))).toBe(false);
+    expect(isPermissionError({ code: 'unavailable' })).toBe(false);
+    expect(isPermissionError(null)).toBe(false);
+  });
+
+  const camPile = {
+    id: 'local',
+    label: 'Camera 2026-10-25',
+    rows: [{ name: 'Sol Ring', quantity: 1, scryfall_id: 'x', set: 'lea', collector_number: '270', foil: null, language: null }],
+    camera: true,
+    shotIds: [],
+  } as unknown as Pile;
+
+  /** A store whose first createScanPile is refused with `first` (unless `refuse` is false); later ones succeed. */
+  function refusingStore(first: unknown, refuse = true) {
+    const created: SharedPileInput[] = [];
+    const writes: number[] = [];
+    const store = {
+      createScanPile: (input: SharedPileInput) => {
+        created.push(input);
+        const n = created.length;
+        return { id: `shared-${n}`, written: n === 1 && refuse ? Promise.reject(first) : Promise.resolve() };
+      },
+      shotChunkIndexes: async () => [],
+      writeShotChunk: async (_p: string, c: { index: number }) => void writes.push(c.index),
+    } as unknown as Store;
+    return { store, created, writes };
+  }
+
+  it('shares a plain pile once when the rules refuse the photo fields', async () => {
+    const { store, created, writes } = refusingStore({ code: 'permission-denied' });
+    const shared: string[] = [];
+    const res = await shareCameraPile(store, camPile, 'Kim', [], { onShared: (id) => shared.push(id), onProgress: () => {} });
+    expect(res).toEqual({ id: 'shared-2', withoutPhotos: true });
+    expect(created).toHaveLength(2);
+    expect(created[0]).toMatchObject({ camera: true, shot_count: 0, to_review: 0 });
+    expect(created[1]).toEqual({ label: 'Camera 2026-10-25', by: 'Kim', rows: created[0]!.rows });
+    expect(writes).toEqual([]);
+    expect(shared.at(-1)).toBe('shared-2');
+    expect(loadPhotoPlan('local')).toBeNull();
+  });
+
+  it('keeps the error for other failures', async () => {
+    const { store, created } = refusingStore(new Error('offline'));
+    await expect(shareCameraPile(store, camPile, 'Kim', [], { onShared: () => {}, onProgress: () => {} })).rejects.toThrow('offline');
+    expect(created).toHaveLength(1);
+  });
+
+  it('shares with the photo fields when the rules allow it', async () => {
+    const { store, created } = refusingStore(undefined, false);
+    const res = await shareCameraPile(store, camPile, 'A', [], { onShared: () => {}, onProgress: () => {} });
+    expect(res).toEqual({ id: 'shared-1', withoutPhotos: false });
+    expect(created).toHaveLength(1);
+    expect(created[0]).toMatchObject({ camera: true });
   });
 });
 

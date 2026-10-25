@@ -13,7 +13,10 @@ export interface VisionClient {
   readonly mode: VisionMode;
   prepare(onProgress?: (p: PrepareProgress) => void): Promise<PrepareInfo>;
   setExpected(entries: ExpectedEntries): void;
-  /** Recognises one crop. The image's pixel buffer is transferred to the worker. */
+  /**
+   * Recognises one crop. The image's pixel buffer is transferred to the worker, and the result's
+   * embedding is transferred back.
+   */
   scan(image: ImageData, request: RecogniseRequest): Promise<RecogniseResult>;
   dispose(): void;
 }

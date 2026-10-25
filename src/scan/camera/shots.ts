@@ -32,6 +32,10 @@ export interface Shot {
   orientation: Orientation | null;
   /** 'photo' for a picture added with Try a photo. */
   source: 'camera' | 'photo';
+  /** The winning pass's Milo embedding (128 values, L2-normalised); null until recognised. */
+  embedding?: Float32Array | null;
+  /** Why the shot was skipped without the Owner: SAME_SLIP for a slip put back (sameSlipAsBefore). */
+  reason?: string;
 }
 
 export function refOf(c: PrintingRef): PrintingRef {
@@ -40,27 +44,107 @@ export function refOf(c: PrintingRef): PrintingRef {
 
 /** A shot as captured, before recognition: kept as 'review' so a failed recognition still leaves the photo. */
 export function newShot(fields: Pick<Shot, 'id' | 'at' | 'thumb' | 'width' | 'height' | 'source'>): Shot {
-  return { ...fields, decision: null, candidates: [], status: 'review', chosen: null, orientation: null };
+  return { ...fields, decision: null, candidates: [], status: 'review', chosen: null, orientation: null, embedding: null };
 }
 
 /**
  * Stores the recognition result on a shot. A match chooses the best Printing of the accepted
  * card. A shot the Owner has already confirmed or skipped keeps that choice.
  */
-export function applyRecognition(shot: Shot, r: Pick<RecogniseResult, 'decision' | 'candidates' | 'orientation'>): Shot {
-  const base = { ...shot, decision: r.decision, candidates: r.candidates.slice(0, 3), orientation: r.orientation };
+export function applyRecognition(
+  shot: Shot,
+  r: Pick<RecogniseResult, 'decision' | 'candidates' | 'orientation'> & { embedding?: Float32Array | null },
+): Shot {
+  const base = { ...shot, decision: r.decision, candidates: r.candidates.slice(0, 3), orientation: r.orientation, embedding: r.embedding ?? null };
   if (shot.status === 'confirmed' || shot.status === 'skipped') return base;
-  const top = r.candidates[0];
-  const status = r.decision.status;
-  return { ...base, status, chosen: status === 'match' && top ? refOf(top) : null };
+  return { ...base, ...fromDecision(base) };
+}
+
+/** The status and choice the recognition gave a shot: a match chooses the best Printing. */
+function fromDecision(shot: Pick<Shot, 'decision' | 'candidates'>): Pick<Shot, 'status' | 'chosen'> {
+  if (!shot.decision) return { status: 'review', chosen: null };
+  const top = shot.candidates[0];
+  const status = shot.decision.status;
+  return { status, chosen: status === 'match' && top ? refOf(top) : null };
+}
+
+/** The reason of a shot skipped as the slip just captured, put back or nudged. */
+export const SAME_SLIP = 'same slip as the one before';
+/** A slip captured again within this long of the one before may be the same slip... */
+export const SAME_SLIP_MS = 4000;
+/** ...when the cosine similarity of their embeddings is at least this and both name the same thing... */
+export const SAME_SLIP_COSINE = 0.92;
+/** ...or at least this, whatever the two recognitions decided (one may say match, the other review). */
+export const SAME_SLIP_SURE_COSINE = 0.97;
+
+/** The Printing a shot's recognition named: the best candidate of a match, else null. */
+function namedPrinting(s: Pick<Shot, 'decision' | 'candidates'>): string | null {
+  if (s.decision?.status !== 'match') return null;
+  const top = s.candidates[0];
+  return top ? top.scryfall_id || `${top.name}|${top.set}|${top.collector_number}` : null;
+}
+
+function dot(a: Float32Array, b: Float32Array): number {
+  let sum = 0;
+  for (let i = 0; i < a.length; i++) sum += a[i]! * b[i]!;
+  return sum;
+}
+
+/** The camera shot captured last before `shot`, or null. */
+export function previousShot(shots: readonly Shot[], shot: Pick<Shot, 'id' | 'at'>): Shot | null {
+  let best: Shot | null = null;
+  for (const s of shots) {
+    if (s.id === shot.id || s.source !== 'camera' || s.at >= shot.at) continue;
+    if (!best || s.at > best.at) best = s;
+  }
+  return best;
+}
+
+/**
+ * True when a freshly recognised camera shot is the same slip as the shot captured just before it:
+ * captured less than SAME_SLIP_MS later, and embeddings either at least SAME_SLIP_SURE_COSINE alike
+ * or at least SAME_SLIP_COSINE alike with both recognitions naming the same Printing (or neither a
+ * match). A borderline slip whose recognition flips between match and review is still caught. A
+ * slip lifted and put back, or
+ * nudged enough to look new to the capture loop, is then counted once.
+ */
+export function sameSlipAsBefore(prev: Shot | null, next: Shot): boolean {
+  if (!prev || next.source !== 'camera' || prev.source !== 'camera') return false;
+  const a = prev.embedding;
+  const b = next.embedding;
+  if (!a || !b || a.length !== b.length || !a.length) return false;
+  const dt = Date.parse(next.at) - Date.parse(prev.at);
+  if (!(dt >= 0 && dt < SAME_SLIP_MS)) return false;
+  const cos = dot(a, b);
+  if (cos >= SAME_SLIP_SURE_COSINE) return true;
+  if (cos < SAME_SLIP_COSINE) return false;
+  return namedPrinting(prev) === namedPrinting(next);
+}
+
+/** Skips a shot as the same slip as the one before; the photo and the recognition are kept. */
+export function skipSameSlip(shot: Shot): Shot {
+  return { ...shot, status: 'skipped', chosen: null, reason: SAME_SLIP };
+}
+
+/** Keeps a shot skipped as the same slip as a second copy: back to what its recognition gave. */
+export function keepSecondCopy(shot: Shot): Shot {
+  const { reason: _reason, ...rest } = shot;
+  return { ...rest, ...fromDecision(shot) };
+}
+
+/** A shot skipped automatically as the same slip as the one before (not counted as captured). */
+export function isSameSlip(s: Shot): boolean {
+  return s.status === 'skipped' && s.reason === SAME_SLIP;
 }
 
 export function confirmShot(shot: Shot, choice: PrintingRef): Shot {
-  return { ...shot, status: 'confirmed', chosen: refOf(choice) };
+  const { reason: _reason, ...rest } = shot;
+  return { ...rest, status: 'confirmed', chosen: refOf(choice) };
 }
 
 export function skipShot(shot: Shot): Shot {
-  return { ...shot, status: 'skipped', chosen: null };
+  const { reason: _reason, ...rest } = shot;
+  return { ...rest, status: 'skipped', chosen: null };
 }
 
 export function isMatched(s: Shot): boolean {
@@ -72,6 +156,7 @@ export function needsReview(s: Shot): boolean {
 }
 
 export interface ShotCounts {
+  /** Shots that count as slips: all but those skipped as the same slip as the one before. */
   captured: number;
   matched: number;
   toReview: number;
@@ -82,12 +167,14 @@ export function shotCounts(shots: readonly Shot[]): ShotCounts {
   let matched = 0;
   let toReview = 0;
   let skipped = 0;
+  let same = 0;
   for (const s of shots) {
+    if (isSameSlip(s)) same++;
     if (isMatched(s)) matched++;
     else if (needsReview(s)) toReview++;
     else if (s.status === 'skipped') skipped++;
   }
-  return { captured: shots.length, matched, toReview, skipped };
+  return { captured: shots.length - same, matched, toReview, skipped };
 }
 
 export type ShotFilter = 'all' | 'review' | 'matched' | 'skipped';
@@ -165,5 +252,7 @@ export function reviveShot(raw: unknown): Shot | null {
     chosen: r.chosen ?? null,
     orientation: r.orientation === 'upright' || r.orientation === 'rotated' ? r.orientation : null,
     source: r.source === 'photo' ? 'photo' : 'camera',
+    embedding: r.embedding instanceof Float32Array ? r.embedding : null,
+    ...(typeof r.reason === 'string' && r.reason ? { reason: r.reason } : {}),
   };
 }

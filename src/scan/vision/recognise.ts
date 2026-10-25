@@ -35,7 +35,7 @@ export async function recognise(image: RgbaImage, request: RecogniseRequest): Pr
   const whole = box.x === 0 && box.y === 0 && box.width === image.width && box.height === image.height;
   const crop = whole ? image : cropImage(image, box);
 
-  let best: { hits: Hit[]; orientation: Orientation } | null = null;
+  let best: { hits: Hit[]; orientation: Orientation; embedding: Float32Array } | null = null;
   let passTime = 0;
   let passes = 0;
   const tried = new Set<Orientation>();
@@ -46,7 +46,7 @@ export async function recognise(image: RgbaImage, request: RecogniseRequest): Pr
     passes++;
     tried.add(orientation);
     const hits = catalog.search(embedding, K);
-    if (!best || (hits[0]?.score ?? -1) > (best.hits[0]?.score ?? -1)) best = { hits, orientation };
+    if (!best || (hits[0]?.score ?? -1) > (best.hits[0]?.score ?? -1)) best = { hits, orientation, embedding };
   };
   const first: Orientation[] = request.passes.length ? request.passes : ['upright', 'rotated'];
   for (const o of first) await run(o);
@@ -56,7 +56,7 @@ export async function recognise(image: RgbaImage, request: RecogniseRequest): Pr
     for (const o of ['upright', 'rotated'] as const) if (!tried.has(o)) await run(o);
     decision = decide(best!.hits, options);
   }
-  const winner = best! as { hits: Hit[]; orientation: Orientation };
+  const winner = best! as { hits: Hit[]; orientation: Orientation; embedding: Float32Array };
   const candidates: ShotCandidate[] = decision.candidates.map((c) => ({
     scryfall_id: c.printing.scryfall_id,
     oracle_id: c.oracle_id,
@@ -70,6 +70,8 @@ export async function recognise(image: RgbaImage, request: RecogniseRequest): Pr
     decision: { status: decision.status, score: decision.score, margin: decision.margin, verdict: decision.verdict },
     candidates,
     orientation: winner.orientation,
+    // A copy with its own buffer, so the worker can transfer it.
+    embedding: Float32Array.from(winner.embedding),
     elapsedMs: performance.now() - started,
     passMs: passes ? passTime / passes : 0,
     passes,

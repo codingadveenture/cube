@@ -4,7 +4,7 @@
 // device, so a retry, even after a reload, asks the server which chunks it has and writes exactly
 // the planned shots of the missing ones.
 // Browser only (canvas, IndexedDB); the pure parts are in src/store/shotChunks.ts.
-import { MAX_PILE_ROWS, toSharedRows } from '../../store/piles';
+import { MAX_PILE_ROWS, sharedPileInput, toSharedRows } from '../../store/piles';
 import {
   chunkShots,
   countToReview,
@@ -86,6 +86,27 @@ export async function sharedShotsOf(shots: readonly Shot[], rows: readonly Share
   return out;
 }
 
+/**
+ * True for a write the Firestore rules refused: the code 'permission-denied' (also with the
+ * 'firestore/' prefix), or a message saying so.
+ */
+export function isPermissionError(e: unknown): boolean {
+  const code = (e as { code?: unknown } | null)?.code;
+  if (code === 'permission-denied' || code === 'firestore/permission-denied') return true;
+  const message = e instanceof Error ? e.message : typeof e === 'string' ? e : String((e as { message?: unknown } | null)?.message ?? '');
+  return message.includes('PERMISSION_DENIED') || message.includes('Missing or insufficient permissions');
+}
+
+/** The outcome of sharing a camera pile. */
+export interface CameraShareResult {
+  id: string;
+  /**
+   * True when the rules refused the pile with photos (the new rules are not pasted yet), so it
+   * was shared as a plain pile: rows only, no photos.
+   */
+  withoutPhotos: boolean;
+}
+
 /** The shared pile document of a camera pile. */
 export function cameraPileInput(pile: Pile, by: string, shots: readonly Pick<SharedShot, 'status'>[]): SharedPileInput {
   return { label: pile.label, by, rows: toSharedRows(pile.rows), shot_count: shots.length, to_review: countToReview(shots), camera: true };
@@ -158,6 +179,10 @@ export async function shotsOfPile(pile: Pile): Promise<Shot[]> {
  * Shares a camera pile: encodes the photos, creates the shared pile, calls onShared with its id
  * (record it at once, so a stopped upload can be resumed), waits for the server, then uploads
  * the chunks. Resolves with the shared pile id.
+ *
+ * When the rules refuse the pile with photos (isPermissionError: the rules that allow the photo
+ * fields are not pasted yet), it is shared once more as a plain pile, without the photo fields or
+ * chunks; onShared is called again with that id and the result says withoutPhotos.
  */
 export async function shareCameraPile(
   store: Store,
@@ -165,7 +190,7 @@ export async function shareCameraPile(
   by: string,
   shots: readonly Shot[],
   hooks: { onShared: (id: string) => void; onProgress: (p: UploadProgress) => void },
-): Promise<string> {
+): Promise<CameraShareResult> {
   needOnline();
   if (pile.rows.length > MAX_PILE_ROWS) throw new Error(`A shared pile holds at most ${MAX_PILE_ROWS} rows; this one has ${pile.rows.length}.`);
   const rows = toSharedRows(pile.rows);
@@ -176,9 +201,18 @@ export async function shareCameraPile(
   savePhotoPlan(pile.id, planOf(chunks));
   const { id, written } = store.createScanPile(cameraPileInput(pile, by, shared));
   hooks.onShared(id);
-  await withTimeout(written);
+  try {
+    await withTimeout(written);
+  } catch (e) {
+    if (!isPermissionError(e)) throw e;
+    const plain = store.createScanPile(sharedPileInput(pile, by));
+    await withTimeout(plain.written);
+    savePhotoPlan(pile.id, null);
+    hooks.onShared(plain.id);
+    return { id: plain.id, withoutPhotos: true };
+  }
   await writeMissingChunks(store, id, chunks.map((c) => c.length), async (i) => chunks[i]!, hooks.onProgress);
-  return id;
+  return { id, withoutPhotos: false };
 }
 
 /**

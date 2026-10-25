@@ -9,11 +9,11 @@ import { prepare, recognise, setExpected } from './recognise';
 import type { FromWorker, ToWorker } from './protocol';
 
 const scope = self as unknown as {
-  postMessage(message: FromWorker): void;
+  postMessage(message: FromWorker, transfer?: Transferable[]): void;
   onmessage: ((e: MessageEvent<ToWorker>) => void) | null;
 };
 
-const post = (m: FromWorker) => scope.postMessage(m);
+const post = (m: FromWorker, transfer: Transferable[] = []) => scope.postMessage(m, transfer);
 
 // Scans run one at a time, in the order they arrive.
 let queue: Promise<void> = Promise.resolve();
@@ -29,7 +29,7 @@ scope.onmessage = (e) => {
   } else if (msg.type === 'scan') {
     queue = queue.then(() =>
       recognise(msg.image, msg.request)
-        .then((result) => post({ type: 'result', id: msg.id, result }))
+        .then((result) => post({ type: 'result', id: msg.id, result }, [result.embedding.buffer]))
         .catch((err: unknown) => post({ type: 'scan-error', id: msg.id, message: err instanceof Error ? err.message : String(err) })),
     );
   }

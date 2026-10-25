@@ -21,11 +21,17 @@ import {
   confirmShot,
   defaultPileLabel,
   filterShots,
+  isSameSlip,
+  keepSecondCopy,
   newShot,
   nextToReview,
+  previousShot,
   reviveShot,
+  SAME_SLIP,
+  sameSlipAsBefore,
   shotCounts,
   shotsToRows,
+  skipSameSlip,
   skipShot,
   sortShots,
   type Shot,
@@ -56,6 +62,11 @@ function slip(shift = 0): Grey {
     }
   }
   return g;
+}
+
+/** The same picture, a little brighter: the same slip nudged or lit a little differently. */
+function brighter(g: Grey, by: number): Grey {
+  return { ...g, data: g.data.map((v) => Math.min(255, v + by)) };
 }
 
 const empty = sheet();
@@ -122,11 +133,50 @@ describe('capture: one photo per visit', () => {
     expect(captures).toEqual([]);
   });
 
-  it('counts a slip lying still once, and the next only after the box has emptied', () => {
-    const frames = [empty, slip(), slip(), slip(), slip(), slip(), slip(), slip(7), slip(7), slip(7), slip(7), empty, empty, slip(2), slip(2), slip(2)];
-    const { captures } = run(frames);
-    // The second slip pushed in without the box emptying is not counted; the third is.
-    expect(captures).toEqual([3, 15]);
+  it('counts a slip lying still once, and the next after the box has emptied', () => {
+    const frames = [empty, slip(), slip(), slip(), slip(), slip(), slip(), empty, empty, slip(2), slip(2), slip(2)];
+    expect(run(frames).captures).toEqual([3, 11]);
+  });
+
+  it('captures a slip slid straight over the previous one, without the box emptying', () => {
+    expect(meanAbsDiff(slip(0), slip(7))).toBeGreaterThanOrEqual(DEFAULT_LOOP_OPTIONS.newSlipDiff);
+    const frames = [empty, slip(), slip(), slip(), slip(), slip(3), slip(5), slip(7), slip(7), slip(7), slip(7)];
+    expect(run(frames).captures).toEqual([3, 9]);
+  });
+
+  it('does not capture the same slip again when it is nudged', () => {
+    const nudged = brighter(slip(), 10);
+    const d = meanAbsDiff(slip(), nudged);
+    expect(d).toBeGreaterThan(DEFAULT_LOOP_OPTIONS.stableDiff);
+    expect(d).toBeLessThan(DEFAULT_LOOP_OPTIONS.newSlipDiff);
+    const frames = [empty, slip(), slip(), slip(), slip(3), nudged, nudged, nudged, nudged];
+    const { captures, state } = run(frames);
+    expect(captures).toEqual([3]);
+    expect(loopPhase(state)).toBe('captured');
+  });
+
+  it('captures a second copy of the same card slid straight over the first', () => {
+    // Another card passes through the box (moving frames unlike the capture), then the copy settles.
+    const frames = [empty, slip(), slip(), slip(), slip(), slip(3), slip(5), slip(7), slip(), slip(), slip(), slip()];
+    expect(run(frames).captures).toEqual([3, 10]);
+  });
+
+  it('does not capture again when the picture drifts slowly without a swap', () => {
+    // Exposure settling: 3 levels a frame counts as still, and drifts far from the capture.
+    const frames = [empty, slip(), slip(), slip()];
+    for (let i = 1; i <= 20; i++) frames.push(brighter(slip(), 3 * i));
+    expect(meanAbsDiff(slip(), frames[frames.length - 1]!)).toBeGreaterThan(DEFAULT_LOOP_OPTIONS.newSlipDiff);
+    expect(run(frames).captures).toEqual([3]);
+  });
+
+  it('captures the same slip again when it is lifted and put back', () => {
+    const frames = [empty, slip(), slip(), slip(), empty, empty, slip(), slip(), slip()];
+    expect(run(frames).captures).toEqual([3, 8]);
+  });
+
+  it('still captures a slow swap with the sheet showing in between', () => {
+    const frames = [slip(), slip(), slip(), empty, empty, empty, slip(7), slip(7), slip(7)];
+    expect(run(frames).captures).toEqual([2, 8]);
   });
 
   it('captures a slip already lying there when the loop starts', () => {
@@ -192,8 +242,9 @@ function shot(id: string, at: string): Shot {
   return newShot({ id, at, thumb: blob, width: 640, height: 896, source: 'camera' });
 }
 
-function result(status: 'match' | 'review' | 'none', candidates: ShotCandidate[]): RecogniseResult {
+function result(status: 'match' | 'review' | 'none', candidates: ShotCandidate[], embedding: Float32Array = new Float32Array(128)): RecogniseResult {
   return {
+    embedding,
     decision: { status, score: candidates[0]?.score ?? 0, margin: 0.1, verdict: null },
     candidates,
     orientation: 'rotated',
@@ -282,6 +333,98 @@ describe('shots', () => {
     expect(back?.orientation).toBe(null);
     expect(back?.source).toBe('camera');
     expect(back?.chosen?.name).toBe('Lightning Bolt');
+  });
+});
+
+/** A unit vector along axis `i`, turned towards axis `j` so that its dot with the axis-i vector is `cos`. */
+function unit(cos = 1, i = 0, j = 1): Float32Array {
+  const v = new Float32Array(128);
+  v[i] = cos;
+  v[j] = Math.sqrt(Math.max(0, 1 - cos * cos));
+  return v;
+}
+
+describe('same slip twice', () => {
+  const bolt = cand('Lightning Bolt', 'lea', '161', 0.9);
+  const ring = cand('Sol Ring', 'lea', '270', 0.88);
+  const at = (s: number) => new Date(Date.UTC(2026, 9, 25, 10, 0, 0) + s * 1000).toISOString();
+  const recognised = (id: string, t: number, status: 'match' | 'review' | 'none', c: ShotCandidate[], e: Float32Array) =>
+    applyRecognition(shot(id, at(t)), result(status, c, e));
+
+  it('skips the same slip captured again within 4 seconds', () => {
+    const a = recognised('a', 0, 'match', [bolt], unit());
+    const b = recognised('b', 1.5, 'match', [bolt], unit(0.97));
+    expect(sameSlipAsBefore(a, b)).toBe(true);
+    const skipped = skipSameSlip(b);
+    expect(skipped.status).toBe('skipped');
+    expect(skipped.reason).toBe(SAME_SLIP);
+    expect(isSameSlip(skipped)).toBe(true);
+    expect(shotCounts([a, skipped])).toEqual({ captured: 1, matched: 1, toReview: 0, skipped: 1 });
+  });
+
+  it('treats two unmatched recognitions as naming the same thing', () => {
+    const a = recognised('a', 0, 'review', [bolt], unit());
+    const b = recognised('b', 1, 'none', [], unit(0.95));
+    expect(sameSlipAsBefore(a, b)).toBe(true);
+  });
+
+  it('counts a slip captured again after 4 seconds', () => {
+    const a = recognised('a', 0, 'match', [bolt], unit());
+    expect(sameSlipAsBefore(a, recognised('b', 4, 'match', [bolt], unit()))).toBe(false);
+    expect(sameSlipAsBefore(a, recognised('b', 3.9, 'match', [bolt], unit()))).toBe(true);
+  });
+
+  it('counts a different Printing', () => {
+    const a = recognised('a', 0, 'match', [bolt], unit());
+    expect(sameSlipAsBefore(a, recognised('b', 1, 'match', [ring], unit(0.95)))).toBe(false);
+    expect(sameSlipAsBefore(a, recognised('b', 1, 'review', [bolt], unit(0.95)))).toBe(false);
+  });
+
+  it('skips a near-identical slip even when one recognition says match and the other review', () => {
+    const a = recognised('a', 0, 'review', [bolt], unit());
+    expect(sameSlipAsBefore(a, recognised('b', 1, 'match', [bolt], unit(0.99)))).toBe(true);
+    expect(sameSlipAsBefore(a, recognised('b', 1, 'match', [ring], unit(0.97)))).toBe(true);
+    expect(sameSlipAsBefore(a, recognised('b', 1, 'match', [bolt], unit(0.96)))).toBe(false);
+  });
+
+  it('counts a slip whose embedding is less alike', () => {
+    const a = recognised('a', 0, 'match', [bolt], unit());
+    expect(sameSlipAsBefore(a, recognised('b', 1, 'match', [bolt], unit(0.9)))).toBe(false);
+    expect(sameSlipAsBefore(a, recognised('b', 1, 'match', [bolt], unit(0.93)))).toBe(true);
+    // Without an embedding (recognition failed or was behind) nothing is skipped.
+    expect(sameSlipAsBefore(shot('a', at(0)), recognised('b', 1, 'match', [bolt], unit()))).toBe(false);
+    expect(sameSlipAsBefore(null, recognised('b', 1, 'match', [bolt], unit()))).toBe(false);
+  });
+
+  it('counts a restored shot as a second copy', () => {
+    const a = recognised('a', 0, 'match', [bolt], unit());
+    const skipped = skipSameSlip(recognised('b', 1, 'match', [bolt], unit()));
+    const kept = keepSecondCopy(skipped);
+    expect(kept.status).toBe('match');
+    expect(kept.chosen?.scryfall_id).toBe('lea-161');
+    expect(kept.reason).toBeUndefined();
+    expect(shotCounts([a, kept])).toEqual({ captured: 2, matched: 2, toReview: 0, skipped: 0 });
+    expect(shotsToRows([a, kept])[0]!.quantity).toBe(2);
+    const doubtful = keepSecondCopy(skipSameSlip(recognised('c', 2, 'review', [bolt], unit())));
+    expect(doubtful.status).toBe('review');
+    expect(doubtful.chosen).toBe(null);
+  });
+
+  it('finds the camera shot captured just before', () => {
+    const a = shot('a', at(0));
+    const b = shot('b', at(1));
+    const photo = { ...shot('p', at(2)), source: 'photo' as const };
+    const c = shot('c', at(3));
+    expect(previousShot([c, photo, b, a], c)?.id).toBe('b');
+    expect(previousShot([c, photo, b, a], a)).toBe(null);
+  });
+
+  it('keeps the embedding and the reason in the store', () => {
+    const s = skipSameSlip(recognised('a', 0, 'match', [bolt], unit()));
+    const back = reviveShot(structuredClone(s));
+    expect(back?.reason).toBe(SAME_SLIP);
+    expect(back?.embedding).toBeInstanceOf(Float32Array);
+    expect(reviveShot({ ...s, embedding: [1, 2] })?.embedding).toBe(null);
   });
 });
 

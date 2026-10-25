@@ -41,6 +41,11 @@ export interface RecogniseResult {
   candidates: ShotCandidate[];
   /** The orientation whose pass won. */
   orientation: Orientation;
+  /**
+   * The winning pass's Milo embedding: 128 values, L2-normalised, so the dot product of two is
+   * their cosine similarity. Transferred from the worker.
+   */
+  embedding: Float32Array;
   /** Wall time of the whole recognition, from the crop to the decision. */
   elapsedMs: number;
   /** Mean time of one pass (preprocessing plus one embed call). */

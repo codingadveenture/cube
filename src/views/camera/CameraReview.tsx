@@ -12,6 +12,8 @@ import {
   confirmShot,
   defaultPileLabel,
   filterShots,
+  isSameSlip,
+  keepSecondCopy,
   needsReview,
   nextToReview,
   shotCounts,
@@ -86,7 +88,7 @@ export function CameraReview({
     );
   }
 
-  const countOf: Record<ShotFilter, number> = { all: counts.captured, review: counts.toReview, matched: counts.matched, skipped: counts.skipped };
+  const countOf: Record<ShotFilter, number> = { all: shots.length, review: counts.toReview, matched: counts.matched, skipped: counts.skipped };
   return (
     <section className="camera-review" aria-label="Review">
       <ExportPanel shots={shots} meta={meta} onExported={onExported} onDone={onDone} onNewSession={onNewSession} />
@@ -103,6 +105,7 @@ export function CameraReview({
         <ul className="shot-list">
           {list.map((s) => {
             const shown = s.chosen ?? s.candidates[0] ?? null;
+            const same = isSameSlip(s);
             return (
               <li key={s.id}>
                 <button type="button" className="shot-tile" onClick={() => setOpenId(s.id)}>
@@ -111,8 +114,14 @@ export function CameraReview({
                     <StatusPill shot={s} reading={reading.has(s.id)} />
                     <span className="shot-name">{shown ? (needsReview(s) ? `${shown.name}?` : shown.name) : 'Not recognised'}</span>
                     {shown && <span className="muted num">{setNumber(shown)}</span>}
+                    {s.reason && <span className="muted">{s.reason[0]!.toUpperCase() + s.reason.slice(1)}.</span>}
                   </span>
                 </button>
+                {same && (
+                  <button type="button" className="shot-keep" onClick={() => onSave(keepSecondCopy(s))}>
+                    Keep as a second copy
+                  </button>
+                )}
               </li>
             );
           })}
@@ -205,7 +214,9 @@ type SharePhase =
   | { kind: 'idle' }
   | { kind: 'sharing'; progress: UploadProgress | null }
   /** The pile is in Scan, but sharing it or its photos stopped; sharedId is null when no shared pile was made. */
-  | { kind: 'failed'; error: string; pile: Pile; shots: Shot[]; sharedId: string | null };
+  | { kind: 'failed'; error: string; pile: Pile; shots: Shot[]; sharedId: string | null }
+  /** Shared as a plain pile: the rules refused the photos. */
+  | { kind: 'plain' };
 
 function ExportPanel({
   shots,
@@ -239,10 +250,11 @@ function ExportPanel({
     const onProgress = (progress: UploadProgress) => setPhase({ kind: 'sharing', progress });
     setPhase({ kind: 'sharing', progress: null });
     try {
+      let withoutPhotos = false;
       if (id) {
         await resumeCameraPhotos(store, id, pile, taken, onProgress);
       } else {
-        await shareCameraPile(store, pile, by.trim(), taken, {
+        const res = await shareCameraPile(store, pile, by.trim(), taken, {
           onShared: (newId) => {
             id = newId;
             recordSharedFrom(pile.id, newId);
@@ -250,8 +262,13 @@ function ExportPanel({
           },
           onProgress,
         });
+        withoutPhotos = res.withoutPhotos;
       }
       setPhotosPending(pile.id, null);
+      if (withoutPhotos) {
+        setPhase({ kind: 'plain' });
+        return;
+      }
       setPhase({ kind: 'idle' });
       onDone();
     } catch (e) {
@@ -288,6 +305,18 @@ function ExportPanel({
           {progressText(phase.progress)}
           {phase.progress && <progress max={phase.progress.total || 1} value={phase.progress.done} />}
         </p>
+      )}
+      {phase.kind === 'plain' && (
+        <>
+          <p className="status error" role="alert">
+            Shared without photos: the new Firestore rules are not pasted yet. Paste them and share again from the Scan tab for the photos.
+          </p>
+          <div className="actions">
+            <button type="button" className="primary" onClick={onDone}>
+              Go to Scan
+            </button>
+          </div>
+        </>
       )}
       {phase.kind === 'failed' && (
         <>
@@ -332,7 +361,7 @@ function ExportPanel({
                     Write your name first; it is shown on the shared pile.
                   </p>
                 )}
-                <p className="muted">All {counts.captured} photos go with the shared pile, so doubtful slips can be checked on a PC.</p>
+                <p className="muted">All {shots.length} photos go with the shared pile, so doubtful slips can be checked on a PC.</p>
               </>
             )}
             {counts.toReview > 0 && (
@@ -366,7 +395,7 @@ function ExportPanel({
                     onNewSession();
                   }}
                 >
-                  Delete {counts.captured} {counts.captured === 1 ? 'photo' : 'photos'} and start again
+                  Delete {shots.length} {shots.length === 1 ? 'photo' : 'photos'} and start again
                 </button>
                 <button type="button" onClick={() => setConfirmNew(false)}>
                   Keep them

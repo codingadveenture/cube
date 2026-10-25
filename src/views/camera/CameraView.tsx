@@ -30,7 +30,7 @@ import {
   type CameraSessionMeta,
   type CameraSettings,
 } from '../../scan/camera/settings';
-import { applyRecognition, needsReview, newShot, shotCounts, type Shot } from '../../scan/camera/shots';
+import { applyRecognition, needsReview, newShot, previousShot, sameSlipAsBefore, shotCounts, skipSameSlip, type Shot } from '../../scan/camera/shots';
 import { createVisionClient, type VisionClient, type VisionMode } from '../../scan/vision/client';
 import type { PrepareInfo, RecogniseRequest } from '../../scan/vision/protocol';
 import { GuideOverlay } from './GuideOverlay';
@@ -43,7 +43,11 @@ type Tab = 'setup' | 'scan' | 'review';
 const CROP_LONG = 896;
 /** Long side a photo from Try a photo is scaled down to. */
 const PHOTO_LONG = 1280;
-const LOOP_MS = 125;
+/**
+ * Tick of the capture loop (about 15 a second). Two still frame pairs make a capture, so a slip is
+ * taken about 130 ms after it stops moving. Each tick only draws and greys the 32x45 thumbnail.
+ */
+const LOOP_MS = 66;
 /**
  * Most camera slips waiting for recognition at once. Each waiting slip holds its full crop (about
  * 2.3 MB), so when the phone falls behind, a further slip keeps only its photo and goes to Review.
@@ -229,18 +233,19 @@ export default function CameraView({ cards }: { cards: Card[] | null }) {
 
   /**
    * Buzz (and beep): one short buzz when a slip is photographed, one long buzz when it matched,
-   * two buzzes when it needs review. The result comes after the capture, so each slip ends with
-   * either the long buzz or the double buzz.
+   * two buzzes when it needs review, one short buzz when it was the same slip as the one before
+   * (not counted). The result comes after the capture, so each slip ends with one of the last three.
    */
-  function feedback(kind: 'capture' | 'match' | 'doubt') {
+  function feedback(kind: 'capture' | 'match' | 'doubt' | 'same') {
     try {
-      navigator.vibrate?.(kind === 'capture' ? 40 : kind === 'match' ? 180 : [90, 70, 90]);
+      navigator.vibrate?.(kind === 'capture' || kind === 'same' ? 40 : kind === 'match' ? 180 : [90, 70, 90]);
     } catch {
       // Vibration is not available.
     }
     const ctx = audioRef.current;
     if (!settingsRef.current.beep || !ctx) return;
-    const tones = kind === 'capture' ? [[0, 880]] : kind === 'match' ? [[0, 1320]] : [[0, 330], [0.16, 330]];
+    const tones =
+      kind === 'capture' ? [[0, 880]] : kind === 'same' ? [[0, 660]] : kind === 'match' ? [[0, 1320]] : [[0, 330], [0.16, 330]];
     for (const [at, freq] of tones) {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -253,8 +258,16 @@ export default function CameraView({ cards }: { cards: Card[] | null }) {
     }
   }
 
-  /** Takes one photo: stores the shot at once, then asks the recogniser. */
-  async function capture(source: CanvasImageSource, rect: { x: number; y: number; width: number; height: number }, from: 'camera' | 'photo') {
+  /**
+   * Takes one photo: stores the shot at once, then asks the recogniser. `onTaken` is called once
+   * the photo is kept (or could not be), before recognition, so the capture loop can go on.
+   */
+  async function capture(
+    source: CanvasImageSource,
+    rect: { x: number; y: number; width: number; height: number },
+    from: 'camera' | 'photo',
+    onTaken?: () => void,
+  ) {
     const scale = Math.min(1, (from === 'camera' ? CROP_LONG : PHOTO_LONG) / Math.max(rect.width, rect.height));
     const w = Math.max(1, Math.round(rect.width * scale));
     const h = Math.max(1, Math.round(rect.height * scale));
@@ -271,6 +284,8 @@ export default function CameraView({ cards }: { cards: Card[] | null }) {
       setScanError('Could not keep the photo of that slip.');
       console.warn(e);
       return;
+    } finally {
+      onTaken?.();
     }
     const shot = newShot({ id: newId(), at: new Date().toISOString(), thumb, width: w, height: h, source: from });
     updateShots((cur) => [shot, ...cur]);
@@ -298,16 +313,20 @@ export default function CameraView({ cards }: { cards: Card[] | null }) {
       const result = await client.scan(image, request);
       const current = shotsRef.current.find((x) => x.id === shot.id);
       if (!current) return; // Retaken meanwhile.
-      const next = applyRecognition(current, result);
+      let next = applyRecognition(current, result);
+      // A slip put back (or nudged) within a few seconds is the same slip: kept, but not counted.
+      const same = from === 'camera' && current.status === 'review' && sameSlipAsBefore(previousShot(shotsRef.current, next), next);
+      if (same) next = skipSameSlip(next);
       updateShots((cur) => cur.map((x) => (x.id === shot.id ? next : x)));
       putShot(next).catch((e: unknown) => console.warn('Could not store the shot', e));
       setScanError(null);
       setSettings((cur) => ({
         ...cur,
         passMs: nextPassMs(cur.passMs, result.passMs),
-        orientation: from === 'camera' && result.decision.status === 'match' ? recordOrientation(cur.orientation, result.orientation) : cur.orientation,
+        orientation:
+          from === 'camera' && !same && result.decision.status === 'match' ? recordOrientation(cur.orientation, result.orientation) : cur.orientation,
       }));
-      if (from === 'camera') feedback(needsReview(next) ? 'doubt' : 'match');
+      if (from === 'camera') feedback(same ? 'same' : needsReview(next) ? 'doubt' : 'match');
     } catch (e) {
       console.warn('Recognition failed', e);
       setScanError(`Could not recognise the last slip (${e instanceof Error ? e.message : String(e)}). The photo is kept for review.`);
@@ -322,7 +341,7 @@ export default function CameraView({ cards }: { cards: Card[] | null }) {
     }
   }
 
-  // The capture loop: about 8 frames a second while the Scan tab is open.
+  // The capture loop: about 15 frames a second while the Scan tab is open.
   const loopRef = useRef(initialLoop());
   const [phase, setPhase] = useState<LoopPhase>('empty');
   const scanning = tab === 'scan' && camera.state === 'on' && settings.baseline !== null;
@@ -337,17 +356,32 @@ export default function CameraView({ cards }: { cards: Card[] | null }) {
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     if (!ctx) return;
     // Stability is counted afresh, but a slip captured before leaving the tab is not taken again.
-    loopRef.current = { ...loopRef.current, prev: null, stable: 0 };
+    // A last capture of another box shape cannot be compared, so it is forgotten.
+    const last = loopRef.current.lastCaptured;
+    const sameSize = last !== null && last.width === canvas.width && last.height === canvas.height;
+    loopRef.current = { ...loopRef.current, prev: null, stable: 0, lastCaptured: sameSize ? last : null };
+    // A tick is skipped while the previous one is still at work (its photo is being kept).
+    let busy = false;
+    let live = true;
     const timer = window.setInterval(() => {
-      if (video.readyState < 2 || document.hidden || !video.videoWidth) return;
+      if (busy || video.readyState < 2 || document.hidden || !video.videoWidth) return;
       const r = guideRect(guide, video.videoWidth, video.videoHeight);
       ctx.drawImage(video, r.x, r.y, r.width, r.height, 0, 0, canvas.width, canvas.height);
       const res = step(loopRef.current, toGrey(ctx.getImageData(0, 0, canvas.width, canvas.height)), baseline, DEFAULT_LOOP_OPTIONS);
       loopRef.current = res.state;
       setPhase(loopPhase(res.state));
-      if (res.capture) void capture(video, r, 'camera');
+      if (res.capture) {
+        busy = true;
+        const free = () => {
+          if (live) busy = false;
+        };
+        void capture(video, r, 'camera', free).finally(free);
+      }
     }, LOOP_MS);
-    return () => window.clearInterval(timer);
+    return () => {
+      live = false;
+      window.clearInterval(timer);
+    };
     // capture reads the latest settings through settingsRef.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scanning, settings.baseline, settings.guide]);
@@ -654,6 +688,7 @@ function LatestResult({ shot, reading, onReview }: { shot: Shot; reading: boolea
         ) : (
           <p className="muted">{reading ? 'Recognising…' : 'Not recognised.'}</p>
         )}
+        {shot.reason && <p className="muted">{`${shot.reason[0]!.toUpperCase()}${shot.reason.slice(1)}; not counted.`}</p>}
         {(shot.status === 'review' || shot.status === 'none') && (
           <button type="button" className="link" onClick={onReview}>
             Review
@@ -717,6 +752,10 @@ function SetupPanel({
         </button>
       </div>
       <h2>Slips</h2>
+      <p className="muted">
+        A new slip is noticed by its content, so the box need not show the sheet between slips; a slip put back within a few seconds is
+        not counted twice.
+      </p>
       <p>
         {o.locked === 'rotated'
           ? 'Slips are upside down. Only that way round is checked, unless a slip does not match.'
@@ -736,7 +775,7 @@ function SetupPanel({
       </p>
       <h2>Feedback</h2>
       <p className="muted">
-        {`The phone buzzes briefly for each photo, then long when the slip matched or twice when it needs review. When recognition falls behind, the header shows how many slips are still recognising; past ${MAX_WAITING}, a slip keeps only its photo and goes to Review.`}
+        {`The phone buzzes briefly for each photo, then long when the slip matched, twice when it needs review, or briefly again when it was the slip just taken. When recognition falls behind, the header shows how many slips are still recognising; past ${MAX_WAITING}, a slip keeps only its photo and goes to Review.`}
       </p>
       <label className="check">
         <input type="checkbox" checked={settings.beep} onChange={(e) => onBeep(e.target.checked)} />

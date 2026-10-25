@@ -243,7 +243,7 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
         }, `Shared ${pile.label} without photos; they are no longer on this device.`);
         return;
       }
-      await shareCameraPile(store, pile, by, shots, {
+      const res = await shareCameraPile(store, pile, by, shots, {
         onShared: (id) => {
           setSharedFrom((m) => ({ ...m, [pile.id]: id }));
           markPending(pile.id, id);
@@ -252,7 +252,11 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
       });
       markPending(pile.id, null);
       setUpload({ pileId: pile.id, progress: null, error: null, done: true });
-      setNotice(`Shared ${pile.label} with ${shots.length} ${shots.length === 1 ? 'photo' : 'photos'}.`);
+      setNotice(
+        res.withoutPhotos
+          ? `Shared ${pile.label} without photos: the new Firestore rules are not pasted yet. Paste them, delete the shared pile and share again for the photos.`
+          : `Shared ${pile.label} with ${shots.length} ${shots.length === 1 ? 'photo' : 'photos'}.`,
+      );
     } catch (e) {
       console.warn('Sharing the camera pile failed', e);
       setUpload({ pileId: pile.id, progress: null, error: errorText(e, PHOTOS_DENIED), done: false });
