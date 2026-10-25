@@ -290,10 +290,15 @@ export function shotsToRows(shots: readonly Shot[]): ScannedRow[] {
   return [...rows.values()];
 }
 
-/** The default label of the exported pile: "Camera 2026-10-25" in local time. */
-export function defaultPileLabel(d: Date): string {
+/**
+ * The default label of the exported pile, unique enough for several piles a day:
+ * "Camera 2026-10-25 18:54, 70 slips" in local time (the count is left out when unknown).
+ */
+export function defaultPileLabel(d: Date, slips?: number): string {
   const p = (n: number) => String(n).padStart(2, '0');
-  return `Camera ${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  const when = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  const count = slips === undefined ? '' : `, ${slips} ${slips === 1 ? 'slip' : 'slips'}`;
+  return `Camera ${when}${count}`;
 }
 
 /** The next shot after `id` in `list` that still needs review, or the first one before it. */

@@ -233,7 +233,8 @@ function ExportPanel({
 }) {
   const { store } = useStore();
   const [asking, setAsking] = useState(false);
-  const [label, setLabel] = useState(() => defaultPileLabel(new Date()));
+  const [label, setLabel] = useState('');
+  const [labelEdited, setLabelEdited] = useState(false);
   const [confirmNew, setConfirmNew] = useState(false);
   // On by default once the shared store is there; the Owner's own choice wins.
   const [shareChoice, setShareChoice] = useState<boolean | null>(null);
@@ -243,6 +244,12 @@ function ExportPanel({
   const [phase, setPhase] = useState<SharePhase>({ kind: 'idle' });
   const counts = shotCounts(shots);
   const cards = shotsToRows(shots).reduce((n, r) => n + r.quantity, 0);
+
+  /** Opens the form with a fresh default name (time and count) unless the Owner typed one. */
+  function openForm() {
+    if (!labelEdited) setLabel(defaultPileLabel(new Date(), cards));
+    setAsking(true);
+  }
 
   async function share(pile: Pile, taken: Shot[], sharedId: string | null) {
     if (!store) return;
@@ -282,7 +289,7 @@ function ExportPanel({
       setNeedName(true);
       return;
     }
-    const name = label.trim() || defaultPileLabel(new Date());
+    const name = label.trim() || defaultPileLabel(new Date(), cards);
     const taken = [...shots];
     const { pile, cards: n } = addShotsToScan(taken, name);
     onExported(name, n);
@@ -338,7 +345,14 @@ function ExportPanel({
           <>
             <label className="field">
               <span>Pile name</span>
-              <input type="text" value={label} onChange={(e) => setLabel(e.target.value)} />
+              <input
+                type="text"
+                value={label}
+                onChange={(e) => {
+                  setLabel(e.target.value);
+                  setLabelEdited(true);
+                }}
+              />
             </label>
             {store && (
               <label className="check">
@@ -382,7 +396,7 @@ function ExportPanel({
           </>
         ) : (
           <div className="actions">
-            <button type="button" className="primary" onClick={() => setAsking(true)} disabled={store ? shots.length === 0 : cards === 0}>
+            <button type="button" className="primary" onClick={openForm} disabled={store ? shots.length === 0 : cards === 0}>
               Add to Scan as a pile
             </button>
             {confirmNew ? (

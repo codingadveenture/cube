@@ -325,7 +325,9 @@ describe('shots', () => {
   });
 
   it('names the pile after the local date', () => {
-    expect(defaultPileLabel(new Date(2026, 9, 5, 23, 59))).toBe('Camera 2026-10-05');
+    expect(defaultPileLabel(new Date(2026, 9, 5, 23, 59))).toBe('Camera 2026-10-05 23:59');
+    expect(defaultPileLabel(new Date(2026, 9, 5, 8, 7), 70)).toBe('Camera 2026-10-05 08:07, 70 slips');
+    expect(defaultPileLabel(new Date(2026, 9, 5, 8, 7), 1)).toBe('Camera 2026-10-05 08:07, 1 slip');
   });
 
   it('checks records read back from the store', () => {
