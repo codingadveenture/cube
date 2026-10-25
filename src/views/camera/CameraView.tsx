@@ -568,6 +568,8 @@ export default function CameraView({ cards }: { cards: Card[] | null }) {
             const next = { ...meta, exported: { at: new Date().toISOString(), label, cards } };
             setMeta(next);
             saveCameraSession(next);
+          }}
+          onDone={() => {
             window.location.hash = '#/scan';
           }}
           onNewSession={() => void newSession()}
@@ -607,7 +609,7 @@ function VisionStatus({ vision, onRetry }: { vision: VisionState; onRetry: () =>
   }
   return (
     <p className="status num" role="status">
-      Loading the recogniser, about 20 MB the first time
+      Loading the recogniser, about 10 MB the first time
       {vision.fraction !== null && <progress max={1} value={vision.fraction} />}
     </p>
   );

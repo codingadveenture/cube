@@ -8,8 +8,10 @@ import {
   deleteField,
   doc,
   getDocFromServer,
+  getDocs,
   getDocsFromServer,
   onSnapshot,
+  runTransaction,
   setDoc,
   updateDoc,
   writeBatch,
@@ -19,6 +21,8 @@ import {
 import { baselineCubeDoc, chunk, shouldStampBaseline, withoutExisting } from './baseline';
 import { cardBatches, cardPatchWrite, listChangeWrite, markPrintedWrites, type CardWrite } from './writes';
 import { ownerFromDoc } from './owner';
+import { MAX_PILE_ROWS, scanPileDoc } from './piles';
+import { applyShotDecision, chunkId, countToReview, parseShotChunk, shotChunkDoc } from './shotChunks';
 import { guardNewCards, updateBatches } from '../upstream/update';
 import {
   CUBE_ID,
@@ -36,6 +40,8 @@ import {
   type Overrides,
   type SharedPile,
   type SharedPileInput,
+  type ShotChunk,
+  type ShotDecisionInput,
   type Snapshot,
   type Store,
   type Suggestion,
@@ -76,6 +82,10 @@ function toPile(id: string, d: DocumentData): SharedPile {
     row_count: typeof d.row_count === 'number' ? d.row_count : rows.length,
     createdAt: strOr(d.createdAt),
     createdByUid: strOr(d.createdByUid),
+    ...(typeof d.shot_count === 'number' ? { shot_count: d.shot_count } : {}),
+    ...(typeof d.to_review === 'number' ? { to_review: d.to_review } : {}),
+    ...(d.camera === true ? { camera: true } : {}),
+    updatedAt: typeof d.updatedAt === 'string' ? d.updatedAt : null,
   };
 }
 
@@ -317,19 +327,80 @@ export class FirestoreStore implements Store {
   createScanPile(input: SharedPileInput): { id: string; written: Promise<void> } {
     const uid = this.requireUid();
     const ref = doc(this.col('scans'));
-    const written = setDoc(ref, {
-      label: input.label,
-      by: input.by.trim(),
-      rows: input.rows,
-      row_count: input.rows.length,
-      createdAt: now(),
-      createdByUid: uid,
-    });
+    // Optional camera fields are only written when set, so a pile from a file looks as it always did.
+    const data = scanPileDoc(input, uid, now());
+    const written = setDoc(ref, data);
     return { id: ref.id, written };
   }
 
-  deleteScanPile(id: string): Promise<void> {
-    return deleteDoc(doc(this.col('scans'), id));
+  private shotsCol(pileId: string) {
+    return collection(this.db, 'cubes', CUBE_ID, 'scans', pileId, 'shots');
+  }
+
+  async deleteScanPile(id: string): Promise<void> {
+    // A subcollection outlives its parent, so the shot chunks are deleted with it. The cache
+    // answers offline; a pile without photos has none.
+    const chunks = await getDocs(this.shotsCol(id)).catch(() => null);
+    if (!chunks || chunks.empty) return deleteDoc(doc(this.col('scans'), id));
+    const batch = writeBatch(this.db);
+    for (const c of chunks.docs) batch.delete(c.ref);
+    batch.delete(doc(this.col('scans'), id));
+    return batch.commit();
+  }
+
+  async shotChunkIndexes(pileId: string): Promise<number[]> {
+    const snap = await getDocsFromServer(this.shotsCol(pileId));
+    return snap.docs.map((d) => parseShotChunk(d.id, d.data()).index);
+  }
+
+  writeShotChunk(pileId: string, chunk: Omit<ShotChunk, 'createdAt' | 'createdByUid'>): Promise<void> {
+    const uid = this.requireUid();
+    return setDoc(doc(this.shotsCol(pileId), chunkId(chunk.index)), shotChunkDoc(chunk, uid, now()));
+  }
+
+  subscribeShotChunks(pileId: string, next: (s: Snapshot<ShotChunk[]>) => void, error: OnError) {
+    return onSnapshot(
+      this.shotsCol(pileId),
+      META,
+      (snap) =>
+        next({
+          data: snap.docs.map((d) => parseShotChunk(d.id, d.data())).sort((a, b) => a.index - b.index),
+          fromCache: snap.metadata.fromCache,
+          hasPendingWrites: snap.metadata.hasPendingWrites,
+        }),
+      error,
+    );
+  }
+
+  async decideShot(pileId: string, chunkIndex: number, shotId: string, decision: ShotDecisionInput): Promise<void> {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      throw new Error('Deciding a photo needs a connection to the server. Try again when online.');
+    }
+    const pileRef = doc(this.col('scans'), pileId);
+    const chunkRef = doc(this.shotsCol(pileId), chunkId(chunkIndex));
+    await runTransaction(this.db, async (tx) => {
+      const pileSnap = await tx.get(pileRef);
+      const chunkSnap = await tx.get(chunkRef);
+      if (!pileSnap.exists() || !chunkSnap.exists()) throw new Error('This pile or its photos were deleted.');
+      const pile = toPile(pileSnap.id, pileSnap.data());
+      const chunk = parseShotChunk(chunkSnap.id, chunkSnap.data());
+      const i = chunk.shots.findIndex((x) => x.id === shotId);
+      if (i < 0) throw new Error('That photo is not in this pile any more.');
+      const was = chunk.shots[i]!;
+      const r = applyShotDecision(pile.rows, was, decision);
+      if (r.rows.length > MAX_PILE_ROWS) throw new Error(`A shared pile holds at most ${MAX_PILE_ROWS} rows.`);
+      const shots = chunk.shots.map((x, j) => (j === i ? r.shot : x));
+      // to_review moves by this one shot; the other chunks are not read.
+      const delta = countToReview([r.shot]) - countToReview([was]);
+      tx.update(pileRef, {
+        rows: r.rows,
+        row_count: r.rows.length,
+        shot_count: Math.max(pile.shot_count ?? 0, chunk.shots.length),
+        to_review: Math.max(0, (pile.to_review ?? countToReview(chunk.shots)) + delta),
+        updatedAt: now(),
+      });
+      tx.update(chunkRef, { shots });
+    });
   }
 
   async addLogEntry(entry: LogEntryInput): Promise<void> {

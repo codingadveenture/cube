@@ -79,6 +79,54 @@ The rules are in `firestore.rules`. After changing them, open the
 go to Firestore, Rules, paste the whole file and press Publish. Without the rules, Firestore in
 production mode refuses every read and write.
 
+### Camera photos on shared piles: paste the rules again
+
+The camera view can now share a pile with its photos, so doubtful slips can be judged on a PC.
+This needs the new `firestore.rules`: open the
+[Firebase console](https://console.firebase.google.com/project/cube-e647a/firestore/rules),
+paste the whole file again and press Publish. Until then, sharing with photos fails with
+"Not allowed" (sharing a pile without photos keeps working). The three changes:
+
+1. **New: the photos of a shared pile.** A pile's photos are stored in chunk documents under it,
+   `cubes/main/scans/{pileId}/shots/{chunkId}`, at most 50 photos each. Anyone may read them.
+   Only the person who shared the pile may add chunks; that person or the Owner may record a
+   review in a chunk or delete it. A chunk may hold only its five fields (`index`, `shots`,
+   `count`, `createdAt`, `createdByUid`).
+2. **Changed: a new shared pile may carry three optional fields**, `shot_count` (how many
+   photos), `to_review` (how many still need a decision) and `camera` (it came from the camera).
+   Piles without them are accepted as before.
+3. **New: a shared pile may be updated** by the person who shared it or the Owner, but only its
+   rows and counts (`rows`, `row_count`, `shot_count`, `to_review`, `updatedAt`). This is how a
+   photo review adds or corrects cards in the pile.
+
+How it works: in the camera view, "Add to Scan as a pile" with "Share it with photos" ticked adds
+the pile to Scan, shares it, then uploads the photos ("Uploading photos 3 of 11"). Photos still
+to review go along too. If the upload stops, "Try again" (or "Finish uploading the photos" on
+the Scan tab) uploads only the chunks that are missing. On the Scan tab, a shared pile with
+photos shows "N photos, M to review" and "Review photos": a list with filters (All, To review,
+Matched, Unknown) and a gallery of the whole stack. The person who shared the pile and the Owner
+pick a candidate, search by name or mark Not a card; the pile's rows change at once and the diff
+follows. Everyone else sees the photos read-only. Deleting a shared pile deletes its photos too.
+
+Each photo is a JPEG of at most 240x336 pixels and at most 12 KB, stored as base64 text without
+a `data:` prefix, the right way up.
+
+**Reading the photos without the app.** Chunk documents are readable without signing in (the
+rule is `allow read: if true`), so a script or an assistant can read them through the Firestore
+REST API with no key or token:
+
+```
+GET https://firestore.googleapis.com/v1/projects/cube-e647a/databases/(default)/documents/cubes/main/scans
+GET https://firestore.googleapis.com/v1/projects/cube-e647a/databases/(default)/documents/cubes/main/scans/{pileId}/shots
+GET https://firestore.googleapis.com/v1/projects/cube-e647a/databases/(default)/documents/cubes/main/scans/{pileId}/shots/c0000
+```
+
+The first lists the shared piles (look for `shot_count`), the second lists a pile's chunks (add
+`?pageSize=5` and follow `nextPageToken`: each chunk is up to about 700 KB), the third reads one
+chunk. Chunk ids are `c0000`, `c0001`, ... in order. In a chunk, `shots` is a list of
+`{row, id, at, thumb, status, score, chosen, candidates}`; `row` is the index into the pile's
+`rows`, or -1 when the photo has no row (to review, unknown or not a card).
+
 ### Owner setup
 
 1. Open the site, go to About and press "Sign in as Owner" (Google). If the popup is blocked, the

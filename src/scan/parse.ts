@@ -17,6 +17,10 @@ export interface Pile {
   id: string;
   label: string;
   rows: ScannedRow[];
+  /** True for a pile added from the camera view; its photos may still be on this device. */
+  camera?: boolean;
+  /** The camera shots the pile was made from, so Share this pile can find their photos. */
+  shotIds?: string[];
 }
 
 /** Header names per field, lower-cased; ManaBox first, then Delver Lens and common exports. */

@@ -46,16 +46,45 @@ service cloud.firestore {
         && d.resolution_note == null;
     }
 
+    // Change 2 (camera photos): shot_count, to_review and camera are allowed, all optional.
     function validScan() {
       let d = request.resource.data;
       return d.keys().hasAll(['label', 'by', 'rows', 'row_count', 'createdAt', 'createdByUid'])
-        && d.keys().hasOnly(['label', 'by', 'rows', 'row_count', 'createdAt', 'createdByUid'])
+        && d.keys().hasOnly(['label', 'by', 'rows', 'row_count', 'createdAt', 'createdByUid', 'shot_count', 'to_review', 'camera'])
         && isStr(d.label, 200)
         && isStr(d.by, 100)
         && d.rows is list && d.rows.size() <= 2000
         && d.row_count is int && d.row_count == d.rows.size()
         && isStr(d.createdAt, 40)
-        && d.createdByUid == request.auth.uid;
+        && d.createdByUid == request.auth.uid
+        && (!('shot_count' in d) || (d.shot_count is int && d.shot_count >= 0))
+        && (!('to_review' in d) || (d.to_review is int && d.to_review >= 0))
+        && (!('camera' in d) || d.camera is bool);
+    }
+
+    // Change 3 (camera photos): a photo review changes only the rows and the counts of a pile.
+    function validScanUpdate() {
+      let d = request.resource.data;
+      return d.diff(resource.data).affectedKeys().hasOnly(['rows', 'row_count', 'shot_count', 'to_review', 'updatedAt'])
+        && d.rows is list && d.rows.size() <= 2000
+        && d.row_count is int && d.row_count == d.rows.size()
+        && (!('shot_count' in d) || (d.shot_count is int && d.shot_count >= 0))
+        && (!('to_review' in d) || (d.to_review is int && d.to_review >= 0))
+        && (!('updatedAt' in d) || isStr(d.updatedAt, 40));
+    }
+
+    // Change 1 (camera photos): one chunk of up to 50 photos of a shared pile, as small JPEGs.
+    // The shots inside are not checked one by one (rules cannot loop); the 1 MiB document cap
+    // and the 50-shot cap bound them.
+    function validShotChunk() {
+      let d = request.resource.data;
+      return d.keys().hasAll(['index', 'shots', 'count', 'createdAt', 'createdByUid'])
+        && d.keys().hasOnly(['index', 'shots', 'count', 'createdAt', 'createdByUid'])
+        && d.index is int && d.index >= 0
+        && d.shots is list && d.shots.size() <= 50
+        && d.count is int && d.count == d.shots.size()
+        && isStr(d.createdAt, 40)
+        && d.createdByUid is string;
     }
 
     // config/owner: created once, by a Google-signed-in user, with their own uid.
@@ -86,7 +115,23 @@ service cloud.firestore {
       match /scans/{id} {
         allow read: if true;
         allow create: if signedIn() && validScan();
+        // Change 3: the creator or the Owner records a photo review in the rows.
+        allow update: if signedIn() && (resource.data.createdByUid == request.auth.uid || isOwner()) && validScanUpdate();
         allow delete: if signedIn() && (resource.data.createdByUid == request.auth.uid || isOwner());
+
+        // Change 1: the pile's photos. Anyone may read them, without signing in. Only the person
+        // who shared the pile adds chunks; that person or the Owner records a review in a chunk
+        // (the creator and the index stay) or deletes it.
+        match /shots/{chunkId} {
+          allow read: if true;
+          allow create: if signedIn() && validShotChunk()
+            && request.resource.data.createdByUid == request.auth.uid
+            && get(/databases/$(database)/documents/cubes/main/scans/$(id)).data.createdByUid == request.auth.uid;
+          allow update: if signedIn() && (resource.data.createdByUid == request.auth.uid || isOwner()) && validShotChunk()
+            && request.resource.data.createdByUid == resource.data.createdByUid
+            && request.resource.data.index == resource.data.index;
+          allow delete: if signedIn() && (resource.data.createdByUid == request.auth.uid || isOwner());
+        }
       }
 
       match /log/{id} {

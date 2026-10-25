@@ -1,8 +1,12 @@
 // Review of a camera session: the shots with their photos, a detail view to pick the right
 // Printing, skip or retake a slip, and the export to the Scan session as a Pile.
-import { useEffect, useMemo, useState } from 'react';
-import { normalizeName } from '../../lib/normalize';
+import { useState } from 'react';
 import { addShotsToScan } from '../../scan/camera/exportPile';
+import { progressText, resumeCameraPhotos, shareCameraPile, type UploadProgress } from '../../scan/camera/sharePhotos';
+import type { Pile } from '../../scan/parse';
+import { errorText, PHOTOS_DENIED, useStore } from '../../store/context';
+import { recordSharedFrom, setPhotosPending } from '../../store/scanPrefs';
+import { NameField, useDisplayName } from '../common';
 import type { CameraSessionMeta } from '../../scan/camera/settings';
 import {
   confirmShot,
@@ -17,8 +21,7 @@ import {
   type Shot,
   type ShotFilter,
 } from '../../scan/camera/shots';
-import { catalogUrls, parseCatalogJson, type CatalogJson } from '../../scan/vision/catalog';
-import type { CatalogEntry } from '../../scan/vision/types';
+import { NameSearch } from './NameSearch';
 import { ArtImage, score, setNumber, ShotPhoto, StatusPill } from './parts';
 
 const FILTERS: { id: ShotFilter; label: string }[] = [
@@ -35,6 +38,7 @@ export function CameraReview({
   onSave,
   onRetake,
   onExported,
+  onDone,
   onNewSession,
 }: {
   shots: Shot[];
@@ -42,7 +46,10 @@ export function CameraReview({
   meta: CameraSessionMeta;
   onSave: (s: Shot) => void;
   onRetake: (id: string) => void;
+  /** The pile is in the Scan session (its photos may still be uploading). */
   onExported: (label: string, cards: number) => void;
+  /** Go on to the Scan tab. */
+  onDone: () => void;
   onNewSession: () => void;
 }) {
   const counts = shotCounts(shots);
@@ -82,7 +89,7 @@ export function CameraReview({
   const countOf: Record<ShotFilter, number> = { all: counts.captured, review: counts.toReview, matched: counts.matched, skipped: counts.skipped };
   return (
     <section className="camera-review" aria-label="Review">
-      <ExportPanel shots={shots} meta={meta} onExported={onExported} onNewSession={onNewSession} />
+      <ExportPanel shots={shots} meta={meta} onExported={onExported} onDone={onDone} onNewSession={onNewSession} />
       <div className="chips review-filters" role="group" aria-label="Show">
         {FILTERS.map((f) => (
           <button key={f.id} type="button" className="filter-chip" aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}>
@@ -194,134 +201,81 @@ function ShotDetail({
   );
 }
 
-interface CatalogCard {
-  oracle_id: string;
-  name: string;
-  key: string;
-  printings: CatalogEntry[];
-}
-
-let catalogCards: Promise<CatalogCard[]> | null = null;
-
-/** The catalog's cards and their Printings (art-catalog.json only; the vectors stay in the worker). */
-function loadCatalogCards(): Promise<CatalogCard[]> {
-  if (!catalogCards) {
-    catalogCards = fetch(catalogUrls().json)
-      .then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json() as Promise<CatalogJson>;
-      })
-      .then((json) => {
-        const byCard = new Map<string, CatalogCard>();
-        for (const e of parseCatalogJson(json)) {
-          let c = byCard.get(e.oracle_id);
-          if (!c) {
-            c = { oracle_id: e.oracle_id, name: e.name, key: normalizeName(e.name), printings: [] };
-            byCard.set(e.oracle_id, c);
-          }
-          // One entry per Printing, the front face when there is one.
-          const i = c.printings.findIndex((p) => p.scryfall_id === e.scryfall_id);
-          if (i < 0) c.printings.push(e);
-          else if (e.face === 'front') c.printings[i] = e;
-        }
-        return [...byCard.values()].sort((a, b) => a.name.localeCompare(b.name));
-      });
-    catalogCards.catch(() => {
-      catalogCards = null;
-    });
-  }
-  return catalogCards;
-}
-
-function NameSearch({ onPick }: { onPick: (c: PrintingRef) => void }) {
-  const [cards, setCards] = useState<CatalogCard[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [q, setQ] = useState('');
-  const [card, setCard] = useState<CatalogCard | null>(null);
-  useEffect(() => {
-    let live = true;
-    loadCatalogCards()
-      .then((c) => live && setCards(c))
-      .catch((e: unknown) => live && setError(e instanceof Error ? e.message : String(e)));
-    return () => {
-      live = false;
-    };
-  }, []);
-  const key = normalizeName(q);
-  const hits = useMemo(() => {
-    if (!cards || key.length < 2) return [];
-    const starts = cards.filter((c) => c.key.startsWith(key));
-    const inside = cards.filter((c) => !c.key.startsWith(key) && c.key.includes(key));
-    return [...starts, ...inside].slice(0, 12);
-  }, [cards, key]);
-
-  if (error) return <p className="status error">Could not load the card names ({error}).</p>;
-  if (!cards) return <p className="status">Loading card names…</p>;
-  if (card) {
-    return (
-      <div className="name-search">
-        <button type="button" className="link" onClick={() => setCard(null)}>
-          Other names
-        </button>
-        <p>
-          Printings of <strong>{card.name}</strong>:
-        </p>
-        <ul className="printing-pick">
-          {card.printings.map((p) => (
-            <li key={p.scryfall_id}>
-              <button type="button" className="candidate" onClick={() => onPick(p)}>
-                <ArtImage c={p} className="candidate-art" />
-                <span className="muted num">{setNumber(p)}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      </div>
-    );
-  }
-  return (
-    <div className="name-search">
-      <label>
-        <span className="visually-hidden">Card name</span>
-        <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Card name" autoFocus />
-      </label>
-      {key.length >= 2 && hits.length === 0 && <p className="status">No card by that name in the catalog.</p>}
-      <ul className="name-hits">
-        {hits.map((c) => (
-          <li key={c.oracle_id}>
-            <button type="button" className="link" onClick={() => (c.printings.length === 1 ? onPick(c.printings[0]!) : setCard(c))}>
-              {c.name}
-            </button>
-            <span className="muted num"> {c.printings.length === 1 ? setNumber(c.printings[0]!) : `${c.printings.length} printings`}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
+type SharePhase =
+  | { kind: 'idle' }
+  | { kind: 'sharing'; progress: UploadProgress | null }
+  /** The pile is in Scan, but sharing it or its photos stopped; sharedId is null when no shared pile was made. */
+  | { kind: 'failed'; error: string; pile: Pile; shots: Shot[]; sharedId: string | null };
 
 function ExportPanel({
   shots,
   meta,
   onExported,
+  onDone,
   onNewSession,
 }: {
   shots: Shot[];
   meta: CameraSessionMeta;
   onExported: (label: string, cards: number) => void;
+  onDone: () => void;
   onNewSession: () => void;
 }) {
+  const { store } = useStore();
   const [asking, setAsking] = useState(false);
   const [label, setLabel] = useState(() => defaultPileLabel(new Date()));
   const [confirmNew, setConfirmNew] = useState(false);
+  // On by default once the shared store is there; the Owner's own choice wins.
+  const [shareChoice, setShareChoice] = useState<boolean | null>(null);
+  const wantShare = !!store && (shareChoice ?? true);
+  const [by, setBy] = useDisplayName();
+  const [needName, setNeedName] = useState(false);
+  const [phase, setPhase] = useState<SharePhase>({ kind: 'idle' });
   const counts = shotCounts(shots);
   const cards = shotsToRows(shots).reduce((n, r) => n + r.quantity, 0);
 
-  function add() {
-    const n = addShotsToScan(shots, label.trim() || defaultPileLabel(new Date()));
-    onExported(label.trim() || defaultPileLabel(new Date()), n);
+  async function share(pile: Pile, taken: Shot[], sharedId: string | null) {
+    if (!store) return;
+    let id = sharedId;
+    const onProgress = (progress: UploadProgress) => setPhase({ kind: 'sharing', progress });
+    setPhase({ kind: 'sharing', progress: null });
+    try {
+      if (id) {
+        await resumeCameraPhotos(store, id, pile, taken, onProgress);
+      } else {
+        await shareCameraPile(store, pile, by.trim(), taken, {
+          onShared: (newId) => {
+            id = newId;
+            recordSharedFrom(pile.id, newId);
+            setPhotosPending(pile.id, newId);
+          },
+          onProgress,
+        });
+      }
+      setPhotosPending(pile.id, null);
+      setPhase({ kind: 'idle' });
+      onDone();
+    } catch (e) {
+      console.warn('Sharing the camera pile failed', e);
+      setPhase({ kind: 'failed', error: errorText(e, PHOTOS_DENIED), pile, shots: taken, sharedId: id });
+    }
   }
 
+  function add() {
+    if (wantShare && !by.trim()) {
+      setNeedName(true);
+      return;
+    }
+    const name = label.trim() || defaultPileLabel(new Date());
+    const taken = [...shots];
+    const { pile, cards: n } = addShotsToScan(taken, name);
+    onExported(name, n);
+    setAsking(false);
+    if (wantShare) void share(pile, taken, null);
+    else onDone();
+  }
+
+  // With photos shared, a session of slips that all still need review is worth sharing too.
+  const canAdd = wantShare ? shots.length > 0 : cards > 0;
   return (
     <div className="panel camera-export">
       {meta.exported && (
@@ -329,54 +283,102 @@ function ExportPanel({
           Added to Scan as {meta.exported.label} ({meta.exported.cards} {meta.exported.cards === 1 ? 'card' : 'cards'}).
         </p>
       )}
-      {asking ? (
+      {phase.kind === 'sharing' && (
+        <p className="status num" role="status">
+          {progressText(phase.progress)}
+          {phase.progress && <progress max={phase.progress.total || 1} value={phase.progress.done} />}
+        </p>
+      )}
+      {phase.kind === 'failed' && (
         <>
-          <label className="field">
-            <span>Pile name</span>
-            <input type="text" value={label} onChange={(e) => setLabel(e.target.value)} />
-          </label>
-          {counts.toReview > 0 && (
-            <p className="status error">
-              {counts.toReview} {counts.toReview === 1 ? 'photo is' : 'photos are'} still to review and will be left out.
-            </p>
-          )}
+          <p className="status error" role="alert">
+            The pile is in Scan, but {phase.sharedId ? 'not all its photos were uploaded' : 'it was not shared'}: {phase.error}
+          </p>
           <div className="actions">
-            <button type="button" className="primary" onClick={add} disabled={cards === 0}>
-              {counts.toReview > 0 ? `Leave them out and add ${cards}` : `Add ${cards}`} {cards === 1 ? 'card' : 'cards'}
+            <button type="button" className="primary" onClick={() => void share(phase.pile, phase.shots, phase.sharedId)}>
+              Try again
             </button>
-            <button type="button" onClick={() => setAsking(false)}>
-              Cancel
+            <button type="button" onClick={onDone}>
+              Go to Scan
             </button>
           </div>
         </>
-      ) : (
-        <div className="actions">
-          <button type="button" className="primary" onClick={() => setAsking(true)} disabled={cards === 0}>
-            Add to Scan as a pile
-          </button>
-          {confirmNew ? (
-            <>
-              <button
-                type="button"
-                className="danger"
-                onClick={() => {
-                  setConfirmNew(false);
-                  onNewSession();
-                }}
-              >
-                Delete {counts.captured} {counts.captured === 1 ? 'photo' : 'photos'} and start again
-              </button>
-              <button type="button" onClick={() => setConfirmNew(false)}>
-                Keep them
-              </button>
-            </>
-          ) : (
-            <button type="button" onClick={() => setConfirmNew(true)} disabled={shots.length === 0}>
-              Start a new session
-            </button>
-          )}
-        </div>
       )}
+      {phase.kind === 'idle' &&
+        (asking ? (
+          <>
+            <label className="field">
+              <span>Pile name</span>
+              <input type="text" value={label} onChange={(e) => setLabel(e.target.value)} />
+            </label>
+            {store && (
+              <label className="check">
+                <input type="checkbox" checked={wantShare} onChange={(e) => setShareChoice(e.target.checked)} />
+                Share it with photos
+              </label>
+            )}
+            {wantShare && (
+              <>
+                <NameField
+                  value={by}
+                  onChange={(v) => {
+                    setBy(v);
+                    if (v.trim()) setNeedName(false);
+                  }}
+                  label="Your name, shown on shared piles"
+                />
+                {needName && (
+                  <p className="status error" role="alert">
+                    Write your name first; it is shown on the shared pile.
+                  </p>
+                )}
+                <p className="muted">All {counts.captured} photos go with the shared pile, so doubtful slips can be checked on a PC.</p>
+              </>
+            )}
+            {counts.toReview > 0 && (
+              <p className="status error">
+                {counts.toReview} {counts.toReview === 1 ? 'photo is' : 'photos are'} still to review and will be left out of the pile
+                {wantShare ? ` until ${counts.toReview === 1 ? 'it is' : 'they are'} reviewed from the shared photos.` : '.'}
+              </p>
+            )}
+            <div className="actions">
+              <button type="button" className="primary" onClick={add} disabled={!canAdd}>
+                {counts.toReview > 0 ? `Leave them out and add ${cards}` : `Add ${cards}`} {cards === 1 ? 'card' : 'cards'}
+                {wantShare ? ' and share' : ''}
+              </button>
+              <button type="button" onClick={() => setAsking(false)}>
+                Cancel
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="actions">
+            <button type="button" className="primary" onClick={() => setAsking(true)} disabled={store ? shots.length === 0 : cards === 0}>
+              Add to Scan as a pile
+            </button>
+            {confirmNew ? (
+              <>
+                <button
+                  type="button"
+                  className="danger"
+                  onClick={() => {
+                    setConfirmNew(false);
+                    onNewSession();
+                  }}
+                >
+                  Delete {counts.captured} {counts.captured === 1 ? 'photo' : 'photos'} and start again
+                </button>
+                <button type="button" onClick={() => setConfirmNew(false)}>
+                  Keep them
+                </button>
+              </>
+            ) : (
+              <button type="button" onClick={() => setConfirmNew(true)} disabled={shots.length === 0}>
+                Start a new session
+              </button>
+            )}
+          </div>
+        ))}
       {confirmNew && !meta.exported && counts.matched > 0 && (
         <p className="status error">This session has not been added to Scan yet.</p>
       )}

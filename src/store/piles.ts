@@ -3,6 +3,22 @@
 import type { Pile, ScannedRow } from '../scan/parse';
 import type { SharedPile, SharedPileInput, SharedPileRow } from './types';
 
+/** The document written for a new shared pile; the optional camera fields only when set. */
+export function scanPileDoc(input: SharedPileInput, uid: string, t: string): Record<string, unknown> {
+  const data: Record<string, unknown> = {
+    label: input.label,
+    by: input.by.trim(),
+    rows: input.rows,
+    row_count: input.rows.length,
+    createdAt: t,
+    createdByUid: uid,
+  };
+  if (input.shot_count !== undefined) data.shot_count = input.shot_count;
+  if (input.to_review !== undefined) data.to_review = input.to_review;
+  if (input.camera) data.camera = true;
+  return data;
+}
+
 export const MAX_PILE_ROWS = 2000;
 
 export function toSharedRows(rows: ScannedRow[]): SharedPileRow[] {
@@ -19,11 +35,12 @@ export function sharedPileInput(pile: Pile, by: string): SharedPileInput {
   return { label: pile.label, by, rows: toSharedRows(pile.rows) };
 }
 
+/** A shared pile as a Pile for the diff. Rows a photo review took down to quantity 0 are left out. */
 export function fromShared(p: SharedPile): Pile {
   return {
     id: `shared:${p.id}`,
     label: p.label,
-    rows: p.rows.map((r) => ({ ...r, foil: null, language: null })),
+    rows: p.rows.filter((r) => r.quantity > 0).map((r) => ({ ...r, foil: null, language: null })),
   };
 }
 
@@ -43,6 +60,12 @@ export function pilesForDiff(
       .filter(([localId]) => localIds.has(localId))
       .map(([, sharedId]) => sharedId),
   );
+  // A local pile whose shared copy a photo review has changed counts with the shared rows.
+  const byId = new Map(shared.map((p) => [p.id, p]));
+  const mine = local.map((p) => {
+    const s = sharedFrom[p.id] ? byId.get(sharedFrom[p.id]!) : undefined;
+    return s?.updatedAt ? { ...p, rows: fromShared(s).rows } : p;
+  });
   const extra = shared.filter((p) => included.has(p.id) && !fromLocal.has(p.id)).map(fromShared);
-  return [...local, ...extra];
+  return [...mine, ...extra];
 }

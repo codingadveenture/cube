@@ -156,6 +156,12 @@ export interface SharedPileInput {
   label: string;
   by: string;
   rows: SharedPileRow[];
+  /** A pile with camera photos: how many shots its chunks hold (cubes/main/scans/{id}/shots). */
+  shot_count?: number;
+  /** Of those shots, how many still need a decision (status review or none). */
+  to_review?: number;
+  /** True for a pile that came from the camera view. */
+  camera?: boolean;
 }
 
 export interface SharedPile extends SharedPileInput {
@@ -163,7 +169,66 @@ export interface SharedPile extends SharedPileInput {
   row_count: number;
   createdAt: string;
   createdByUid: string;
+  /** Set when a photo review changed the rows. */
+  updatedAt?: string | null;
 }
+
+/** The fields a new shared pile may have; firestore.rules (validScan) lists the same. */
+export const SCAN_CREATE_KEYS = ['label', 'by', 'rows', 'row_count', 'createdAt', 'createdByUid', 'shot_count', 'to_review', 'camera'] as const;
+/** The only fields a photo review may change on a shared pile (validScanUpdate). */
+export const SCAN_UPDATE_KEYS = ['rows', 'row_count', 'shot_count', 'to_review', 'updatedAt'] as const;
+
+/** A Printing a shared shot was taken to be. */
+export interface SharedShotRef {
+  scryfall_id: string;
+  oracle_id: string;
+  name: string;
+  set: string;
+  collector_number: string;
+}
+
+export interface SharedShotCandidate extends SharedShotRef {
+  score: number;
+}
+
+/** The status words of a camera shot (src/scan/camera/shots.ts ShotStatus). */
+export type SharedShotStatus = 'match' | 'review' | 'none' | 'confirmed' | 'skipped';
+
+/** One camera photo inside a chunk document. */
+export interface SharedShot {
+  /** Index into the parent pile's rows, or -1 when the shot has no row (to review, unknown, not a card). */
+  row: number;
+  /** The camera shot id. */
+  id: string;
+  /** ISO time of the capture. */
+  at: string;
+  /** Base64 JPEG without a data: prefix, upright, at most 240x336 and MAX_THUMB_CHARS characters. */
+  thumb: string;
+  status: SharedShotStatus;
+  /** The recognition score, null when recognition never answered. */
+  score: number | null;
+  chosen: SharedShotRef | null;
+  /** The top three candidates, best first. */
+  candidates: SharedShotCandidate[];
+}
+
+/** cubes/main/scans/{pileId}/shots/{chunkId}: up to 50 photos of a shared pile. */
+export interface ShotChunk {
+  /** 0-based chunk number; the document id is chunkId(index). */
+  index: number;
+  shots: SharedShot[];
+  count: number;
+  createdAt: string;
+  createdByUid: string;
+}
+
+/** The fields of a chunk document; firestore.rules (validShotChunk) lists the same. */
+export const SHOT_CHUNK_KEYS = ['index', 'shots', 'count', 'createdAt', 'createdByUid'] as const;
+/** The fields of one shot inside a chunk. */
+export const SHARED_SHOT_KEYS = ['row', 'id', 'at', 'thumb', 'status', 'score', 'chosen', 'candidates'] as const;
+
+/** A decision on one shared shot, made in the photo review. */
+export type ShotDecisionInput = { kind: 'pick'; ref: SharedShotRef } | { kind: 'not_a_card' };
 
 export type LogType = 'winner_pick' | 'ban';
 
@@ -273,7 +338,18 @@ export interface Store {
   resolveSuggestion(id: string, status: 'accepted' | 'rejected', note: string | null, plan: AcceptPlan | null): Promise<void>;
   /** Starts the write and returns the new id at once; `written` settles when the server has it. */
   createScanPile(input: SharedPileInput): { id: string; written: Promise<void> };
+  /** Deletes the pile and its shot chunks. */
   deleteScanPile(id: string): Promise<void>;
+  /** The chunk indexes the server already has for a pile; needs a connection. */
+  shotChunkIndexes(pileId: string): Promise<number[]>;
+  /** Writes one chunk (create, or replace one this user wrote). Resolves when the server has it. */
+  writeShotChunk(pileId: string, chunk: Omit<ShotChunk, 'createdAt' | 'createdByUid'>): Promise<void>;
+  subscribeShotChunks(pileId: string, next: (s: Snapshot<ShotChunk[]>) => void, error: OnError): Unsubscribe;
+  /**
+   * The pile's creator or the Owner decides one shot: in one transaction the shot in its chunk
+   * (status, chosen, row) and the parent's rows, row_count, shot_count and to_review.
+   */
+  decideShot(pileId: string, chunkIndex: number, shotId: string, decision: ShotDecisionInput): Promise<void>;
   addLogEntry(entry: LogEntryInput): Promise<void>;
   addLogEntries(entries: LogEntryInput[]): Promise<void>;
   updateLogEntry(id: string, entry: LogEntryInput): Promise<void>;

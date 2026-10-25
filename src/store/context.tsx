@@ -14,6 +14,7 @@ import {
   type Overrides,
   type OwnerConfig,
   type SharedPile,
+  type ShotChunk,
   type Snapshot,
   type Store,
   type Suggestion,
@@ -67,10 +68,14 @@ const NO_AUTH: AuthState = {
 
 const StoreContext = createContext<StoreContextValue | null>(null);
 
-export function errorText(e: unknown): string {
+/** The permission text of the photo flows: the person who shared a pile may change its photos too. */
+export const PHOTOS_DENIED = 'Not allowed: only the Owner and the person who shared the pile can change its photos, or the new Firestore rules are not pasted yet.';
+
+/** A message for `e`; `denied` replaces the permission text where more people than the Owner may write. */
+export function errorText(e: unknown, denied?: string): string {
   const code = (e as { code?: string } | null)?.code ?? '';
   if (code === 'permission-denied' || code === 'firestore/permission-denied') {
-    return 'Not allowed. Only the Owner can do that, or the Firestore rules are not published yet.';
+    return denied ?? 'Not allowed. Only the Owner can do that, or the Firestore rules are not published yet.';
   }
   if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') return 'Sign-in was cancelled.';
   if (code === 'auth/unauthorized-domain') return 'This site is not an authorized domain for sign-in.';
@@ -294,3 +299,12 @@ export const usePrintMetaDoc = () => useLive<Record<string, unknown> | null>(sub
 export const useUpstreamMetaDoc = () => useLive<Record<string, unknown> | null>(subUpstreamMeta, null);
 /** cubes/main/meta/updates as stored: the history of applied Updates. */
 export const useUpdatesMetaDoc = () => useLive<Record<string, unknown> | null>(subUpdatesMeta, null);
+
+/** The photo chunks of one shared pile, live; nothing is read while pileId is null. */
+export function useShotChunks(pileId: string | null): Live<ShotChunk[]> {
+  const subscribe = useCallback<Subscribe<ShotChunk[]>>(
+    (s, n, e) => (pileId ? s.subscribeShotChunks(pileId, n, e) : () => undefined),
+    [pileId],
+  );
+  return useLive<ShotChunk[]>(subscribe, NONE);
+}

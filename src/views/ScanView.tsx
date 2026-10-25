@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import type { Card } from '../types';
 import { normalizeName } from '../lib/normalize';
 import { replaceHash } from '../router';
@@ -26,12 +26,26 @@ import {
   type ScanSession,
 } from '../scan/session';
 import { takeSharedFiles } from '../scan/shared';
-import { useCardStates, useScans, useStore, type Live } from '../store/context';
+import { errorText, PHOTOS_DENIED, useCardStates, useScans, useStore, type Live } from '../store/context';
 import { lookupById, lookupPrinting } from '../store/lookup';
 import { MAX_PILE_ROWS, pilesForDiff, sharedPileInput } from '../store/piles';
-import { loadIncluded, loadSharedFrom, saveIncluded, saveSharedFrom } from '../store/scanPrefs';
+import { progressText, type UploadProgress } from '../store/shotChunks';
+import { loadIncluded, loadPhotosPending, loadSharedFrom, saveIncluded, saveSharedFrom, setPhotosPending } from '../store/scanPrefs';
 import type { InBoxState, SharedPile } from '../store/types';
 import { formatTime, LiveStatus, NameField, useDisplayName } from './common';
+
+// Camera code (IndexedDB shots, thumbnails, the art catalog of Search by name) loads only when a
+// camera pile is shared or its photos are reviewed, so the Scan tab stays light.
+const SharedPhotoReview = lazy(() => import('./SharedPhotoReview').then((m) => ({ default: m.SharedPhotoReview })));
+const loadSharePhotos = () => import('../scan/camera/sharePhotos');
+
+/** A photo upload of a local camera pile, shown under that pile. */
+interface PhotoUpload {
+  pileId: string;
+  progress: UploadProgress | null;
+  error: string | null;
+  done: boolean;
+}
 
 type Tab = 'missing' | 'unexpected' | 'to-print' | 'different-art' | 'duplicates' | 'other-set' | 'unknown';
 
@@ -75,6 +89,10 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
   const [sharedFrom, setSharedFrom] = useState<Record<string, string>>(loadSharedFrom);
   useEffect(() => saveIncluded(included), [included]);
   useEffect(() => saveSharedFrom(sharedFrom), [sharedFrom]);
+  // Local camera piles whose photos have not all been uploaded (local pile id -> shared pile id).
+  const [photosPending, setPhotosPendingState] = useState<Record<string, string>>(loadPhotosPending);
+  const [upload, setUpload] = useState<PhotoUpload | null>(null);
+  const [reviewId, setReviewId] = useState<string | null>(null);
   // This device's piles plus the ticked shared piles; a pile shared from here counts once.
   const diffPiles = useMemo(
     () => pilesForDiff(session.piles, scans.data, new Set(included), sharedFrom),
@@ -169,11 +187,76 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
       return;
     }
     setError(null);
+    if (pile.camera) {
+      void shareCamera(pile);
+      return;
+    }
     void save(() => {
       const { id, written } = store.createScanPile(sharedPileInput(pile, by));
       setSharedFrom((m) => ({ ...m, [pile.id]: id }));
       return written;
     }, `Shared ${pile.label}.`);
+  }
+
+  function markPending(localId: string, sharedId: string | null) {
+    setPhotosPending(localId, sharedId);
+    setPhotosPendingState(loadPhotosPending());
+  }
+
+  /**
+   * A pile from the camera: shared with its photos when they are still on this device, else as
+   * rows only (marked camera). `resumeId` continues a stopped photo upload of that shared pile.
+   */
+  async function shareCamera(pile: Pile, resumeId: string | null = null) {
+    if (!store || (upload && upload.pileId === pile.id && !upload.done && !upload.error)) return;
+    setUpload({ pileId: pile.id, progress: null, error: null, done: false });
+    const onProgress = (progress: UploadProgress) => setUpload({ pileId: pile.id, progress, error: null, done: false });
+    try {
+      const { PhotosGoneError, resumeCameraPhotos, shareCameraPile, shotsOfPile } = await loadSharePhotos();
+      const shots = await shotsOfPile(pile);
+      if (resumeId && shots.length > 0) {
+        try {
+          await resumeCameraPhotos(store, resumeId, pile, shots, onProgress);
+        } catch (e) {
+          if (!(e instanceof PhotosGoneError)) throw e;
+          setUpload(null);
+          markPending(pile.id, null);
+          setError(`${pile.label}: ${e.message}`);
+          return;
+        }
+        markPending(pile.id, null);
+        setUpload({ pileId: pile.id, progress: null, error: null, done: true });
+        setNotice(`Uploaded the rest of the photos of ${pile.label}.`);
+        return;
+      }
+      if (shots.length === 0) {
+        setUpload(null);
+        if (resumeId) {
+          markPending(pile.id, null);
+          setError(`The photos of ${pile.label} are no longer on this device; the shared pile keeps the photos that arrived.`);
+          return;
+        }
+        void save(() => {
+          const { id, written } = store.createScanPile({ ...sharedPileInput(pile, by), camera: true });
+          setSharedFrom((m) => ({ ...m, [pile.id]: id }));
+          return written;
+        }, `Shared ${pile.label} without photos; they are no longer on this device.`);
+        return;
+      }
+      await shareCameraPile(store, pile, by, shots, {
+        onShared: (id) => {
+          setSharedFrom((m) => ({ ...m, [pile.id]: id }));
+          markPending(pile.id, id);
+        },
+        onProgress,
+      });
+      markPending(pile.id, null);
+      setUpload({ pileId: pile.id, progress: null, error: null, done: true });
+      setNotice(`Shared ${pile.label} with ${shots.length} ${shots.length === 1 ? 'photo' : 'photos'}.`);
+    } catch (e) {
+      console.warn('Sharing the camera pile failed', e);
+      setUpload({ pileId: pile.id, progress: null, error: errorText(e, PHOTOS_DENIED), done: false });
+    }
   }
 
   /** Owner: the scanned Printing is what is in the box. Writes the In-box Printing; Wanted stays. */
@@ -364,6 +447,9 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
   const hasPiles = diffPiles.length > 0;
   const hasLocalPiles = session.piles.length > 0;
   const sharedIds = new Set(scans.data.map((s) => s.id));
+  // The shared pile whose photos are open; the panel closes by itself when the pile is deleted.
+  const reviewing = reviewId ? scans.data.find((s) => s.id === reviewId) ?? null : null;
+  const canEditShared = (p: SharedPile) => auth.isOwner || (!!auth.uid && p.createdByUid === auth.uid);
   // Scryfall is still being asked: the art tabs are not final yet.
   const checking = progress !== null && progress.done < progress.total;
   const artEmpty = (text: string) => (checking ? 'Checking art…' : text);
@@ -428,11 +514,18 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
             {session.piles.map((p) => {
               const sharedId = sharedFrom[p.id];
               const isShared = !!sharedId && (sharedIds.has(sharedId) || scans.status !== 'ready');
+              const up = upload?.pileId === p.id ? upload : null;
+              const uploading = !!up && !up.done && !up.error;
+              const pending = isShared && photosPending[p.id] === sharedId;
               return (
                 <li key={p.id}>
                   <span className="pile-label">{p.label}</span>
-                  <span className="num muted">{p.rows.length} rows</span>
-                  {isShared ? (
+                  <span className="num muted">
+                    {p.rows.length} rows{p.camera ? ` · camera${p.shotIds?.length ? `, ${p.shotIds.length} photos` : ''}` : ''}
+                  </span>
+                  {uploading ? (
+                    <span className="muted">Sharing…</span>
+                  ) : isShared ? (
                     <span className="muted">Shared</span>
                   ) : (
                     store && (
@@ -441,9 +534,25 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
                       </button>
                     )
                   )}
+                  {pending && !uploading && store && (
+                    <button type="button" className="link" onClick={() => void shareCamera(p, sharedId)}>
+                      Finish uploading the photos
+                    </button>
+                  )}
                   <button type="button" className="link" onClick={() => removePile(p.id)}>
                     Remove
                   </button>
+                  {uploading && (
+                    <p className="status num pile-upload" role="status">
+                      {progressText(up.progress)}
+                      {up.progress && <progress max={up.progress.total || 1} value={up.progress.done} />}
+                    </p>
+                  )}
+                  {up?.error && (
+                    <p className="status error pile-upload" role="alert">
+                      {isShared ? 'Not all the photos were uploaded' : 'Not shared'}: {up.error}
+                    </p>
+                  )}
                 </li>
               );
             })}
@@ -468,17 +577,24 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
         )}
       </section>
 
-      <SharedPiles
-        live={scans}
-        included={included}
-        onToggle={(id) => setIncluded((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]))}
-        canDelete={(p) => auth.isOwner || (!!auth.uid && p.createdByUid === auth.uid)}
-        onDelete={(p) => {
-          if (!store || !window.confirm(`Delete the shared pile ${p.label}?`)) return;
-          void save(() => store.deleteScanPile(p.id), `Deleted ${p.label}.`);
-          setIncluded((cur) => cur.filter((x) => x !== p.id));
-        }}
-      />
+      {reviewing ? (
+        <Suspense fallback={<p className="status muted">Loading the photos…</p>}>
+          <SharedPhotoReview key={reviewing.id} pile={reviewing} canDecide={canEditShared(reviewing)} onClose={() => setReviewId(null)} />
+        </Suspense>
+      ) : (
+        <SharedPiles
+          live={scans}
+          included={included}
+          onToggle={(id) => setIncluded((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]))}
+          canDelete={canEditShared}
+          onDelete={(p) => {
+            if (!store || !window.confirm(`Delete the shared pile ${p.label}${p.shot_count ? ' and its photos' : ''}?`)) return;
+            void save(() => store.deleteScanPile(p.id), `Deleted ${p.label}.`);
+            setIncluded((cur) => cur.filter((x) => x !== p.id));
+          }}
+          onReview={(p) => setReviewId(p.id)}
+        />
+      )}
 
       {notice && <p className="notice" role="status">{notice}</p>}
       {removed && (
@@ -828,12 +944,14 @@ function SharedPiles({
   onToggle,
   canDelete,
   onDelete,
+  onReview,
 }: {
   live: Live<SharedPile[]>;
   included: string[];
   onToggle: (id: string) => void;
   canDelete: (p: SharedPile) => boolean;
   onDelete: (p: SharedPile) => void;
+  onReview: (p: SharedPile) => void;
 }) {
   const piles = live.data;
   return (
@@ -855,6 +973,17 @@ function SharedPiles({
               <span className="num muted">
                 {p.row_count} rows · {p.by || 'someone'} · {formatTime(p.createdAt)}
               </span>
+              {!!p.shot_count && (
+                <>
+                  <span className="num muted">
+                    {p.shot_count} {p.shot_count === 1 ? 'photo' : 'photos'}
+                    {p.to_review !== undefined && `, ${p.to_review} to review`}
+                  </span>
+                  <button type="button" className="link" onClick={() => onReview(p)}>
+                    Review photos
+                  </button>
+                </>
+              )}
               {canDelete(p) && (
                 <button type="button" className="link" onClick={() => onDelete(p)}>
                   Delete

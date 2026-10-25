@@ -1862,3 +1862,53 @@ a.button {
     max-width: 260px;
   }
 }
+
+/* Shared photos of a camera pile (Scan tab) */
+.pile-upload {
+  flex-basis: 100%;
+  margin: 0;
+}
+.shared-shots {
+  list-style: none;
+  margin: 0.5rem 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+.shared-shot {
+  display: grid;
+  /* The photo at 240 px wide is 336 px tall: the name on the slip stays readable. */
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: start;
+  padding: 0.6rem 0;
+  border-top: 1px solid var(--border);
+}
+.shared-shot[aria-busy='true'] {
+  opacity: 0.7;
+}
+.shared-photo {
+  display: block;
+  width: 240px;
+  height: auto;
+  aspect-ratio: 5 / 7;
+  object-fit: contain;
+  background: var(--chip);
+}
+.shared-shot-body .actions {
+  margin-bottom: 0;
+}
+.shared-shot .candidates {
+  grid-template-columns: repeat(auto-fill, minmax(110px, 160px));
+}
+.shot-status.tone-skipped {
+  background: var(--chip);
+}
+@media (max-width: 560px) {
+  .shared-shot {
+    grid-template-columns: 1fr;
+  }
+  .shared-photo {
+    width: min(100%, 240px);
+  }
+}
