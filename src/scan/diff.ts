@@ -144,6 +144,13 @@ export function scannedPrintings(rows: ScannedRowWithPrinting[]): string[] {
   return out;
 }
 
+/** The distinct pile labels of some rows, in scan order; empty when the rows carry none. */
+export function pilesOf(rows: readonly { pile?: string }[]): string[] {
+  const out: string[] = [];
+  for (const r of rows) if (r.pile && !out.includes(r.pile)) out.push(r.pile);
+  return out;
+}
+
 /** Index the expected cards by every name they may be scanned under. */
 export function buildNameIndex<T extends Matchable>(expected: T[]): Map<string, T> {
   const index = new Map<string, T>();

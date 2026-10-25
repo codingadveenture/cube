@@ -52,6 +52,7 @@ export function makePile(label: string, rows: ScannedRow[]): Pile {
   return { id: `${Date.now().toString(36)}-${counter}`, label, rows };
 }
 
+/** All rows of the piles, each tagged with its pile's label so a result can say where it was found. */
 export function mergedRows(piles: Pile[]): ScannedRow[] {
-  return piles.flatMap((p) => p.rows);
+  return piles.flatMap((p) => p.rows.map((r) => ({ ...r, pile: p.label })));
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { diffScan, printingKey, scannedPrintings, type ExpectedCard, type ResolvedPrinting, type ToPrintCard } from './diff';
+import { diffScan, printingKey, scannedPrintings, type ExpectedCard, type ResolvedPrinting, type ToPrintCard, pilesOf } from './diff';
 import type { ScannedRow } from './parse';
 
 function card(name: string, ill: string, set = 'lea', num = '1', front = name.split(' // ')[0]!): ExpectedCard {
@@ -190,5 +190,13 @@ describe('found, but marked To print', () => {
     const d = diffScan(EXPECTED, [row('Tarmogoyf')], new Map(), TO_PRINT);
     expect(d.foundToPrint).toEqual([]);
     expect(d.unexpected.map((u) => u.name)).toEqual(['Tarmogoyf']);
+  });
+});
+
+describe('pilesOf', () => {
+  it('lists the distinct pile labels of the rows in scan order, skipping rows without one', () => {
+    const rows = [{ pile: 'Stack 2' }, { pile: 'Stack 1' }, {}, { pile: 'Stack 2' }];
+    expect(pilesOf(rows)).toEqual(['Stack 2', 'Stack 1']);
+    expect(pilesOf([{}])).toEqual([]);
   });
 });

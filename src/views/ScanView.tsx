@@ -11,6 +11,7 @@ import {
   type ToPrintResult,
   type UnexpectedResult,
   scannedPrintings,
+  pilesOf,
 } from '../scan/diff';
 import { knownPrintings, localPrintings, resolvePrintings, type ResolveProgress } from '../scan/resolve';
 import { expectedCards, toPrintCards } from '../scan/expected';
@@ -645,7 +646,8 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
 
 function duplicateNote(r: CardResult): string {
   const seen = scannedPrintings(r.rows);
-  return `Scanned ${r.count} times, expected once${seen.length > 0 ? ` · ${seen.join(', ')}` : ''}`;
+  const piles = pilesOf(r.rows);
+  return `Scanned ${r.count} times, expected once${seen.length > 0 ? ` · ${seen.join(', ')}` : ''}${piles.length > 0 ? ` · in ${piles.join(', ')}` : ''}`;
 }
 
 function Total({ label, value, warn }: { label: string; value: number; warn?: boolean }) {
@@ -722,6 +724,7 @@ function ArtItem({
 }) {
   const s = r.scanned;
   const scannedLabel = s ? `Scanned ${s.set.toUpperCase()} ${s.collector_number}` : 'Scanned';
+  const piles = pilesOf(r.rows);
   return (
     <Item k={`${tab}:${r.card.oracle_id}`} session={session} toggle={toggle}>
       <span className="row-text art-name">
@@ -729,6 +732,7 @@ function ArtItem({
           {r.card.name}
         </a>
         {tab === 'other-set' && <span className="muted">Probable scanner guess</span>}
+        {piles.length > 0 && <span className="muted">in {piles.join(', ')}</span>}
       </span>
       <Thumb src={imageOf(r.card)} label={`In-box ${r.card.in_box.set.toUpperCase()} ${r.card.in_box.collector_number}`} />
       <Thumb src={s?.image_small} label={scannedLabel} />
@@ -752,6 +756,7 @@ function UnexpectedItem({
 }) {
   const p = u.rows.find((r) => r.printing)?.printing ?? null;
   const first = u.rows[0];
+  const piles = pilesOf(u.rows);
   const where = p
     ? `${p.set.toUpperCase()} ${p.collector_number}`
     : first?.set
@@ -764,7 +769,8 @@ function UnexpectedItem({
         <span className="row-name">{u.name}</span>
         <span className="muted num">
           {u.count > 1 ? `${u.count} scanned` : '1 scanned'}
-          {where && ` · ${where}`} · not on the List
+          {where && ` · ${where}`}
+          {piles.length > 0 && ` · in ${piles.join(', ')}`} · not on the List
         </span>
       </span>
     </Item>
@@ -788,6 +794,7 @@ function ToPrintItem({
 }) {
   const p = f.rows.find((r) => r.printing)?.printing ?? null;
   const seen = scannedPrintings(f.rows);
+  const piles = pilesOf(f.rows);
   return (
     <Item k={`to-print:${f.card.oracle_id}`} session={session} toggle={toggle}>
       <Thumb src={p?.image_small ?? image} />
@@ -797,7 +804,8 @@ function ToPrintItem({
         </a>
         <span className="muted num">
           {f.count > 1 ? `${f.count} scanned` : '1 scanned'}
-          {seen.length > 0 && ` · ${seen.join(', ')}`} · marked To print
+          {seen.length > 0 && ` · ${seen.join(', ')}`}
+          {piles.length > 0 && ` · in ${piles.join(', ')}`} · marked To print
         </span>
       </span>
       {onBoxHasThis && (

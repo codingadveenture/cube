@@ -9,6 +9,8 @@ export interface ScannedRow {
   collector_number: string | null;
   foil: string | null;
   language: string | null;
+  /** Label of the pile the row came from, set when piles are merged for a diff. */
+  pile?: string;
 }
 
 export interface Pile {
