@@ -1,7 +1,9 @@
 rules_version = '2';
 
 // Firestore rules for the Cube app (project cube-e647a).
-// Paste this file into Firebase console -> Firestore -> Rules -> Publish.
+// Publish with: npx --yes firebase-tools@14 deploy --only firestore:rules --project cube-e647a
+// (firebase.json points here; sign in once with npx firebase-tools@14 login). Pasting the file into
+// Firebase console -> Firestore -> Rules -> Publish works too.
 // Everyone who opens the site is signed in anonymously; only the Owner signs in with Google.
 service cloud.firestore {
   match /databases/{database}/documents {

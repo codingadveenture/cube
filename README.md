@@ -74,18 +74,23 @@ the built-in card data and says so.
 
 ### Firestore rules
 
-The rules are in `firestore.rules`. After changing them, open the
-[Firebase console](https://console.firebase.google.com/project/cube-e647a/firestore/rules),
-go to Firestore, Rules, paste the whole file and press Publish. Without the rules, Firestore in
-production mode refuses every read and write.
+The rules are in `firestore.rules`. Publish them from the repo with the Firebase CLI:
 
-### Camera photos on shared piles: paste the rules again
+```
+npx --yes firebase-tools@14 login
+npx --yes firebase-tools@14 deploy --only firestore:rules --project cube-e647a
+```
+
+`firebase.json` points at the file and `.firebaserc` at the project; the sign-in is kept on the
+machine. Pasting the whole file in the
+[Firebase console](https://console.firebase.google.com/project/cube-e647a/firestore/rules) under
+Firestore, Rules, Publish works too. Without the rules, Firestore in a new project denies everything.
+
+### Camera photos on shared piles
+
 
 The camera view can now share a pile with its photos, so doubtful slips can be judged on a PC.
-This needs the new `firestore.rules`: open the
-[Firebase console](https://console.firebase.google.com/project/cube-e647a/firestore/rules),
-paste the whole file again and press Publish. Until then, sharing with photos fails with
-"Not allowed" (sharing a pile without photos keeps working). The three changes:
+The rules for this were published on 2026-10-25 (see Firestore rules above). Sharing with photos falls back to sharing without them, and says so, when the rules in the project are older.
 
 1. **New: the photos of a shared pile.** A pile's photos are stored in chunk documents under it,
    `cubes/main/scans/{pileId}/shots/{chunkId}`, at most 50 photos each. Anyone may read them.
