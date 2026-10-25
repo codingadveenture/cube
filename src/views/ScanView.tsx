@@ -54,6 +54,8 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
   const [paste, setPaste] = useState('');
   const [tab, setTab] = useState<Tab>('missing');
   const fileInput = useRef<HTMLInputElement>(null);
+  const nameBox = useRef<HTMLDivElement>(null);
+  const [needName, setNeedName] = useState(false);
 
   const expected: ExpectedCard[] = useMemo(() => expectedCards(cards), [cards]);
   const known = useMemo(() => knownPrintings(cards), [cards]);
@@ -149,9 +151,12 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
   function sharePile(pile: Pile) {
     if (!store) return;
     if (!by.trim()) {
-      setError('Write your name below the piles first; it is shown on the shared pile.');
+      // The error used to render far below the button, off-screen on a phone: ask at the field.
+      setNeedName(true);
+      nameBox.current?.querySelector('input')?.focus();
       return;
     }
+    setNeedName(false);
     if (pile.rows.length > MAX_PILE_ROWS) {
       setError(`A shared pile holds at most ${MAX_PILE_ROWS} rows; this one has ${pile.rows.length}. Split it into smaller files.`);
       return;
@@ -369,7 +374,23 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
             })}
           </ul>
         )}
-        {hasLocalPiles && store && <NameField value={by} onChange={setBy} label="Your name, shown on shared piles" />}
+        {hasLocalPiles && store && (
+          <div ref={nameBox}>
+            <NameField
+              value={by}
+              onChange={(v) => {
+                setBy(v);
+                if (v.trim()) setNeedName(false);
+              }}
+              label="Your name, shown on shared piles"
+            />
+            {needName && (
+              <p className="status error" role="alert">
+                Write your name here first; it is shown on the shared pile. Then press Share this pile again.
+              </p>
+            )}
+          </div>
+        )}
       </section>
 
       <SharedPiles
