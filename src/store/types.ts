@@ -218,7 +218,9 @@ export type CardPatch =
   /** A card goes Out: off the List; it stays in the box until it is pulled. */
   | { kind: 'list_out' }
   /** The card was taken out of the box. */
-  | { kind: 'pull'; retired_printing: InBoxState; at: string };
+  | { kind: 'pull'; retired_printing: InBoxState; at: string }
+  /** The card is on the List but not in the box (never printed, or lost): it goes to the print batch. */
+  | { kind: 'not_in_box' };
 
 /**
  * A change to the pending List changes: `name` joins `field` and every name in `drop` leaves the

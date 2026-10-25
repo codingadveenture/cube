@@ -2,6 +2,7 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import type { Card } from '../types';
 import { useCardStates, useStore } from '../store/context';
+import { lifecycleOf } from '../store/lifecycle';
 import { lookupPrinting } from '../store/lookup';
 import { plainError } from '../print/errors';
 import { knownPrintings } from '../scan/resolve';
@@ -36,6 +37,21 @@ export function CardActions({ card, cards }: { card: Card; cards: Card[] }) {
         {auth.isOwner && (
           <button type="button" aria-expanded={open === 'box'} onClick={() => toggle('box')} disabled={!ownerReady}>
             Box has a different printing
+          </button>
+        )}
+        {auth.isOwner && lifecycleOf(card) === 'in_box' && (
+          <button
+            type="button"
+            disabled={!ownerReady}
+            onClick={() => {
+              if (!window.confirm(`Mark ${card.name} as not in the box? It goes to the print batch.`)) return;
+              void save(
+                () => store.updateCard(card.oracle_id, { kind: 'not_in_box' }),
+                `${card.name} marked not in the box; it goes to the print batch.`,
+              );
+            }}
+          >
+            Not in the box
           </button>
         )}
         {auth.isOwner && card.flags.length > 0 && (

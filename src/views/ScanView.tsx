@@ -8,11 +8,13 @@ import {
   type CardResult,
   type ExpectedCard,
   type ResolvedPrinting,
+  type ToPrintResult,
   type UnexpectedResult,
   scannedPrintings,
 } from '../scan/diff';
 import { knownPrintings, localPrintings, resolvePrintings, type ResolveProgress } from '../scan/resolve';
-import { expectedCards } from '../scan/expected';
+import { expectedCards, toPrintCards } from '../scan/expected';
+import { inBoxForToPrint, notInBoxCandidates } from '../scan/owner';
 import {
   clearSession,
   emptySession,
@@ -24,13 +26,13 @@ import {
 } from '../scan/session';
 import { takeSharedFiles } from '../scan/shared';
 import { useCardStates, useScans, useStore, type Live } from '../store/context';
-import { lookupPrinting } from '../store/lookup';
+import { lookupById, lookupPrinting } from '../store/lookup';
 import { MAX_PILE_ROWS, pilesForDiff, sharedPileInput } from '../store/piles';
 import { loadIncluded, loadSharedFrom, saveIncluded, saveSharedFrom } from '../store/scanPrefs';
-import type { SharedPile } from '../store/types';
+import type { InBoxState, SharedPile } from '../store/types';
 import { formatTime, LiveStatus, NameField, useDisplayName } from './common';
 
-type Tab = 'missing' | 'unexpected' | 'different-art' | 'duplicates' | 'other-set' | 'unknown';
+type Tab = 'missing' | 'unexpected' | 'to-print' | 'different-art' | 'duplicates' | 'other-set' | 'unknown';
 
 const NOTHING_SHARED = 'Nothing arrived from the share. Try Choose files instead.';
 
@@ -38,6 +40,7 @@ const NOTHING_SHARED = 'Nothing arrived from the share. Try Choose files instead
 const TAB_HINT: Record<Tab, string> = {
   missing: 'On the List but not scanned: look for these in the box.',
   unexpected: 'Scanned but not on the List: take these out.',
+  'to-print': 'On the List and marked To print, but the scan found it. If the box really has it, say so and it leaves the print batch.',
   'different-art': 'Scanned with other art than the In-box Printing: check the card in the box.',
   duplicates: 'Scanned more than once: take out the extra copies.',
   'other-set': 'Same art as the In-box Printing but another set or number. Probably the scanner guessed the wrong Printing; counted as present.',
@@ -49,6 +52,8 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
   const [printings, setPrintings] = useState<Map<string, ResolvedPrinting>>(new Map());
   const [progress, setProgress] = useState<ResolveProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Errors of the Owner row actions show in the tab panel, next to the rows; the page error is off-screen there.
+  const [rowError, setRowError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [removed, setRemoved] = useState<{ pile: Pile; index: number } | null>(null);
   const [paste, setPaste] = useState('');
@@ -58,6 +63,7 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
   const [needName, setNeedName] = useState(false);
 
   const expected: ExpectedCard[] = useMemo(() => expectedCards(cards), [cards]);
+  const toPrint = useMemo(() => toPrintCards(cards), [cards]);
   const known = useMemo(() => knownPrintings(cards), [cards]);
   const byOracle = useMemo(() => new Map(cards.map((c) => [c.oracle_id, c])), [cards]);
   const { store, auth, save } = useStore();
@@ -74,7 +80,7 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
     [session.piles, scans.data, included, sharedFrom],
   );
   const rows = useMemo(() => mergedRows(diffPiles), [diffPiles]);
-  const diff = useMemo(() => diffScan(expected, rows, printings), [expected, rows, printings]);
+  const diff = useMemo(() => diffScan(expected, rows, printings, toPrint), [expected, rows, printings, toPrint]);
 
   useEffect(() => saveSession(session), [session]);
 
@@ -210,6 +216,61 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
     }
   }
 
+  /** Owner: List cards that are not in the box (never printed, or lost). They go to the print batch. */
+  async function notInBox(list: ExpectedCard[], doneText: string) {
+    if (!store || list.length === 0) return;
+    if (cardStates.status !== 'ready') {
+      setRowError('The shared card state has not loaded yet. Try again in a moment.');
+      return;
+    }
+    setRowError(null);
+    await save(
+      () =>
+        list.length === 1
+          ? store.updateCard(list[0]!.oracle_id, { kind: 'not_in_box' })
+          : store.updateCards(list.map((c) => ({ oracle_id: c.oracle_id, patch: { kind: 'not_in_box' } }))),
+      doneText,
+    );
+  }
+
+  function markMissingNotInBox(list: ExpectedCard[]) {
+    const n = list.length;
+    const cardsWord = n === 1 ? 'card' : 'cards';
+    if (!window.confirm(`Mark ${n} missing ${cardsWord} as not in the box? They go to the print batch and will be printed.`)) return;
+    void notInBox(list, `${n} ${cardsWord} marked not in the box; they go to the print batch.`);
+  }
+
+  /**
+   * Owner: the box has a card that is marked To print. Writes the In-box Printing from the scanned
+   * Printing when one can be found, else from the Wanted Printing.
+   */
+  async function boxHasToPrint(f: ToPrintResult) {
+    if (!store) return;
+    const card = byOracle.get(f.card.oracle_id);
+    if (!card) return;
+    if (cardStates.status !== 'ready') {
+      setRowError('The shared card state has not loaded yet. Try again in a moment.');
+      return;
+    }
+    setRowError(null);
+    let in_box: InBoxState;
+    try {
+      in_box = await inBoxForToPrint(f.rows, card.wanted, {
+        bySetNumber: (set, number) => lookupPrinting(set, number, known),
+        byId: (id) => lookupById(id, known),
+      });
+    } catch (e) {
+      console.warn('Box has this failed', e);
+      setRowError(`Could not look up the scanned printing of ${card.name} (no connection?). Try again.`);
+      return;
+    }
+    const b = in_box;
+    await save(
+      () => store.updateCard(card.oracle_id, { kind: 'in_box', in_box: b }),
+      `${card.name} is in the box as ${b.set.toUpperCase()} ${b.collector_number}; it leaves the print batch.`,
+    );
+  }
+
   function removePile(id: string) {
     const index = session.piles.findIndex((p) => p.id === id);
     const pile = session.piles[index];
@@ -278,6 +339,7 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
   const tabs: { id: Tab; label: string; count: number }[] = [
     { id: 'missing', label: 'Missing', count: t.missing },
     { id: 'unexpected', label: 'Unexpected', count: t.unexpected },
+    { id: 'to-print', label: 'Found, to print', count: t.foundToPrint },
     { id: 'different-art', label: 'Different art', count: t.differentArt },
     { id: 'duplicates', label: 'Duplicates', count: t.duplicates },
     { id: 'other-set', label: 'Other set', count: t.sameArtOtherSet },
@@ -304,6 +366,13 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
   // Scryfall is still being asked: the art tabs are not final yet.
   const checking = progress !== null && progress.done < progress.total;
   const artEmpty = (text: string) => (checking ? 'Checking art…' : text);
+
+  const canWrite = auth.isOwner && !!store;
+  // Only List cards can go to the print batch; a missing card that is To pull is not offered.
+  const onList = (c: Pick<ExpectedCard, 'oracle_id'>) => byOracle.get(c.oracle_id)?.in_list === true;
+  const unresolvedMissing = notInBoxCandidates(diff.missing, (id) => onList({ oracle_id: id }), session.resolved);
+  // Owner writes wait for the shared card state, the way CardActions does.
+  const statesReady = cardStates.status === 'ready';
 
   const imageOf = (c: ExpectedCard) => byOracle.get(c.oracle_id)?.in_box?.image_small ?? c.in_box.image_small;
 
@@ -430,6 +499,7 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
             <Total label="Scanned names" value={t.scannedUniqueNames} />
             <Total label="Missing" value={t.missing} warn />
             <Total label="Unexpected" value={t.unexpected} warn />
+            <Total label="Found, to print" value={t.foundToPrint} warn />
             <Total label="Duplicates" value={t.duplicates} warn />
             <Total label="Different art" value={t.differentArt} warn />
             <Total label="Unknown art" value={t.unknown} />
@@ -463,20 +533,60 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
 
           <div role="tabpanel" id="scan-panel" aria-labelledby={`scan-tab-${tab}`} tabIndex={0}>
             <p className="muted">{TAB_HINT[tab]}</p>
+            {canWrite && !statesReady && (tab === 'missing' || tab === 'to-print') && (
+              <p className="muted">Changes wait until the shared card state has loaded.</p>
+            )}
+            {rowError && (tab === 'missing' || tab === 'to-print') && (
+              <p className="status error" role="alert">{rowError}</p>
+            )}
             {tab === 'missing' && (
-              <ItemList empty="Nothing missing.">
-                {diff.missing.map((c) => (
-                  <Item key={c.oracle_id} k={`missing:${c.oracle_id}`} session={session} toggle={toggle}>
-                    <Thumb src={imageOf(c)} />
-                    <ItemText card={c} note={`In-box ${c.in_box.set.toUpperCase()} ${c.in_box.collector_number}`} />
-                  </Item>
-                ))}
-              </ItemList>
+              <>
+                {canWrite && unresolvedMissing.length > 0 && (
+                  <div className="actions">
+                    <button type="button" onClick={() => markMissingNotInBox(unresolvedMissing)} disabled={!statesReady}>
+                      Mark {unresolvedMissing.length} unresolved missing {unresolvedMissing.length === 1 ? 'card' : 'cards'} as not in the box
+                    </button>
+                  </div>
+                )}
+                <ItemList empty="Nothing missing.">
+                  {diff.missing.map((c) => (
+                    <Item key={c.oracle_id} k={`missing:${c.oracle_id}`} session={session} toggle={toggle}>
+                      <Thumb src={imageOf(c)} />
+                      <ItemText card={c} note={`In-box ${c.in_box.set.toUpperCase()} ${c.in_box.collector_number}`} />
+                      {canWrite && onList(c) && (
+                        <button
+                          type="button"
+                          className="link"
+                          disabled={!statesReady}
+                          onClick={() => void notInBox([c], `${c.name} marked not in the box; it goes to the print batch.`)}
+                        >
+                          Not in the box
+                        </button>
+                      )}
+                    </Item>
+                  ))}
+                </ItemList>
+              </>
             )}
             {tab === 'unexpected' && (
               <ItemList empty="Nothing unexpected.">
                 {diff.unexpected.map((u) => (
                   <UnexpectedItem key={u.name} u={u} session={session} toggle={toggle} />
+                ))}
+              </ItemList>
+            )}
+            {tab === 'to-print' && (
+              <ItemList empty="No card marked To print was scanned.">
+                {diff.foundToPrint.map((f) => (
+                  <ToPrintItem
+                    key={f.card.oracle_id}
+                    f={f}
+                    image={byOracle.get(f.card.oracle_id)?.wanted.image_small}
+                    session={session}
+                    toggle={toggle}
+                    onBoxHasThis={canWrite ? () => void boxHasToPrint(f) : undefined}
+                    disabled={!statesReady}
+                  />
                 ))}
               </ItemList>
             )}
@@ -657,6 +767,44 @@ function UnexpectedItem({
           {where && ` · ${where}`} · not on the List
         </span>
       </span>
+    </Item>
+  );
+}
+
+function ToPrintItem({
+  f,
+  image,
+  session,
+  toggle,
+  onBoxHasThis,
+  disabled = false,
+}: {
+  f: ToPrintResult;
+  image: string | undefined;
+  session: ScanSession;
+  toggle: (k: string) => void;
+  onBoxHasThis?: () => void;
+  disabled?: boolean;
+}) {
+  const p = f.rows.find((r) => r.printing)?.printing ?? null;
+  const seen = scannedPrintings(f.rows);
+  return (
+    <Item k={`to-print:${f.card.oracle_id}`} session={session} toggle={toggle}>
+      <Thumb src={p?.image_small ?? image} />
+      <span className="row-text">
+        <a className="row-name" href={`#/cube/${encodeURIComponent(f.card.oracle_id)}`}>
+          {f.card.name}
+        </a>
+        <span className="muted num">
+          {f.count > 1 ? `${f.count} scanned` : '1 scanned'}
+          {seen.length > 0 && ` · ${seen.join(', ')}`} · marked To print
+        </span>
+      </span>
+      {onBoxHasThis && (
+        <button type="button" className="link" onClick={onBoxHasThis} disabled={disabled}>
+          Box has this
+        </button>
+      )}
     </Item>
   );
 }

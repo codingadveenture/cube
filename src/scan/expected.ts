@@ -1,7 +1,7 @@
 // Turn a Card into the ExpectedCard the Scan diff matches against. A Scan expects every card that
 // is physically in the box: on the List, or waiting to be pulled.
 import type { Card, InBoxPrinting, PrintingBase } from '../types';
-import type { ExpectedCard } from './diff';
+import type { ExpectedCard, ToPrintCard } from './diff';
 
 function keysOf(p: PrintingBase): string[] {
   return [p.scryfall_id.toLowerCase(), `${p.set.toLowerCase()}/${p.collector_number.toLowerCase()}`];
@@ -31,4 +31,20 @@ export function toExpectedCard(card: Card & { in_box: InBoxPrinting }): Expected
 /** The cards a Scan expects: exactly the cards with an In-box Printing. */
 export function expectedCards(cards: Card[]): ExpectedCard[] {
   return cards.filter((c): c is Card & { in_box: InBoxPrinting } => c.in_box !== null).map(toExpectedCard);
+}
+
+/**
+ * The List cards that are not in the box (To print). The Scan does not expect them, but a scanned
+ * row that matches one is shown as found rather than unexpected.
+ */
+export function toPrintCards(cards: Card[]): ToPrintCard[] {
+  return cards
+    .filter((c) => c.in_list && c.in_box === null)
+    .map((c) => ({
+      name: c.name,
+      front_name: c.front_name,
+      oracle_id: c.oracle_id,
+      aliases: c.wanted.name && c.wanted.name !== c.name ? [c.wanted.name] : [],
+      printing_keys: keysOf(c.wanted),
+    }));
 }

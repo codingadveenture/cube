@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { diffScan, printingKey, scannedPrintings, type ExpectedCard, type ResolvedPrinting } from './diff';
+import { diffScan, printingKey, scannedPrintings, type ExpectedCard, type ResolvedPrinting, type ToPrintCard } from './diff';
 import type { ScannedRow } from './parse';
 
 function card(name: string, ill: string, set = 'lea', num = '1', front = name.split(' // ')[0]!): ExpectedCard {
@@ -138,6 +138,7 @@ describe('totals', () => {
       scannedUniqueNames: 5,
       missing: 1,
       unexpected: 1,
+      foundToPrint: 0,
       duplicates: 1,
       differentArt: 1,
       sameArtOtherSet: 1,
@@ -149,5 +150,45 @@ describe('totals', () => {
     const d = diffScan(EXPECTED, []);
     expect(d.totals.missing).toBe(5);
     expect(d.totals.scannedRows).toBe(0);
+  });
+});
+
+describe('found, but marked To print', () => {
+  const TO_PRINT: ToPrintCard[] = [
+    { name: 'Goblin Guide', front_name: 'Goblin Guide', oracle_id: 'oracle-guide', printing_keys: ['zen/126', 'guide-id'] },
+    { name: 'Ponder', front_name: 'Ponder', oracle_id: 'oracle-ponder', aliases: ['Ponder Alias'] },
+  ];
+
+  it('puts a row matching a To print card in foundToPrint, not in unexpected', () => {
+    const d = diffScan(EXPECTED, [row('Goblin Guide', 2), row('Goblin Guide')], new Map(), TO_PRINT);
+    expect(d.unexpected).toEqual([]);
+    expect(d.foundToPrint).toHaveLength(1);
+    expect(d.foundToPrint[0]!.card.oracle_id).toBe('oracle-guide');
+    expect(d.foundToPrint[0]!.count).toBe(3);
+    expect(d.foundToPrint[0]!.rows).toHaveLength(2);
+    expect(d.totals.foundToPrint).toBe(1);
+    expect(d.totals.unexpected).toBe(0);
+  });
+
+  it('matches a To print card by alias and by the printing key of its Wanted Printing', () => {
+    const byKey: ScannedRow = { ...row('Some Other Name'), set: 'ZEN', collector_number: '126' };
+    const d = diffScan(EXPECTED, [byKey, row('Ponder Alias'), row('Unknown', 1, 'guide-id')], new Map(), TO_PRINT);
+    expect(d.unexpected).toEqual([]);
+    expect(d.foundToPrint.map((f) => [f.card.oracle_id, f.count])).toEqual([
+      ['oracle-guide', 2],
+      ['oracle-ponder', 1],
+    ]);
+  });
+
+  it('still puts a row matching an expected card in found', () => {
+    const d = diffScan(EXPECTED, [row('Lightning Bolt')], new Map(), TO_PRINT);
+    expect(d.foundToPrint).toEqual([]);
+    expect(d.present.map((r) => r.card.name)).toEqual(['Lightning Bolt']);
+  });
+
+  it('keeps a row that matches nothing in unexpected', () => {
+    const d = diffScan(EXPECTED, [row('Tarmogoyf')], new Map(), TO_PRINT);
+    expect(d.foundToPrint).toEqual([]);
+    expect(d.unexpected.map((u) => u.name)).toEqual(['Tarmogoyf']);
   });
 });

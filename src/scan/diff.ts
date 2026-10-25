@@ -31,6 +31,19 @@ export interface ExpectedCard {
   printing_keys?: string[];
 }
 
+/** A List card that is not in the box (To print). A scanned row that matches one is not unexpected. */
+export interface ToPrintCard {
+  name: string;
+  front_name: string;
+  oracle_id: string;
+  aliases?: string[];
+  /** printingKey values of the Wanted Printing. */
+  printing_keys?: string[];
+}
+
+/** The names and Printings a card may be scanned under. */
+type Matchable = Pick<ExpectedCard, 'name' | 'front_name' | 'aliases' | 'printing_keys'>;
+
 export type ArtVerdict = 'match' | 'same-art-other-set' | 'different-art' | 'unknown';
 
 export interface ScannedRowWithPrinting extends ScannedRow {
@@ -52,12 +65,20 @@ export interface UnexpectedResult {
   rows: ScannedRowWithPrinting[];
 }
 
+/** Rows of a List card marked To print that the scan found anyway. */
+export interface ToPrintResult {
+  card: ToPrintCard;
+  count: number;
+  rows: ScannedRowWithPrinting[];
+}
+
 export interface DiffTotals {
   expected: number;
   scannedRows: number;
   scannedUniqueNames: number;
   missing: number;
   unexpected: number;
+  foundToPrint: number;
   duplicates: number;
   differentArt: number;
   sameArtOtherSet: number;
@@ -67,6 +88,7 @@ export interface DiffTotals {
 export interface Diff {
   missing: ExpectedCard[];
   unexpected: UnexpectedResult[];
+  foundToPrint: ToPrintResult[];
   duplicates: CardResult[];
   present: CardResult[];
   totals: DiffTotals;
@@ -123,8 +145,8 @@ export function scannedPrintings(rows: ScannedRowWithPrinting[]): string[] {
 }
 
 /** Index the expected cards by every name they may be scanned under. */
-export function buildNameIndex(expected: ExpectedCard[]): Map<string, ExpectedCard> {
-  const index = new Map<string, ExpectedCard>();
+export function buildNameIndex<T extends Matchable>(expected: T[]): Map<string, T> {
+  const index = new Map<string, T>();
   for (const card of expected) {
     for (const n of [card.name, card.front_name, ...(card.aliases ?? [])]) {
       const key = normalizeName(n);
@@ -135,8 +157,8 @@ export function buildNameIndex(expected: ExpectedCard[]): Map<string, ExpectedCa
 }
 
 /** Index the expected cards by the printingKey of their In-box and Wanted Printings. */
-export function buildPrintingIndex(expected: ExpectedCard[]): Map<string, ExpectedCard> {
-  const index = new Map<string, ExpectedCard>();
+export function buildPrintingIndex<T extends Matchable>(expected: T[]): Map<string, T> {
+  const index = new Map<string, T>();
   for (const card of expected) {
     for (const k of card.printing_keys ?? []) {
       const key = k.toLowerCase();
@@ -149,15 +171,21 @@ export function buildPrintingIndex(expected: ExpectedCard[]): Map<string, Expect
 /**
  * Compare the expected cards with the scanned rows of all piles.
  * Quantities are summed per card. `printings` maps printingKey(row) to the resolved Printing.
+ * `toPrint`: List cards not in the box; a row that matches no expected card but one of these goes
+ * to foundToPrint instead of unexpected.
  */
 export function diffScan(
   expected: ExpectedCard[],
   rows: ScannedRow[],
   printings: ReadonlyMap<string, ResolvedPrinting> = new Map(),
+  toPrint: ToPrintCard[] = [],
 ): Diff {
   const index = buildNameIndex(expected);
   const byPrinting = buildPrintingIndex(expected);
+  const toPrintIndex = buildNameIndex(toPrint);
+  const toPrintByPrinting = buildPrintingIndex(toPrint);
   const byCard = new Map<string, ScannedRowWithPrinting[]>();
+  const byToPrint = new Map<string, ToPrintResult>();
   const unexpected = new Map<string, UnexpectedResult>();
   const uniqueNames = new Set<string>();
 
@@ -174,6 +202,14 @@ export function diffScan(
       const list = byCard.get(card.oracle_id) ?? [];
       list.push(withPrinting);
       byCard.set(card.oracle_id, list);
+      continue;
+    }
+    const later = toPrintIndex.get(key) ?? (k ? toPrintByPrinting.get(k) : undefined);
+    if (later) {
+      const f = byToPrint.get(later.oracle_id) ?? { card: later, count: 0, rows: [] };
+      f.count += row.quantity;
+      f.rows.push(withPrinting);
+      byToPrint.set(later.oracle_id, f);
     } else {
       const u = unexpected.get(key) ?? { name: row.name, count: 0, rows: [] };
       u.count += row.quantity;
@@ -198,9 +234,11 @@ export function diffScan(
   }
 
   const withArt = [...present, ...duplicates];
+  const foundToPrint = toPrint.flatMap((c) => byToPrint.get(c.oracle_id) ?? []);
   return {
     missing,
     unexpected: [...unexpected.values()],
+    foundToPrint,
     duplicates,
     present,
     totals: {
@@ -209,6 +247,7 @@ export function diffScan(
       scannedUniqueNames: uniqueNames.size,
       missing: missing.length,
       unexpected: unexpected.size,
+      foundToPrint: foundToPrint.length,
       duplicates: duplicates.length,
       differentArt: withArt.filter((r) => r.verdict === 'different-art').length,
       sameArtOtherSet: withArt.filter((r) => r.verdict === 'same-art-other-set').length,

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import type { CardsFile } from '../types';
 import { diffScan } from './diff';
-import { expectedCards } from './expected';
+import { expectedCards, toPrintCards } from './expected';
 import { parseScanText } from './parse';
 import { knownPrintings } from './resolve';
 
@@ -78,5 +78,16 @@ describe('what a Scan expects', () => {
     expect(ids.has(a!.oracle_id)).toBe(true);
     expect(ids.has(b!.oracle_id)).toBe(false);
     expect(ids.has(c!.oracle_id)).toBe(false);
+  });
+});
+
+describe('the List cards a Scan treats as To print', () => {
+  it('is exactly the List cards without an In-box Printing, keyed by the Wanted Printing', () => {
+    const [a, b, c] = cardsFile.cards;
+    const changed = [{ ...a!, in_box: null }, { ...b!, in_box: null, in_list: false }, c!];
+    const out = toPrintCards(changed);
+    expect(out.map((t) => t.oracle_id)).toEqual([a!.oracle_id]);
+    expect(out[0]!.printing_keys).toContain(a!.wanted.scryfall_id.toLowerCase());
+    expect(out[0]!.printing_keys).toContain(`${a!.wanted.set.toLowerCase()}/${a!.wanted.collector_number.toLowerCase()}`);
   });
 });

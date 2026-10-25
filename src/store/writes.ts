@@ -54,6 +54,9 @@ export function cardPatchWrite(patch: CardPatch, now: string): CardWrite {
         },
         unionFlags: null,
       };
+    case 'not_in_box':
+      // Not a pull: retired_printing and retired_at stay as they are.
+      return { fields: { in_box: null, updatedAt: now }, unionFlags: null };
   }
 }
 
