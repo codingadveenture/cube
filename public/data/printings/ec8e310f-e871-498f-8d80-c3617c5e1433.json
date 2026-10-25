@@ -1,0 +1,8 @@
+{
+ "name": "Absorbing Man",
+ "oracle_id": "ec8e310f-e871-498f-8d80-c3617c5e1433",
+ "printings": [
+  {"id":"35d772a2-717d-4b82-a267-52efed584ae9","set":"msh","set_name":"Marvel Super Heroes","set_type":"expansion","collector_number":"416","released_at":"2026-06-26","frame":"2015","frame_effects":["legendary","extendedart"],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":["universesbeyond"],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"77111756-cb72-405d-8151-fef63544b3b3","artist":"Nathaniel Himawan","image_normal":"https://cards.scryfall.io/normal/front/3/5/35d772a2-717d-4b82-a267-52efed584ae9.jpg?1783902830","back_image_normal":null,"back_illustration_id":null,"security_stamp":"oval","reprint":false,"variation":false,"booster":false,"digital":false,"games":["paper","mtgo"]},
+  {"id":"7114ef87-53ff-43e9-864c-9faa455d86ef","set":"msh","set_name":"Marvel Super Heroes","set_type":"expansion","collector_number":"199","released_at":"2026-06-26","frame":"2015","frame_effects":["legendary"],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":["universesbeyond"],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"77111756-cb72-405d-8151-fef63544b3b3","artist":"Nathaniel Himawan","image_normal":"https://cards.scryfall.io/normal/front/7/1/7114ef87-53ff-43e9-864c-9faa455d86ef.jpg?1783902907","back_image_normal":null,"back_illustration_id":null,"security_stamp":"oval","reprint":false,"variation":false,"booster":false,"digital":false,"games":["paper","mtgo","arena"]}
+ ]
+}

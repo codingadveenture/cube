@@ -1,0 +1,8 @@
+{
+ "name": "Iron Man Armor",
+ "oracle_id": "958d81c2-ca09-4275-890e-3bb595317325",
+ "printings": [
+  {"id":"cb2f6737-8063-4e67-affc-42c4915d2db1","set":"msh","set_name":"Marvel Super Heroes","set_type":"expansion","collector_number":"427","released_at":"2026-06-26","frame":"2015","frame_effects":["extendedart"],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":["universesbeyond"],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"60e142e8-fca4-4f31-a590-88e4477206f2","artist":"Javier Charro","image_normal":"https://cards.scryfall.io/normal/front/c/b/cb2f6737-8063-4e67-affc-42c4915d2db1.jpg?1783902830","back_image_normal":null,"back_illustration_id":null,"security_stamp":"oval","reprint":false,"variation":false,"booster":false,"digital":false,"games":["paper","mtgo"]},
+  {"id":"361c2f3b-f04e-446b-a683-9195e238daf0","set":"msh","set_name":"Marvel Super Heroes","set_type":"expansion","collector_number":"248","released_at":"2026-06-26","frame":"2015","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":["universesbeyond"],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"60e142e8-fca4-4f31-a590-88e4477206f2","artist":"Javier Charro","image_normal":"https://cards.scryfall.io/normal/front/3/6/361c2f3b-f04e-446b-a683-9195e238daf0.jpg?1783902891","back_image_normal":null,"back_illustration_id":null,"security_stamp":"oval","reprint":false,"variation":false,"booster":false,"digital":false,"games":["paper","mtgo","arena"]}
+ ]
+}

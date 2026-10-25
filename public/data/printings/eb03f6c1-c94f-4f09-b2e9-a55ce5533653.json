@@ -1,0 +1,8 @@
+{
+ "name": "Marwyn, the Preserver",
+ "oracle_id": "eb03f6c1-c94f-4f09-b2e9-a55ce5533653",
+ "printings": [
+  {"id":"447c324a-1e66-44fc-9d6e-5e1bbbd7cc03","set":"fra","set_name":"Reality Fracture","set_type":"expansion","collector_number":"315","released_at":"2026-10-02","frame":"2015","frame_effects":["legendary","inverted"],"border_color":"borderless","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"9609755e-e91e-484f-b607-1c60e68b7462","artist":"Jessica Liu","image_normal":"https://cards.scryfall.io/normal/front/4/4/447c324a-1e66-44fc-9d6e-5e1bbbd7cc03.jpg?1790135712","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":false,"variation":false,"booster":false,"digital":false,"games":["paper","mtgo"]},
+  {"id":"90f33f99-7bc5-42e1-815e-bfb4c2b74107","set":"fra","set_name":"Reality Fracture","set_type":"expansion","collector_number":"263","released_at":"2026-10-02","frame":"2015","frame_effects":["legendary"],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"a72f9046-50c7-46f4-a8ab-64315af257a3","artist":"Quintin Gleim","image_normal":"https://cards.scryfall.io/normal/front/9/0/90f33f99-7bc5-42e1-815e-bfb4c2b74107.jpg?1789644564","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":false,"variation":false,"booster":false,"digital":false,"games":["paper","mtgo","arena"]}
+ ]
+}

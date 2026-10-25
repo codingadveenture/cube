@@ -1,0 +1,8 @@
+{
+ "name": "Scrapwork Mutt",
+ "oracle_id": "5906b378-c7a7-44fd-a63b-55a347d97854",
+ "printings": [
+  {"id":"2d78d844-72e8-481b-a700-f92571b2d347","set":"plst","set_name":"The List","set_type":"masters","collector_number":"BRO-164","released_at":"2024-08-02","frame":"2015","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil"],"highres":true,"illustration_id":"8248abd7-51cc-421e-9a77-0b9fc90f78c6","artist":"Sidharth Chaturvedi","image_normal":"https://cards.scryfall.io/normal/front/2/d/2d78d844-72e8-481b-a700-f92571b2d347.jpg?1783910108","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":true,"variation":false,"booster":true,"digital":false,"games":["paper"]},
+  {"id":"4742800a-4872-4c2d-b884-01e0ba16950c","set":"bro","set_name":"The Brothers' War","set_type":"expansion","collector_number":"164","released_at":"2022-11-18","frame":"2015","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"8248abd7-51cc-421e-9a77-0b9fc90f78c6","artist":"Sidharth Chaturvedi","image_normal":"https://cards.scryfall.io/normal/front/4/7/4742800a-4872-4c2d-b884-01e0ba16950c.jpg?1783920056","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":false,"variation":false,"booster":true,"digital":false,"games":["paper","arena","mtgo"]}
+ ]
+}

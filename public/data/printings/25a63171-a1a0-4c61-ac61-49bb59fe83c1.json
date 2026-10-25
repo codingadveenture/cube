@@ -1,0 +1,7 @@
+{
+ "name": "Thought-Stalker Warlock",
+ "oracle_id": "25a63171-a1a0-4c61-ac61-49bb59fe83c1",
+ "printings": [
+  {"id":"42e80284-d489-493b-ae92-95b742d07cb3","set":"blb","set_name":"Bloomburrow","set_type":"expansion","collector_number":"118","released_at":"2024-08-02","frame":"2015","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"8ed50b7a-c441-47b8-88a6-ce0c66dc6f81","artist":"Daniel Ljunggren","image_normal":"https://cards.scryfall.io/normal/front/4/2/42e80284-d489-493b-ae92-95b742d07cb3.jpg?1783910826","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":false,"variation":false,"booster":true,"digital":false,"games":["paper","mtgo","arena"]}
+ ]
+}

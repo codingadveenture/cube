@@ -1,0 +1,8 @@
+{
+ "name": "Sear",
+ "oracle_id": "23b11fdc-61b5-4f5e-ad80-f81b729fc91d",
+ "printings": [
+  {"id":"0a13f8e0-8b23-4553-ad76-9e52f8d4c63c","set":"ecl","set_name":"Lorwyn Eclipsed","set_type":"expansion","collector_number":"405","released_at":"2026-01-23","frame":"2015","frame_effects":["inverted"],"border_color":"black","full_art":false,"textless":false,"promo":true,"promo_types":["promopack"],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"180381de-305e-441b-b60d-01b3d87ee4c4","artist":"Lars Grant-West","image_normal":"https://cards.scryfall.io/normal/front/0/a/0a13f8e0-8b23-4553-ad76-9e52f8d4c63c.jpg?1783904345","back_image_normal":null,"back_illustration_id":null,"security_stamp":"oval","reprint":false,"variation":false,"booster":false,"digital":false,"games":["paper","mtgo"]},
+  {"id":"aeb4612c-758b-4492-ba03-eb6741b4176e","set":"ecl","set_name":"Lorwyn Eclipsed","set_type":"expansion","collector_number":"154","released_at":"2026-01-23","frame":"2015","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"180381de-305e-441b-b60d-01b3d87ee4c4","artist":"Lars Grant-West","image_normal":"https://cards.scryfall.io/normal/front/a/e/aeb4612c-758b-4492-ba03-eb6741b4176e.jpg?1783904441","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":false,"variation":false,"booster":true,"digital":false,"games":["paper","arena","mtgo"]}
+ ]
+}

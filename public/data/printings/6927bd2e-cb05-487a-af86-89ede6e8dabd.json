@@ -1,0 +1,8 @@
+{
+ "name": "Wan Shi Tong, All-Knowing",
+ "oracle_id": "6927bd2e-cb05-487a-af86-89ede6e8dabd",
+ "printings": [
+  {"id":"a071a829-b3dc-4229-9b09-0e96bd7a40dd","set":"tle","set_name":"Avatar: The Last Airbender Eternal","set_type":"eternal","collector_number":"182","released_at":"2025-11-21","frame":"2015","frame_effects":["legendary","extendedart"],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":["universesbeyond","boosterfun"],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"7ee7c76b-308b-4461-bcf4-07d9a6163c0b","artist":"Axel Sauerwald","image_normal":"https://cards.scryfall.io/normal/front/a/0/a071a829-b3dc-4229-9b09-0e96bd7a40dd.jpg?1783904798","back_image_normal":null,"back_illustration_id":null,"security_stamp":"oval","reprint":false,"variation":false,"booster":false,"digital":false,"games":["paper","mtgo"]},
+  {"id":"777fcc21-2856-4181-8ecd-c272f9769e36","set":"tle","set_name":"Avatar: The Last Airbender Eternal","set_type":"eternal","collector_number":"98","released_at":"2025-11-21","frame":"2015","frame_effects":["legendary"],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":["universesbeyond"],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"7ee7c76b-308b-4461-bcf4-07d9a6163c0b","artist":"Axel Sauerwald","image_normal":"https://cards.scryfall.io/normal/front/7/7/777fcc21-2856-4181-8ecd-c272f9769e36.jpg?1783904828","back_image_normal":null,"back_illustration_id":null,"security_stamp":"oval","reprint":false,"variation":false,"booster":false,"digital":false,"games":["paper","arena","mtgo"]}
+ ]
+}

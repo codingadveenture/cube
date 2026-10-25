@@ -1,0 +1,7 @@
+{
+ "name": "The Wondrous Wasp",
+ "oracle_id": "5ad8963b-8091-4787-9147-20a1fe7bf0fb",
+ "printings": [
+  {"id":"484e80a4-1d5f-4c27-98a8-ee2ef9d6cbdc","set":"msh","set_name":"Marvel Super Heroes","set_type":"expansion","collector_number":"84","released_at":"2026-06-26","frame":"2015","frame_effects":["legendary"],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":["universesbeyond"],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"a948e450-fa65-4fe9-8d74-d9040ee580b2","artist":"Gal Or","image_normal":"https://cards.scryfall.io/normal/front/4/8/484e80a4-1d5f-4c27-98a8-ee2ef9d6cbdc.jpg?1783902947","back_image_normal":null,"back_illustration_id":null,"security_stamp":"oval","reprint":false,"variation":false,"booster":false,"digital":false,"games":["paper","mtgo","arena"]}
+ ]
+}

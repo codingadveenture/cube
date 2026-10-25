@@ -1,0 +1,8 @@
+{
+ "name": "Phyrexian Dragon Engine",
+ "oracle_id": "022b42a6-ee0f-4080-b973-c1b68938c3be",
+ "printings": [
+  {"id":"534b042b-1b86-4fc9-be3c-0d0f8c46d881","set":"pbro","set_name":"The Brothers' War Promos","set_type":"promo","collector_number":"163s","released_at":"2022-11-18","frame":"2015","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":true,"promo_types":["prerelease","datestamped"],"finishes":["foil"],"highres":true,"illustration_id":"4cbe85d3-4b24-4fb3-9f3f-4028ff07d01b","artist":"Chris Rahn","image_normal":"https://cards.scryfall.io/normal/front/5/3/534b042b-1b86-4fc9-be3c-0d0f8c46d881.jpg?1783919838","back_image_normal":null,"back_illustration_id":null,"security_stamp":"oval","reprint":true,"variation":false,"booster":false,"digital":false,"games":["paper"]},
+  {"id":"e2b826be-4256-4fd6-ad4d-6c80933ee940","set":"bro","set_name":"The Brothers' War","set_type":"expansion","collector_number":"163","released_at":"2022-11-18","frame":"2015","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"4cbe85d3-4b24-4fb3-9f3f-4028ff07d01b","artist":"Chris Rahn","image_normal":"https://cards.scryfall.io/normal/front/e/2/e2b826be-4256-4fd6-ad4d-6c80933ee940.jpg?1783920055","back_image_normal":null,"back_illustration_id":null,"security_stamp":"oval","reprint":false,"variation":false,"booster":true,"digital":false,"games":["paper","mtgo","arena"]}
+ ]
+}

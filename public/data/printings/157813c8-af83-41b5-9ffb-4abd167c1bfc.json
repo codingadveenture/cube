@@ -1,0 +1,7 @@
+{
+ "name": "Firestorm",
+ "oracle_id": "157813c8-af83-41b5-9ffb-4abd167c1bfc",
+ "printings": [
+  {"id":"e674aa8a-668a-4345-95ee-73a0b87bbcb1","set":"wth","set_name":"Weatherlight","set_type":"expansion","collector_number":"101","released_at":"1997-06-09","frame":"1997","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil"],"highres":true,"illustration_id":"fcc28533-aa6f-4a06-b25a-dfad07ceb385","artist":"Jeff Miracola","image_normal":"https://cards.scryfall.io/normal/front/e/6/e674aa8a-668a-4345-95ee-73a0b87bbcb1.jpg?1783946726","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":false,"variation":false,"booster":true,"digital":false,"games":["paper","mtgo"]}
+ ]
+}

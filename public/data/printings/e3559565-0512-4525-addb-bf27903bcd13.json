@@ -1,0 +1,7 @@
+{
+ "name": "Night Nurse, Healer of Heroes",
+ "oracle_id": "e3559565-0512-4525-addb-bf27903bcd13",
+ "printings": [
+  {"id":"3199907b-9f24-4554-942a-8ab5a7701717","set":"msh","set_name":"Marvel Super Heroes","set_type":"expansion","collector_number":"26","released_at":"2026-06-26","frame":"2015","frame_effects":["legendary"],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":["universesbeyond"],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"70376890-7d43-40dc-af25-a7aceb18402b","artist":"Gal Or","image_normal":"https://cards.scryfall.io/normal/front/3/1/3199907b-9f24-4554-942a-8ab5a7701717.jpg?1783902972","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":false,"variation":false,"booster":false,"digital":false,"games":["paper","mtgo","arena"]}
+ ]
+}

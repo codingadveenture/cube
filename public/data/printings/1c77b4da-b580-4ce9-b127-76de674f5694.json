@@ -1,0 +1,8 @@
+{
+ "name": "Iron-Shield Elf",
+ "oracle_id": "1c77b4da-b580-4ce9-b127-76de674f5694",
+ "printings": [
+  {"id":"3d47b1f2-da4a-42c4-992e-e0bfdd1a3e2a","set":"ecl","set_name":"Lorwyn Eclipsed","set_type":"expansion","collector_number":"404","released_at":"2026-01-23","frame":"2015","frame_effects":["inverted"],"border_color":"black","full_art":false,"textless":false,"promo":true,"promo_types":["promopack"],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"d209c798-d103-43b4-b0dc-f8eeed33746b","artist":"Adrián Rodríguez Pérez","image_normal":"https://cards.scryfall.io/normal/front/3/d/3d47b1f2-da4a-42c4-992e-e0bfdd1a3e2a.jpg?1783904345","back_image_normal":null,"back_illustration_id":null,"security_stamp":"oval","reprint":false,"variation":false,"booster":false,"digital":false,"games":["paper","mtgo"]},
+  {"id":"9e0140b2-0185-4adb-b365-2611ce89a0e2","set":"ecl","set_name":"Lorwyn Eclipsed","set_type":"expansion","collector_number":"108","released_at":"2026-01-23","frame":"2015","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"d209c798-d103-43b4-b0dc-f8eeed33746b","artist":"Adrián Rodríguez Pérez","image_normal":"https://cards.scryfall.io/normal/front/9/e/9e0140b2-0185-4adb-b365-2611ce89a0e2.jpg?1783904461","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":false,"variation":false,"booster":true,"digital":false,"games":["paper","arena","mtgo"]}
+ ]
+}

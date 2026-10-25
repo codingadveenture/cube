@@ -1,0 +1,203 @@
+# Cards that may be in the box or in the next Update but are not on the List: the 102 Out cards of the
+# last sheet update plus the MTGO Vintage Cube names the List lacks (2026-10-25). One name per line.
+Aang's Iceberg
+Absorbing Man
+Agatha's Soul Cauldron
+Arc Trail
+Archangel Elspeth
+Armageddon
+Ashen Rider
+Assimilation Aegis
+Avatar of Burgeoning Echoes
+Bala Ged Recovery
+Balustrade Wurm
+Batroc the Leaper
+Batterskull
+Beza, the Bounding Spring
+Bilbo, Thief in the Night
+Birgi, God of Storytelling
+Bitter Reunion
+Black Widow, Super Spy
+Bloodchief's Thirst
+Bonecrusher Giant
+Boomerang Basics
+Brightglass Gearhulk
+Bristlebud Farmer
+Carnivorous Cultivator
+Chainsaw
+Chrome Host Seedshark
+Clarion Conqueror
+Cloak and Dagger, Entwined
+Court of Garenbrig
+Crabomination
+Craterhoof Behemoth
+Crop Rotation
+Cryptic Command
+Damn
+Damnation
+Dark Depths
+Dead // Gone
+Delayed Blast Fireball
+Detective's Phoenix
+Devoted Druid
+Dragonhawk, Fate's Tempest
+Dryad of the Ilysian Grove
+Eladamri, Korvecdal
+Elder Gargaroth
+Elves of Deep Shadow
+Elvish Reclaimer
+Emeritus of Abundance
+Emeritus of Ideation
+Emry, Lurker of the Loch
+Engineered Explosives
+Ephemerate
+Erode
+Escape to the Wilds
+Eshki Dragonclaw
+Esper Sentinel
+Evolved Sleeper
+Exhume
+Fabled Passage
+Fell
+Figure of Fable
+Firestorm
+Flashback
+Floodfarm Verge
+Force of Vigor
+Formidable Speaker
+Gandalf, Goblins' Bane
+Garruk Wildspeaker
+Garruk, Curse Breaker
+Gau, Feral Youth
+Ginger, Queen of Sweets
+Gix's Command
+Gloomlake Verge
+Goblin Bombardment
+Goblin Engineer
+Goblin Welder
+Goldspan Dragon
+Golos, Tireless Pilgrim
+Grave Titan
+Greasewrench Goblin
+Grindstone
+Gruff Triplets
+Guardian Scalelord
+Gush
+Harvester of Misery
+Herd Heirloom
+Horizon Canopy
+Hushwood Verge
+Impractical Joke
+Inevitable Defeat
+Insidious Fungus
+Iron Man Armor
+Iron-Shield Elf
+Jennifer Walters
+Kinnan, Bonder Prodigy
+Kiora, the Rising Tide
+Knight of the Reliquary
+Lava Dart
+Ledger Shredder
+Legion Extruder
+Lim-Dûl's Vault
+Magmatic Hellkite
+Mana Tithe
+Marang River Regent
+Marwyn, the Preserver
+Mishra's Research Desk
+Mole Man, Moloid Master
+Monastery Swiftspear
+Moonshadow
+Multiversal Passage
+Mutagenic Growth
+Mystic Forge
+Nethergoyf
+Night Nurse, Healer of Heroes
+Nissa, Ascended Animist
+Okoye, Mighty and Adored
+Omnath, Locus of Creation
+Ouroboroid
+Overlord of the Balemurk
+Overlord of the Mistmoors
+Painter's Servant
+Phyrexian Dragon Engine
+Pick Your Poison
+Piggy Bank
+Pompous Battlemage
+Portable Hole
+Pre-War Formalwear
+Proft's Eidetic Memory
+Quirion Ranger
+Rakshasa's Bargain
+Rampaging Raptor
+Rampart Architect
+Recurring Nightmare
+Restless Vents
+Riverpyre Verge
+Samut, Hazoret's Champion
+Samwise the Stouthearted
+Sanctum Lurker
+Scavenging Ooze
+Scrapwork Mutt
+Sear
+Seasoned Cryomancer
+Seething Song
+Sewer-veillance Cam
+Sheltered by Ghosts
+Shiko, Paragon of the Way
+Shorikai, Genesis Engine
+Sink into Stupor
+Sinkhole Surveyor
+Skateboard
+Slickshot Show-Off
+Smirking Spelljacker
+Smuggler's Surprise
+Sorin of House Markov
+Soul-Scar Mage
+Sphinx of False Conclusions
+Sphinx of Forgotten Lore
+Spider-Woman, Stunning Savior
+Stadium Headliner
+Steel Seraph
+Stingcaster Mage
+Stormscale Scion
+Strategic Betrayal
+Student of Warfare
+Super Shredder
+Superior Spider-Man
+Swift Reconfiguration
+Syr Ginger, the Meal Ender
+Talon Gates of Madara
+Tamiyo's Safekeeping
+Tarfire
+The Echoverse Fulcrum
+The Fantasticar
+The Wondrous Wasp
+Thespian's Stage
+Thought Scour
+Thought-Stalker Warlock
+Three Steps Ahead
+Tireless Provisioner
+Tough Cookie
+Traumatic Critique
+Treachery
+Triplicate Titan
+Trumpeting Carnosaur
+Ulamog, the Infinite Gyre
+Unidentified Hovership
+Utopia Sprawl
+Vendetta
+Vibrance
+Vicious Rivalry
+Virtue of Loyalty
+Voldaren Epicure
+Vraska's Final Mercy
+Walk-In Closet // Forgotten Cellar
+Wan Shi Tong, All-Knowing
+Wastewood Verge
+Wight of the Reliquary
+Winter Orb
+Winternight Stories
+Wistfulness
+Witch Enchanter
+Yathan Roadwatcher

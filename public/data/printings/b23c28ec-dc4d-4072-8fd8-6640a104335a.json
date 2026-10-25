@@ -1,0 +1,8 @@
+{
+ "name": "Smirking Spelljacker",
+ "oracle_id": "b23c28ec-dc4d-4072-8fd8-6640a104335a",
+ "printings": [
+  {"id":"bff6761e-8353-4725-95ed-3d8400de98ee","set":"otc","set_name":"Outlaws of Thunder Junction Commander","set_type":"commander","collector_number":"52","released_at":"2024-04-19","frame":"2015","frame_effects":["extendedart"],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":["boosterfun"],"finishes":["nonfoil"],"highres":true,"illustration_id":"3bcddd75-32f0-4bd2-bcb9-5be29661799e","artist":"Borja Pindado","image_normal":"https://cards.scryfall.io/normal/front/b/f/bff6761e-8353-4725-95ed-3d8400de98ee.jpg?1783911956","back_image_normal":null,"back_illustration_id":null,"security_stamp":"oval","reprint":false,"variation":false,"booster":false,"digital":false,"games":["paper","mtgo"]},
+  {"id":"01d1e394-1b0c-4b40-ba85-f55973703d41","set":"otc","set_name":"Outlaws of Thunder Junction Commander","set_type":"commander","collector_number":"16","released_at":"2024-04-19","frame":"2015","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil"],"highres":true,"illustration_id":"3bcddd75-32f0-4bd2-bcb9-5be29661799e","artist":"Borja Pindado","image_normal":"https://cards.scryfall.io/normal/front/0/1/01d1e394-1b0c-4b40-ba85-f55973703d41.jpg?1783911967","back_image_normal":null,"back_illustration_id":null,"security_stamp":"oval","reprint":false,"variation":false,"booster":false,"digital":false,"games":["paper","mtgo"]}
+ ]
+}

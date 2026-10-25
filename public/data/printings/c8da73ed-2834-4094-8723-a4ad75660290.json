@@ -1,0 +1,7 @@
+{
+ "name": "Impractical Joke",
+ "oracle_id": "c8da73ed-2834-4094-8723-a4ad75660290",
+ "printings": [
+  {"id":"39a816b4-39b8-421c-b828-68db901d34b7","set":"sos","set_name":"Secrets of Strixhaven","set_type":"expansion","collector_number":"119","released_at":"2026-04-24","frame":"2015","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"102f6b9b-b4de-4afb-b45c-99f1da60ce61","artist":"Caroline Gariba","image_normal":"https://cards.scryfall.io/normal/front/3/9/39a816b4-39b8-421c-b828-68db901d34b7.jpg?1783903668","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":false,"variation":false,"booster":false,"digital":false,"games":["paper","mtgo","arena"]}
+ ]
+}

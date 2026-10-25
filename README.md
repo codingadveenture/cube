@@ -144,6 +144,20 @@ npm run build:data              # reuses cached Scryfall responses in scripts/.c
 node scripts/build-cards.mjs --refresh
 ```
 
+### Scanner art catalog
+
+The Scan page recognises slips with the Milo model from CollectorVision
+(`public/models/milo-1.0.0.onnx`) against a closed catalog of our cards' Printings:
+
+```
+node scripts/build-art-catalog.mjs    # public/data/art-catalog.bin, art-catalog.json, extra-cards.json
+node scripts/eval-art-catalog.mjs     # offline check; writes research/art-catalog-eval.md
+```
+
+The build filters the CollectorVision hosted catalog to every Printing of the List cards and the
+names in `data/extra-cards.txt`, and embeds the Printings it lacks (digital-only arts) itself.
+Third-party licences: `THIRD_PARTY_NOTICES.md`.
+
 The app icons are drawn by `node scripts/make-icons.mjs`.
 
 ### Deployment

@@ -1,0 +1,8 @@
+{
+ "name": "Student of Warfare",
+ "oracle_id": "0bc2875b-3a5a-4885-86b9-16ab7330ac10",
+ "printings": [
+  {"id":"2f2cf48b-949e-4920-a72d-fddca05c6e98","set":"plst","set_name":"The List","set_type":"masters","collector_number":"ROE-47","released_at":"2021-09-25","frame":"2003","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil"],"highres":true,"illustration_id":"e7a70035-a36c-4c3f-a4d5-c1fea259ecac","artist":"Volkan Baǵa","image_normal":"https://cards.scryfall.io/normal/front/2/f/2f2cf48b-949e-4920-a72d-fddca05c6e98.jpg?1783925212","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":true,"variation":false,"booster":true,"digital":false,"games":["paper"]},
+  {"id":"9f4df9be-324b-458a-9379-ab4aa437a6d2","set":"roe","set_name":"Rise of the Eldrazi","set_type":"expansion","collector_number":"47","released_at":"2010-04-23","frame":"2003","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"e7a70035-a36c-4c3f-a4d5-c1fea259ecac","artist":"Volkan Baǵa","image_normal":"https://cards.scryfall.io/normal/front/9/f/9f4df9be-324b-458a-9379-ab4aa437a6d2.jpg?1783942002","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":false,"variation":false,"booster":true,"digital":false,"games":["paper","mtgo"]}
+ ]
+}

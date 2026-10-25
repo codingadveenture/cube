@@ -1,0 +1,8 @@
+{
+ "name": "Batroc the Leaper",
+ "oracle_id": "ebbea7a7-c990-43fa-8f67-a5da17fbbb10",
+ "printings": [
+  {"id":"c2c43855-e2f9-4369-b404-ebede94fd264","set":"msc","set_name":"Marvel Super Heroes Commander","set_type":"commander","collector_number":"357","released_at":"2026-06-26","frame":"2015","frame_effects":["legendary","extendedart"],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":["universesbeyond"],"finishes":["nonfoil"],"highres":true,"illustration_id":"e7f123d7-a340-4c8a-a6c6-34ea477a6fba","artist":"Lucio Parrillo","image_normal":"https://cards.scryfall.io/normal/front/c/2/c2c43855-e2f9-4369-b404-ebede94fd264.jpg?1783903161","back_image_normal":null,"back_illustration_id":null,"security_stamp":"oval","reprint":false,"variation":false,"booster":false,"digital":false,"games":["paper","mtgo"]},
+  {"id":"e34e33ea-042e-409c-b304-52644ec5b1f5","set":"msc","set_name":"Marvel Super Heroes Commander","set_type":"commander","collector_number":"49","released_at":"2026-06-26","frame":"2015","frame_effects":["legendary"],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":["surgefoil","universesbeyond"],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"e7f123d7-a340-4c8a-a6c6-34ea477a6fba","artist":"Lucio Parrillo","image_normal":"https://cards.scryfall.io/normal/front/e/3/e34e33ea-042e-409c-b304-52644ec5b1f5.jpg?1783903286","back_image_normal":null,"back_illustration_id":null,"security_stamp":"oval","reprint":false,"variation":false,"booster":false,"digital":false,"games":["paper","mtgo"]}
+ ]
+}

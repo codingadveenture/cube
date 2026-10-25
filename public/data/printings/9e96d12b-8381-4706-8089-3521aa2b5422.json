@@ -1,0 +1,8 @@
+{
+ "name": "Gau, Feral Youth",
+ "oracle_id": "9e96d12b-8381-4706-8089-3521aa2b5422",
+ "printings": [
+  {"id":"c7f4920b-cbf6-407c-ae02-6f6cc047187d","set":"fic","set_name":"Final Fantasy Commander","set_type":"commander","collector_number":"152","released_at":"2025-06-13","frame":"2015","frame_effects":["extendedart","legendary"],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":["ffvi","universesbeyond","boosterfun"],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"a7c859a2-c222-4318-a9d1-0434d466ee23","artist":"Eglė Mosakaitė","image_normal":"https://cards.scryfall.io/normal/front/c/7/c7f4920b-cbf6-407c-ae02-6f6cc047187d.jpg?1783906321","back_image_normal":null,"back_illustration_id":null,"security_stamp":"triangle","reprint":false,"variation":false,"booster":false,"digital":false,"games":["paper","mtgo"]},
+  {"id":"89175ce1-0746-4ba1-970e-617d134b0527","set":"fic","set_name":"Final Fantasy Commander","set_type":"commander","collector_number":"55","released_at":"2025-06-13","frame":"2015","frame_effects":["legendary"],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":["surgefoil","ffvi","universesbeyond"],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"a7c859a2-c222-4318-a9d1-0434d466ee23","artist":"Eglė Mosakaitė","image_normal":"https://cards.scryfall.io/normal/front/8/9/89175ce1-0746-4ba1-970e-617d134b0527.jpg?1783906357","back_image_normal":null,"back_illustration_id":null,"security_stamp":"triangle","reprint":false,"variation":false,"booster":false,"digital":false,"games":["paper","mtgo"]}
+ ]
+}

@@ -1,0 +1,8 @@
+{
+ "name": "Rampart Architect",
+ "oracle_id": "b0edba6f-8f54-4dc4-b952-20b57a797d60",
+ "printings": [
+  {"id":"027dc6b6-cf74-423d-a6b4-3d7feb05a809","set":"tdc","set_name":"Tarkir: Dragonstorm Commander","set_type":"commander","collector_number":"87","released_at":"2025-04-11","frame":"2015","frame_effects":["extendedart"],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":["boosterfun"],"finishes":["nonfoil"],"highres":false,"illustration_id":"c5a46f46-462d-402c-b3b1-b686340a8fbe","artist":"Eelis Kyttanen","image_normal":"https://cards.scryfall.io/normal/front/0/2/027dc6b6-cf74-423d-a6b4-3d7feb05a809.jpg?1783907144","back_image_normal":null,"back_illustration_id":null,"security_stamp":"oval","reprint":false,"variation":false,"booster":false,"digital":false,"games":["paper","mtgo"]},
+  {"id":"20f533fc-51d0-49bd-afcc-81b8b3ff9749","set":"tdc","set_name":"Tarkir: Dragonstorm Commander","set_type":"commander","collector_number":"47","released_at":"2025-04-11","frame":"2015","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil"],"highres":false,"illustration_id":"c5a46f46-462d-402c-b3b1-b686340a8fbe","artist":"Eelis Kyttanen","image_normal":"https://cards.scryfall.io/normal/front/2/0/20f533fc-51d0-49bd-afcc-81b8b3ff9749.jpg?1783907165","back_image_normal":null,"back_illustration_id":null,"security_stamp":"oval","reprint":false,"variation":false,"booster":false,"digital":false,"games":["paper","mtgo"]}
+ ]
+}

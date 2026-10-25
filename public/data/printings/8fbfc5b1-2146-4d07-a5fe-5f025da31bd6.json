@@ -1,0 +1,8 @@
+{
+ "name": "Okoye, Mighty and Adored",
+ "oracle_id": "8fbfc5b1-2146-4d07-a5fe-5f025da31bd6",
+ "printings": [
+  {"id":"57606be3-6603-4265-9b2a-be1d21e08aae","set":"msc","set_name":"Marvel Super Heroes Commander","set_type":"commander","collector_number":"410","released_at":"2026-06-26","frame":"2015","frame_effects":["legendary","extendedart"],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":["universesbeyond"],"finishes":["nonfoil"],"highres":true,"illustration_id":"26ab7b0e-db52-4dc8-a6a5-6aed39d27f31","artist":"Aniekan Udofia","image_normal":"https://cards.scryfall.io/normal/front/5/7/57606be3-6603-4265-9b2a-be1d21e08aae.jpg?1783903141","back_image_normal":null,"back_illustration_id":null,"security_stamp":"oval","reprint":false,"variation":false,"booster":false,"digital":false,"games":["paper","mtgo"]},
+  {"id":"18ee486e-dc25-4de7-a71f-f11fdf100176","set":"msc","set_name":"Marvel Super Heroes Commander","set_type":"commander","collector_number":"89","released_at":"2026-06-26","frame":"2015","frame_effects":["legendary"],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":["surgefoil","universesbeyond"],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"26ab7b0e-db52-4dc8-a6a5-6aed39d27f31","artist":"Aniekan Udofia","image_normal":"https://cards.scryfall.io/normal/front/1/8/18ee486e-dc25-4de7-a71f-f11fdf100176.jpg?1783903267","back_image_normal":null,"back_illustration_id":null,"security_stamp":"oval","reprint":false,"variation":false,"booster":false,"digital":false,"games":["paper","mtgo"]}
+ ]
+}

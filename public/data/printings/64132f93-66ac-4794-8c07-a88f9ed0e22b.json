@@ -1,0 +1,8 @@
+{
+ "name": "Cloak and Dagger, Entwined",
+ "oracle_id": "64132f93-66ac-4794-8c07-a88f9ed0e22b",
+ "printings": [
+  {"id":"50aa361c-72fd-4ecb-b877-a27646c66ad0","set":"msh","set_name":"Marvel Super Heroes","set_type":"expansion","collector_number":"419","released_at":"2026-06-26","frame":"2015","frame_effects":["legendary","extendedart"],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":["universesbeyond"],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"abfd9c13-a565-4498-bca5-1d1c66193049","artist":"Rimas Valeikis","image_normal":"https://cards.scryfall.io/normal/front/5/0/50aa361c-72fd-4ecb-b877-a27646c66ad0.jpg?1783902830","back_image_normal":null,"back_illustration_id":null,"security_stamp":"oval","reprint":false,"variation":false,"booster":false,"digital":false,"games":["paper","mtgo"]},
+  {"id":"fa01d35f-1064-4a7c-9475-4504566df850","set":"msh","set_name":"Marvel Super Heroes","set_type":"expansion","collector_number":"211","released_at":"2026-06-26","frame":"2015","frame_effects":["legendary"],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":["universesbeyond"],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"abfd9c13-a565-4498-bca5-1d1c66193049","artist":"Rimas Valeikis","image_normal":"https://cards.scryfall.io/normal/front/f/a/fa01d35f-1064-4a7c-9475-4504566df850.jpg?1783902902","back_image_normal":null,"back_illustration_id":null,"security_stamp":"oval","reprint":false,"variation":false,"booster":false,"digital":false,"games":["paper","mtgo","arena"]}
+ ]
+}

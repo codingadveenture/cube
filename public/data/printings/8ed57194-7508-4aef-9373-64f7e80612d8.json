@@ -1,0 +1,7 @@
+{
+ "name": "Treachery",
+ "oracle_id": "8ed57194-7508-4aef-9373-64f7e80612d8",
+ "printings": [
+  {"id":"613694aa-b169-400d-8063-2b83d8303611","set":"uds","set_name":"Urza's Destiny","set_type":"expansion","collector_number":"50","released_at":"1999-06-07","frame":"1997","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"92c32033-063d-4ae4-af68-41b176dd9d3b","artist":"Matthew D. Wilson","image_normal":"https://cards.scryfall.io/normal/front/6/1/613694aa-b169-400d-8063-2b83d8303611.jpg?1783946075","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":false,"variation":false,"booster":true,"digital":false,"games":["paper","mtgo"]}
+ ]
+}

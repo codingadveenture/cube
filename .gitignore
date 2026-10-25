@@ -1,6 +1,11 @@
 # planning notes and research contain local paths and first names; kept out of the public repo
 .scratch/
 research/
+# two technical notes the public notices and README point to; they hold no personal data
+!research/
+research/*
+!research/collectorvision-integration.md
+!research/art-catalog-eval.md
 data/log.json
 
 # build and tooling

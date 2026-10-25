@@ -1,0 +1,8 @@
+{
+ "name": "Mole Man, Moloid Master",
+ "oracle_id": "34994475-b914-44f6-8ca1-c2747b6d5956",
+ "printings": [
+  {"id":"f1fbac4b-574e-4f30-9ee7-6054081b278c","set":"msh","set_name":"Marvel Super Heroes","set_type":"expansion","collector_number":"415","released_at":"2026-06-26","frame":"2015","frame_effects":["legendary","extendedart"],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":["universesbeyond"],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"a1c48133-0c05-4712-a572-3f404a5577c0","artist":"Michele Giorgi","image_normal":"https://cards.scryfall.io/normal/front/f/1/f1fbac4b-574e-4f30-9ee7-6054081b278c.jpg?1783902831","back_image_normal":null,"back_illustration_id":null,"security_stamp":"oval","reprint":false,"variation":false,"booster":false,"digital":false,"games":["paper","mtgo"]},
+  {"id":"1b406cc5-75c9-430a-83a2-de0f2a8aeae6","set":"msh","set_name":"Marvel Super Heroes","set_type":"expansion","collector_number":"177","released_at":"2026-06-26","frame":"2015","frame_effects":["legendary"],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":["universesbeyond"],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"a1c48133-0c05-4712-a572-3f404a5577c0","artist":"Michele Giorgi","image_normal":"https://cards.scryfall.io/normal/front/1/b/1b406cc5-75c9-430a-83a2-de0f2a8aeae6.jpg?1783902919","back_image_normal":null,"back_illustration_id":null,"security_stamp":"oval","reprint":false,"variation":false,"booster":false,"digital":false,"games":["paper","mtgo","arena"]}
+ ]
+}

@@ -32,142 +32,26 @@
 // back_image_png are not stored, to keep the files small. The client derives them from
 // image_normal (back_image_normal for the back): small by replacing "/normal/" with "/small/",
 // png by replacing "/normal/" with "/png/" and ".jpg" with ".png".
-// Files in public/data/printings/ for cards no longer in cards.json are removed.
+// Files in public/data/printings/ for cards no longer in cards.json are removed, except those of
+// the extra cards listed in public/data/extra-cards.json (see build-art-catalog.mjs).
+// The Scryfall client and the Printing fields live in scripts/lib/scryfall.mjs.
 // Node 24, no npm dependencies.
 
 import { readFile, writeFile, mkdir, readdir, rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loadCard as loadCardFrom, cardPrintings, pretty, stats } from './lib/scryfall.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CARDS = join(ROOT, 'public', 'data', 'cards.json');
+const EXTRA_CARDS = join(ROOT, 'public', 'data', 'extra-cards.json');
 const CACHE = join(ROOT, 'scripts', '.cache');
 const OUT_DIR = join(ROOT, 'public', 'data');
 const CARD_DIR = join(OUT_DIR, 'printings');
 const REFRESH = process.argv.includes('--refresh');
-const GAP_MS = 150;
-const MIN_INTERVAL_MS = 750;
-const MAX_429_RETRIES = 3;
-const HEADERS = {
-  'User-Agent': 'cube-app-build/0.1 (github.com/codingadveenture/cube)',
-  Accept: 'application/json',
-};
 
-const SKIP_SET_TYPES = new Set(['art_series', 'minigame', 'token']);
-const SKIP_LAYOUTS = new Set(['art_series', 'token', 'double_faced_token', 'emblem']);
-
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-let requests = 0;
-let rateLimited = 0;
-let lastStart = 0;
-let lastEnd = 0;
-
-// Returns the parsed body, or null on 404 (a search with no results).
-async function getJson(url) {
-  for (let attempt = 0; attempt <= MAX_429_RETRIES; attempt++) {
-    const now = Date.now();
-    const wait = Math.max(lastEnd + GAP_MS - now, lastStart + MIN_INTERVAL_MS - now, 0);
-    if (lastStart && wait) await sleep(wait);
-    lastStart = Date.now();
-    requests++;
-    const res = await fetch(url, { headers: HEADERS });
-    const text = await res.text();
-    lastEnd = Date.now();
-    if (res.status === 429) {
-      rateLimited++;
-      if (attempt === MAX_429_RETRIES) break;
-      const retryAfter = Number(res.headers.get('retry-after')) || 60;
-      console.warn(`429 from Scryfall, waiting ${retryAfter + 2} s`);
-      await sleep((retryAfter + 2) * 1000);
-      continue;
-    }
-    if (res.status === 404) return null;
-    if (!res.ok) throw new Error(`Scryfall HTTP ${res.status} for ${url}: ${text}`);
-    return JSON.parse(text);
-  }
-  throw new Error('Scryfall kept answering 429');
-}
-
-function searchUrl(oracleId) {
-  const q = encodeURIComponent(`oracleid:${oracleId} lang:en`).replace(/%20/g, '+');
-  return (
-    `https://api.scryfall.com/cards/search?q=${q}&unique=prints&include_extras=true` +
-    '&include_variations=true&order=released&dir=desc'
-  );
-}
-
-// All Scryfall card objects for one oracle_id, from the cache or from the API.
-async function loadCard(oracleId) {
-  const file = join(CACHE, `printings-all-${oracleId}.json`);
-  const url = searchUrl(oracleId);
-  if (!REFRESH && existsSync(file)) {
-    const cached = JSON.parse(await readFile(file, 'utf8'));
-    // A cache made with a different query is stale; refetch.
-    if (cached.url === url) return cached;
-  }
-  const data = [];
-  let next = url;
-  let notFound = false;
-  while (next) {
-    const body = await getJson(next);
-    if (!body) {
-      notFound = true;
-      break;
-    }
-    data.push(...body.data);
-    next = body.has_more ? body.next_page : null;
-  }
-  const out = { url, fetched_at: new Date().toISOString(), not_found: notFound, data };
-  await writeFile(file, JSON.stringify(out));
-  return out;
-}
-
-function keep(sc) {
-  return (
-    sc.lang === 'en' &&
-    !SKIP_SET_TYPES.has(sc.set_type) &&
-    sc.border_color !== 'gold' &&
-    !sc.oversized &&
-    !SKIP_LAYOUTS.has(sc.layout)
-  );
-}
-
-function printingFields(sc) {
-  const faces = sc.card_faces || [];
-  const imgSrc = sc.image_uris || (faces[0] && faces[0].image_uris) || {};
-  // back_* only when the second face has its own image (transform, modal_dfc,
-  // reversible_card).
-  const back = faces[1] && faces[1].image_uris ? faces[1] : null;
-  return {
-    id: sc.id,
-    set: sc.set,
-    set_name: sc.set_name,
-    set_type: sc.set_type,
-    collector_number: sc.collector_number,
-    released_at: sc.released_at,
-    frame: sc.frame,
-    frame_effects: sc.frame_effects || [],
-    border_color: sc.border_color,
-    full_art: !!sc.full_art,
-    textless: !!sc.textless,
-    promo: !!sc.promo,
-    promo_types: sc.promo_types || [],
-    finishes: sc.finishes || [],
-    highres: sc.image_status === 'highres_scan',
-    illustration_id: sc.illustration_id || (faces[0] && faces[0].illustration_id) || null,
-    artist: sc.artist || (faces[0] && faces[0].artist) || null,
-    image_normal: imgSrc.normal || null,
-    back_image_normal: back ? back.image_uris.normal || null : null,
-    back_illustration_id: back ? back.illustration_id || null : null,
-    security_stamp: sc.security_stamp || null,
-    reprint: !!sc.reprint,
-    variation: !!sc.variation,
-    booster: !!sc.booster,
-    digital: !!sc.digital,
-    games: sc.games || [],
-  };
-}
+const loadCard = (oracleId) => loadCardFrom(CACHE, oracleId, REFRESH);
 
 const started = Date.now();
 const cardsFile = JSON.parse(await readFile(CARDS, 'utf8'));
@@ -179,10 +63,7 @@ const missing = [];
 for (const [i, c] of cardsFile.cards.entries()) {
   const loaded = await loadCard(c.oracle_id);
   // Newest first; the sort is stable, so Scryfall's order is kept within a release date.
-  const printings = loaded.data
-    .filter(keep)
-    .map(printingFields)
-    .sort((a, b) => (a.released_at < b.released_at ? 1 : a.released_at > b.released_at ? -1 : 0));
+  const printings = cardPrintings(loaded);
   if (!printings.length) zero.push(c.name);
   out[c.oracle_id] = { name: c.name, oracle_id: c.oracle_id, printings };
   const ids = new Set(printings.map((p) => p.id));
@@ -192,29 +73,9 @@ for (const [i, c] of cardsFile.cards.entries()) {
       missing.push(`${c.name} ${role} ${p.set} ${p.collector_number} (paper: ${p.paper})`);
     }
   }
-  if ((i + 1) % 50 === 0) console.log(`${i + 1}/${cardsFile.cards.length} cards, ${requests} requests`);
+  if ((i + 1) % 50 === 0) console.log(`${i + 1}/${cardsFile.cards.length} cards, ${stats.requests} requests`);
 }
 const generatedAt = new Date().toISOString();
-
-// Pretty JSON with 1-space indent, except that leaf values (primitives, arrays of primitives,
-// and flat objects whose values are primitives or arrays of primitives, such as a printing)
-// stay on one line.
-const isPrimitive = (v) => v === null || typeof v !== 'object';
-function pretty(value, indent = '') {
-  const flat = JSON.stringify(value);
-  const isLeaf =
-    isPrimitive(value) ||
-    Object.values(value).every((v) => isPrimitive(v) || (Array.isArray(v) && v.every(isPrimitive)));
-  if (isLeaf) return flat;
-  const inner = indent + ' ';
-  if (Array.isArray(value)) {
-    if (!value.length) return '[]';
-    return `[\n${value.map((v) => inner + pretty(v, inner)).join(',\n')}\n${indent}]`;
-  }
-  const entries = Object.entries(value);
-  if (!entries.length) return '{}';
-  return `{\n${entries.map(([k, v]) => `${inner}${JSON.stringify(k)}: ${pretty(v, inner)}`).join(',\n')}\n${indent}}`;
-}
 
 await mkdir(CARD_DIR, { recursive: true });
 const fileBytes = {};
@@ -223,7 +84,14 @@ for (const [oracleId, card] of Object.entries(out)) {
   fileBytes[oracleId] = Buffer.byteLength(text);
   await writeFile(join(CARD_DIR, `${oracleId}.json`), text);
 }
-const stale = (await readdir(CARD_DIR)).filter((f) => f.endsWith('.json') && !out[f.slice(0, -5)]);
+// Files for the extra cards (public/data/extra-cards.json, written by build-art-catalog.mjs) are
+// not stale.
+const extraIds = new Set(
+  existsSync(EXTRA_CARDS) ? JSON.parse(await readFile(EXTRA_CARDS, 'utf8')).map((c) => c.oracle_id) : [],
+);
+const stale = (await readdir(CARD_DIR)).filter(
+  (f) => f.endsWith('.json') && !out[f.slice(0, -5)] && !extraIds.has(f.slice(0, -5)),
+);
 for (const f of stale) await rm(join(CARD_DIR, f));
 if (stale.length) console.log(`removed ${stale.length} stale files: ${stale.join(', ')}`);
 const [largestId, largestBytes] = Object.entries(fileBytes).sort((a, b) => b[1] - a[1])[0];
@@ -272,5 +140,5 @@ await writeFile(join(OUT_DIR, 'printings-meta.json'), JSON.stringify(meta, null,
 console.log(JSON.stringify(meta, null, 1));
 if (zero.length) console.warn(`cards with zero printings: ${zero.join(', ')}`);
 if (missing.length) console.warn(`in_box/wanted printings not in the index:\n  ${missing.join('\n  ')}`);
-console.log(`Scryfall requests: ${requests}, HTTP 429: ${rateLimited}, wall time: ${((Date.now() - started) / 1000).toFixed(1)} s`);
+console.log(`Scryfall requests: ${stats.requests}, HTTP 429: ${stats.rateLimited}, wall time: ${((Date.now() - started) / 1000).toFixed(1)} s`);
 console.log(`${Object.keys(fileBytes).length} files in public/data/printings/, ${meta.total_bytes} bytes`);

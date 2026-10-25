@@ -1,0 +1,7 @@
+{
+ "name": "Piggy Bank",
+ "oracle_id": "a13f4095-300b-434f-aa9a-3608aaae5163",
+ "printings": [
+  {"id":"55d35442-5ca0-4fd7-8ff1-b7347b3e6690","set":"dsk","set_name":"Duskmourn: House of Horror","set_type":"expansion","collector_number":"148","released_at":"2024-09-27","frame":"2015","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"17ab1f0f-6e8b-40b0-951c-902f90fb0dc4","artist":"Steve Ellis","image_normal":"https://cards.scryfall.io/normal/front/5/5/55d35442-5ca0-4fd7-8ff1-b7347b3e6690.jpg?1783909465","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":false,"variation":false,"booster":true,"digital":false,"games":["paper","mtgo","arena"]}
+ ]
+}

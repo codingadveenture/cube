@@ -1,0 +1,7 @@
+{
+ "name": "Skateboard",
+ "oracle_id": "decfde5e-ea53-4b15-8f69-51da7ef39d15",
+ "printings": [
+  {"id":"deadb6d8-3eea-4261-a07c-8536df89e85c","set":"tmt","set_name":"Teenage Mutant Ninja Turtles","set_type":"expansion","collector_number":"178","released_at":"2026-03-06","frame":"2015","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":["universesbeyond"],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"b27e5fc1-15f1-4d2c-a8bd-4c4c4607bd40","artist":"Hokyoung Kim","image_normal":"https://cards.scryfall.io/normal/front/d/e/deadb6d8-3eea-4261-a07c-8536df89e85c.jpg?1783904067","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":false,"variation":false,"booster":false,"digital":false,"games":["paper","arena","mtgo"]}
+ ]
+}

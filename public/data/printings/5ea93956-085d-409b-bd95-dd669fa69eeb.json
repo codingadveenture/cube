@@ -1,0 +1,8 @@
+{
+ "name": "Ginger, Queen of Sweets",
+ "oracle_id": "5ea93956-085d-409b-bd95-dd669fa69eeb",
+ "printings": [
+  {"id":"321e0ec3-e2d7-4bd8-98df-8fec88e365c0","set":"frc","set_name":"Reality Fracture Commander","set_type":"commander","collector_number":"99","released_at":"2026-10-02","frame":"2015","frame_effects":["legendary","extendedart"],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil"],"highres":true,"illustration_id":"de74df36-05e1-4b70-9d0f-d924e4264c68","artist":"Arif Wijaya","image_normal":"https://cards.scryfall.io/normal/front/3/2/321e0ec3-e2d7-4bd8-98df-8fec88e365c0.jpg?1790310603","back_image_normal":null,"back_illustration_id":null,"security_stamp":"oval","reprint":false,"variation":false,"booster":false,"digital":false,"games":["paper","mtgo"]},
+  {"id":"f4ff6bf9-89a9-4c2a-84a2-d4ceb7168adf","set":"frc","set_name":"Reality Fracture Commander","set_type":"commander","collector_number":"14","released_at":"2026-10-02","frame":"2015","frame_effects":["legendary"],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil"],"highres":true,"illustration_id":"de74df36-05e1-4b70-9d0f-d924e4264c68","artist":"Arif Wijaya","image_normal":"https://cards.scryfall.io/normal/front/f/4/f4ff6bf9-89a9-4c2a-84a2-d4ceb7168adf.jpg?1790343341","back_image_normal":null,"back_illustration_id":null,"security_stamp":"oval","reprint":false,"variation":false,"booster":false,"digital":false,"games":["paper","mtgo","arena"]}
+ ]
+}

@@ -1,0 +1,8 @@
+{
+ "name": "Talon Gates of Madara",
+ "oracle_id": "8c45bf9d-a017-43bf-9e32-67810a8a217b",
+ "printings": [
+  {"id":"c565f8fe-acf7-40dd-8100-8f692d1e232c","set":"m3c","set_name":"Modern Horizons 3 Commander","set_type":"commander","collector_number":"134","released_at":"2024-06-14","frame":"2015","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil"],"highres":true,"illustration_id":"d6078090-e1f6-46b2-a406-275fb4b8ae3d","artist":"Steven Belledin","image_normal":"https://cards.scryfall.io/normal/front/c/5/c565f8fe-acf7-40dd-8100-8f692d1e232c.jpg?1783911400","back_image_normal":null,"back_illustration_id":null,"security_stamp":"oval","reprint":false,"variation":false,"booster":false,"digital":false,"games":["paper","mtgo"]},
+  {"id":"de92facf-762b-4a23-8d5e-bb673b0500c0","set":"m3c","set_name":"Modern Horizons 3 Commander","set_type":"commander","collector_number":"82","released_at":"2024-06-14","frame":"2015","frame_effects":["extendedart"],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":["ripplefoil","boosterfun"],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"d6078090-e1f6-46b2-a406-275fb4b8ae3d","artist":"Steven Belledin","image_normal":"https://cards.scryfall.io/normal/front/d/e/de92facf-762b-4a23-8d5e-bb673b0500c0.jpg?1783911414","back_image_normal":null,"back_illustration_id":null,"security_stamp":"oval","reprint":false,"variation":false,"booster":false,"digital":false,"games":["paper","mtgo"]}
+ ]
+}

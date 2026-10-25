@@ -1,0 +1,7 @@
+{
+ "name": "Rakshasa's Bargain",
+ "oracle_id": "d87be8c6-7a1f-4db8-ada1-b1a030f03877",
+ "printings": [
+  {"id":"5c409f4f-3b2c-4c33-b850-55b2a46f51ca","set":"tdm","set_name":"Tarkir: Dragonstorm","set_type":"expansion","collector_number":"214","released_at":"2025-04-11","frame":"2015","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil","foil"],"highres":false,"illustration_id":"4854aeaa-f18f-4eac-b93f-08d0861f5ec1","artist":"Yigit Koroglu","image_normal":"https://cards.scryfall.io/normal/front/5/c/5c409f4f-3b2c-4c33-b850-55b2a46f51ca.jpg?1783907303","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":false,"variation":false,"booster":true,"digital":false,"games":["paper","arena","mtgo"]}
+ ]
+}

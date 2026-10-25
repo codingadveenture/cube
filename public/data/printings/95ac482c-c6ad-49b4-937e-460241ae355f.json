@@ -1,0 +1,7 @@
+{
+ "name": "Mishra's Research Desk",
+ "oracle_id": "95ac482c-c6ad-49b4-937e-460241ae355f",
+ "printings": [
+  {"id":"bb142d99-b210-47c8-897c-be62f90d2192","set":"bro","set_name":"The Brothers' War","set_type":"expansion","collector_number":"162","released_at":"2022-11-18","frame":"2015","frame_effects":[],"border_color":"black","full_art":false,"textless":false,"promo":false,"promo_types":[],"finishes":["nonfoil","foil"],"highres":true,"illustration_id":"86286ea4-bb6f-41f6-802a-2f9a91e2ccfc","artist":"Matt Stewart","image_normal":"https://cards.scryfall.io/normal/front/b/b/bb142d99-b210-47c8-897c-be62f90d2192.jpg?1783920054","back_image_normal":null,"back_illustration_id":null,"security_stamp":null,"reprint":false,"variation":false,"booster":true,"digital":false,"games":["paper","arena","mtgo"]}
+ ]
+}
