@@ -7,6 +7,10 @@
 //   card: 'exact' when that Printing is the best hit of the card, 'same art' when the best hit
 //   shares its illustration, 'other art' when another illustration wins by at least
 //   `printingMargin`, 'ambiguous' otherwise;
+// - printings sharing the best hit's illustration within `printingMargin` of it (a set's plain card,
+//   its prerelease promo, The List reprint, a digital reprint) embed almost alike, so the top one
+//   among them is arbitrary: the expected Printing wins if it is among them, else the plainest
+//   paper one (plainnessRank), for the decision and for every candidate;
 // - below `accept` (or without the margin) the slip goes to review with the top candidates, and
 //   below `floor` the frame is treated as holding no card at all.
 // The default thresholds come from the offline eval, research/art-catalog-eval.md.
@@ -51,7 +55,8 @@ export interface Candidate {
   oracle_id: string;
   name: string;
   on_list: boolean;
-  /** The best-scoring row of this card. */
+  /** The row named for this card: among the rows sharing its best row's illustration within
+   *  `printingMargin`, the expected Printing or else the plainest (choosePrinting). */
   printing: Hit;
   score: number;
 }
@@ -60,14 +65,14 @@ export interface Decision {
   status: 'match' | 'review' | 'none';
   /** The accepted card; null unless status is 'match'. */
   card: { oracle_id: string; name: string; on_list: boolean } | null;
-  /** The best-scoring row of the accepted card; null unless status is 'match'. */
+  /** The row named for the accepted card (choosePrinting); null unless status is 'match'. */
   printing: Hit | null;
   verdict: Verdict | null;
   /** The best score. */
   score: number;
   /** Lead of the best card over the next card (a lower bound when no other card is in the hits). */
   margin: number;
-  /** The top 3 distinct cards with their best row and score. */
+  /** The top 3 distinct cards with their named row and best score. */
   candidates: Candidate[];
 }
 
@@ -80,6 +85,40 @@ export function groupByCard(hits: Hit[]): Candidate[] {
     }
   }
   return [...seen.values()];
+}
+
+/**
+ * How far a Printing is from the plain paper card of its set, as a sort key (lower is plainer):
+ * digital, then a set starting with 'p' (promos), then The List ('plst'), then a collector number
+ * that is not only digits (a trailing 's' or 'p' and the like). Promo sets are 'p' plus a parent
+ * code, four letters or more, so three-letter sets such as plc or pls are not promos. Ties go to
+ * the oldest printing: the catalog lists each card's printings newest first, so the higher row.
+ */
+export function plainnessRank(h: Pick<Hit, 'digital' | 'set' | 'collector_number'>): [number, number, number, number] {
+  const set = h.set.toLowerCase();
+  const promo = set.startsWith('p') && set.length >= 4;
+  return [h.digital ? 1 : 0, promo ? 1 : 0, set === 'plst' ? 1 : 0, /^\d+$/.test(h.collector_number) ? 0 : 1];
+}
+
+/** Orders hits plainest first (plainnessRank), then oldest first (higher catalog row). */
+export function comparePlainness(a: Hit, b: Hit): number {
+  const ra = plainnessRank(a);
+  const rb = plainnessRank(b);
+  for (let i = 0; i < ra.length; i++) if (ra[i] !== rb[i]) return ra[i]! - rb[i]!;
+  return b.row - a.row;
+}
+
+/**
+ * The Printing to name among one card's hits (best first): of the hits sharing the best hit's
+ * illustration within `printingMargin` of it, the expected Printing if present, else the plainest.
+ */
+export function choosePrinting(cardHits: Hit[], expected: ExpectedPrinting | null | undefined, printingMargin: number): Hit {
+  const best = cardHits[0]!;
+  const twins = cardHits.filter(
+    (h) => h === best || (best.illustration_id !== null && h.illustration_id === best.illustration_id && best.score - h.score <= printingMargin),
+  );
+  const exp = expected ? twins.find((h) => h.scryfall_id === expected.scryfall_id) : undefined;
+  return exp ?? [...twins].sort(comparePlainness)[0]!;
 }
 
 const sortHits = (hits: Hit[]) => [...hits].sort((a, b) => b.score - a.score);
@@ -107,7 +146,14 @@ export function printingVerdict(
 export function decide(hitsIn: Hit[], options: Partial<DecideOptions> = {}): Decision {
   const opts = { ...DEFAULT_DECIDE_OPTIONS, ...options };
   const hits = sortHits(hitsIn);
-  const cards = groupByCard(hits);
+  const cards = groupByCard(hits).map((c) => ({
+    ...c,
+    printing: choosePrinting(
+      hits.filter((h) => h.oracle_id === c.oracle_id),
+      opts.expected?.(c.oracle_id),
+      opts.printingMargin,
+    ),
+  }));
   const candidates = cards.slice(0, 3);
   if (!hits.length) {
     return { status: 'none', card: null, printing: null, verdict: null, score: 0, margin: 0, candidates };
@@ -125,7 +171,11 @@ export function decide(hitsIn: Hit[], options: Partial<DecideOptions> = {}): Dec
     return { status: 'review', card: null, printing: null, verdict: null, ...base };
   }
   const cardHits = hits.filter((h) => h.oracle_id === top.oracle_id);
-  const verdict = printingVerdict(cardHits, opts.expected?.(top.oracle_id), opts.printingMargin, lowest);
+  const expected = opts.expected?.(top.oracle_id);
+  const verdict =
+    expected && top.printing.scryfall_id === expected.scryfall_id
+      ? 'exact'
+      : printingVerdict(cardHits, expected, opts.printingMargin, lowest);
   return {
     status: 'match',
     card: { oracle_id: top.oracle_id, name: top.name, on_list: top.on_list },

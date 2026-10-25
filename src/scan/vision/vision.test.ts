@@ -15,7 +15,7 @@ import {
   type RgbaImage,
 } from './preprocess';
 import { ArtCatalog, parseCatalogJson, topK, type CatalogJson } from './catalog';
-import { decide, groupByCard, printingVerdict, votes, type DecideOptions } from './match';
+import { decide, groupByCard, plainnessRank, printingVerdict, votes, type DecideOptions } from './match';
 import type { Hit } from './types';
 
 function solid(width: number, height: number, rgb: [number, number, number]): RgbaImage {
@@ -307,7 +307,8 @@ describe('printing verdict', () => {
   });
 
   it('is same art when a reprint with the expected illustration wins', () => {
-    const d = decide([hit('a', 'a2', 0.9, 'shared'), hit('a', 'a1', 0.89, 'shared'), hit('b', 'b1', 0.5)], {
+    // The expected a1 trails by more than the printing margin, so it is not a tie and a2 is named.
+    const d = decide([hit('a', 'a2', 0.9, 'shared'), hit('a', 'a1', 0.8, 'shared'), hit('b', 'b1', 0.5)], {
       ...opts,
       expected: expected('a1', 'shared'),
     });
@@ -338,6 +339,103 @@ describe('printing verdict', () => {
   it('does not treat two missing illustrations as the same art', () => {
     const v = printingVerdict([hit('a', 'a2', 0.9, null), hit('a', 'a1', 0.8, null)], { scryfall_id: 'a1', illustration_id: null }, 0.05, 0.1);
     expect(v).toBe('other art');
+  });
+});
+
+describe('printings sharing one illustration', () => {
+  const printing = (id: string, score: number, set: string, cn: string, extra: Partial<Hit> = {}): Hit => ({
+    ...hit('mh3card', id, score, 'art-shared'),
+    set,
+    collector_number: cn,
+    ...extra,
+  });
+  const other = () => hit('z', 'z1', 0.5);
+  const expected = (id: string) => () => ({ scryfall_id: id, illustration_id: 'art-shared' });
+
+  it('ranks paper, non-promo, non-List, plain-numbered printings first', () => {
+    expect(plainnessRank({ digital: false, set: 'mh3', collector_number: '29' })).toEqual([0, 0, 0, 0]);
+    expect(plainnessRank({ digital: false, set: 'pmh3', collector_number: '29s' })).toEqual([0, 1, 0, 1]);
+    expect(plainnessRank({ digital: false, set: 'plst', collector_number: 'MH3-29' })).toEqual([0, 1, 1, 1]);
+    expect(plainnessRank({ digital: true, set: 'vma', collector_number: '4' })).toEqual([1, 0, 0, 0]);
+  });
+
+  it('names the plain set card over its prerelease promo on a tie', () => {
+    const d = decide([printing('promo', 0.9, 'pmh3', '29s'), printing('plain', 0.895, 'mh3', '29'), other()], opts);
+    expect(d.status).toBe('match');
+    expect(d.printing?.scryfall_id).toBe('plain');
+    expect(d.candidates[0].printing.scryfall_id).toBe('plain');
+    expect(d.verdict).toBe('no expected printing');
+  });
+
+  it('names the promo when it is the expected printing, as exact', () => {
+    const d = decide([printing('plain', 0.9, 'mh3', '29'), printing('promo', 0.89, 'pmh3', '29s'), other()], {
+      ...opts,
+      expected: expected('promo'),
+    });
+    expect(d.printing?.scryfall_id).toBe('promo');
+    expect(d.candidates[0].printing.scryfall_id).toBe('promo');
+    expect(d.verdict).toBe('exact');
+  });
+
+  it('names the plain card as same art when the expected promo is not tied', () => {
+    const d = decide([printing('promo2', 0.9, 'pmh3', '29p'), printing('plain', 0.9, 'mh3', '29'), other()], {
+      ...opts,
+      expected: expected('absent'),
+    });
+    expect(d.printing?.scryfall_id).toBe('plain');
+    expect(d.verdict).toBe('same art');
+  });
+
+  it('names paper over a digital reprint unless the digital one is expected', () => {
+    const hits = () => [printing('vma', 0.9, 'vma', '4', { digital: true }), printing('lea', 0.88, 'lea', '4'), other()];
+    expect(decide(hits(), opts).printing?.scryfall_id).toBe('lea');
+    const d = decide(hits(), { ...opts, expected: expected('vma') });
+    expect(d.printing?.scryfall_id).toBe('vma');
+    expect(d.verdict).toBe('exact');
+  });
+
+  it('names the original set over The List', () => {
+    const d = decide([printing('list', 0.9, 'plst', 'MH3-29'), printing('orig', 0.9, 'mh3', '29'), other()], opts);
+    expect(d.printing?.scryfall_id).toBe('orig');
+  });
+
+  it('names the oldest among equally plain printings (the catalog lists newest first)', () => {
+    const newer = printing('newer', 0.9, 'm3c', '29');
+    const older = printing('older', 0.88, 'mh3', '29');
+    expect(decide([newer, older, other()], opts).printing?.scryfall_id).toBe('older');
+  });
+
+  it('does not take a three-letter set starting with p for a promo', () => {
+    const d = decide([printing('tsr', 0.9, 'tsr', '120'), printing('plc', 0.9, 'plc', '120'), other()], opts);
+    expect(d.printing?.scryfall_id).toBe('plc');
+  });
+
+  it('does not reach past the printing margin or into another illustration', () => {
+    const far = decide([printing('promo', 0.9, 'pmh3', '29s'), printing('plain', 0.8, 'mh3', '29'), other()], opts);
+    expect(far.printing?.scryfall_id).toBe('promo');
+    const art = decide([printing('promo', 0.9, 'pmh3', '29s'), { ...printing('plain', 0.9, 'mh3', '29'), illustration_id: 'art-new' }, other()], opts);
+    expect(art.printing?.scryfall_id).toBe('promo');
+  });
+
+  it('still says other art when another illustration wins clearly', () => {
+    const d = decide(
+      [
+        { ...printing('newpromo', 0.9, 'pmh3', '30s'), illustration_id: 'art-new' },
+        { ...printing('newplain', 0.89, 'mh3', '30'), illustration_id: 'art-new' },
+        printing('old', 0.8, 'mh3', '29'),
+        other(),
+      ],
+      { ...opts, expected: expected('old') },
+    );
+    expect(d.printing?.scryfall_id).toBe('newplain');
+    expect(d.verdict).toBe('other art');
+  });
+
+  it('orders review candidates with the plain printing of each card', () => {
+    const d = decide([printing('promo', 0.62, 'pmh3', '29s'), printing('plain', 0.61, 'mh3', '29'), hit('y', 'y1', 0.6)], opts);
+    expect(d.status).toBe('review');
+    expect(d.candidates.map((c) => c.printing.scryfall_id)).toEqual(['plain', 'y1']);
+    expect(d.candidates[0].score).toBeCloseTo(0.62, 6);
   });
 });
 
