@@ -1597,6 +1597,29 @@ a.button {
   margin: 0;
   color: #fff;
 }
+/* The slip count under the live picture, big enough to read from the rig without bending down. */
+.camera-big-count {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.5rem;
+  margin: 0 0 0.25rem;
+  line-height: 1;
+}
+.camera-big-count strong {
+  font-size: 64px;
+  font-weight: 800;
+}
+.camera-big-count span {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.camera-setup select {
+  min-height: 44px;
+  font: inherit;
+}
 .guide-layer {
   position: absolute;
   inset: 0;
@@ -1615,7 +1638,8 @@ a.button {
 .guide-box.tone-empty {
   border-color: #fff;
 }
-.guide-box.tone-settling {
+.guide-box.tone-settling,
+.guide-box.tone-unclear {
   border: 4px solid #f0b429;
 }
 .guide-box.tone-captured {
@@ -1663,7 +1687,8 @@ a.button {
 .loop-phase.tone-captured {
   color: var(--ok);
 }
-.loop-phase.tone-settling {
+.loop-phase.tone-settling,
+.loop-phase.tone-unclear {
   color: var(--warn);
 }
 .camera-setup h2 {
@@ -1845,6 +1870,16 @@ a.button {
 .candidate-name {
   font-weight: 600;
   overflow-wrap: anywhere;
+}
+/* "already in this pile" on a candidate the pile has: small, so the name and score stay first. */
+.candidate-tag {
+  align-self: flex-start;
+  padding: 0 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.5;
 }
 .name-search {
   margin: 0.5rem 0;

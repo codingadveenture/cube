@@ -35,8 +35,18 @@ export interface Shot {
   /** The winning pass's Milo embedding (128 values, L2-normalised); null until recognised. */
   embedding?: Float32Array | null;
   /** Why the shot was skipped without the Owner: SAME_SLIP for a slip put back that lost to the photo
-   *  before it, REPLACED for a photo that a better one of the same slip took over from (skipSameSlip). */
+   *  before it, REPLACED for a photo that a better one of the same slip took over from (skipSameSlip),
+   *  REPEAT for a match of a Printing the pile already has (repeatOf, or the Owner's word in Review). */
   reason?: string;
+}
+
+/** The fields that name a Printing, on a candidate as well as on a chosen ref. */
+export type PrintingLike = Pick<PrintingRef, 'scryfall_id' | 'name' | 'set' | 'collector_number'>;
+
+/** True when both name the same Printing: by scryfall_id, or by name, set and number when either lacks one. */
+export function samePrinting(a: PrintingLike, b: PrintingLike): boolean {
+  if (a.scryfall_id && b.scryfall_id) return a.scryfall_id === b.scryfall_id;
+  return a.name === b.name && a.set === b.set && a.collector_number === b.collector_number;
 }
 
 export function refOf(c: PrintingRef): PrintingRef {
@@ -197,15 +207,52 @@ export function skipSameSlip(previous: Shot, next: Shot): SameSlipOutcome {
   };
 }
 
-/** Keeps a shot skipped as the same slip as a second copy: back to what its recognition gave. */
+/** The reason of a matched shot whose Printing the pile already had: most often the same slip fed again. */
+export const REPEAT = 'repeat of a slip already taken';
+
+/**
+ * The kept shot (isMatched) that already names `printing`, newest first, or null. A shot with id
+ * `except` is left out, and so is every shot captured at or after `before`.
+ */
+function keptWith(shots: readonly Shot[], printing: PrintingLike, except?: string, before?: string): Shot | null {
+  let best: Shot | null = null;
+  for (const s of shots) {
+    if (s.id === except || (before !== undefined && s.at >= before) || !isMatched(s)) continue;
+    if (!samePrinting(s.chosen!, printing)) continue;
+    if (!best || s.at > best.at) best = s;
+  }
+  return best;
+}
+
+/**
+ * The earlier kept shot whose Printing a freshly recognised camera shot matched again, or null.
+ * Only a match counts as a repeat by itself: the top candidate of a review may be wrong, and a shot
+ * the Owner confirmed is their word. A real second copy is restored with keepSecondCopy.
+ */
+export function repeatOf(shots: readonly Shot[], next: Shot): Shot | null {
+  if (next.source !== 'camera' || next.status !== 'match' || !next.chosen) return null;
+  return keptWith(shots, next.chosen, next.id, next.at);
+}
+
+/** The kept shot that already names a candidate's Printing (for the Review UI), or null. */
+export function alreadyInPile(shots: readonly Shot[], candidate: PrintingLike, except?: string): Shot | null {
+  return keptWith(shots, candidate, except);
+}
+
+/** Sets a shot aside as a repeat of a slip already taken; its recognition stays for keepSecondCopy. */
+export function skipAsRepeat(shot: Shot): Shot {
+  return skippedAs(shot, REPEAT);
+}
+
+/** Keeps a shot set aside as the same slip, or as a repeat, as a second copy: back to what its recognition gave. */
 export function keepSecondCopy(shot: Shot): Shot {
   const { reason: _reason, ...rest } = shot;
   return { ...rest, ...fromDecision(shot) };
 }
 
-/** A shot skipped automatically as another photo of the slip that counts (not counted as captured). */
+/** A shot set aside without the Owner: another photo of the slip that counts, or a repeat (not counted as captured). */
 export function isSameSlip(s: Shot): boolean {
-  return s.status === 'skipped' && (s.reason === SAME_SLIP || s.reason === REPLACED);
+  return s.status === 'skipped' && (s.reason === SAME_SLIP || s.reason === REPLACED || s.reason === REPEAT);
 }
 
 export function confirmShot(shot: Shot, choice: PrintingRef): Shot {
@@ -227,11 +274,14 @@ export function needsReview(s: Shot): boolean {
 }
 
 export interface ShotCounts {
-  /** Shots that count as slips: all but the extra photos of a slip skipped automatically (isSameSlip). */
+  /** Shots that count as slips: all but the photos set aside automatically (isSameSlip), repeats among them. */
   captured: number;
   matched: number;
   toReview: number;
+  /** Every skipped shot, the Owner's and the automatic ones. */
   skipped: number;
+  /** Shots set aside as REPEAT: slips fed again whose card the pile already had. */
+  repeats: number;
 }
 
 export function shotCounts(shots: readonly Shot[]): ShotCounts {
@@ -239,13 +289,15 @@ export function shotCounts(shots: readonly Shot[]): ShotCounts {
   let toReview = 0;
   let skipped = 0;
   let same = 0;
+  let repeats = 0;
   for (const s of shots) {
     if (isSameSlip(s)) same++;
+    if (s.status === 'skipped' && s.reason === REPEAT) repeats++;
     if (isMatched(s)) matched++;
     else if (needsReview(s)) toReview++;
     else if (s.status === 'skipped') skipped++;
   }
-  return { captured: shots.length - same, matched, toReview, skipped };
+  return { captured: shots.length - same, matched, toReview, skipped, repeats };
 }
 
 export type ShotFilter = 'all' | 'review' | 'matched' | 'skipped';

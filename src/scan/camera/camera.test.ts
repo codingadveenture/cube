@@ -6,6 +6,7 @@ import {
   loopPhase,
   meanAbsDiff,
   medianRgb,
+  normalisedMeanAbsDiff,
   presence,
   step,
   toGrey,
@@ -15,8 +16,9 @@ import {
 } from './capture';
 import { clampGuide, guideRect, moveGuide, parseGuide, resizeGuide, turnGuide, DEFAULT_GUIDE, MIN_H } from './guide';
 import { initialOrientation, LOCK_AFTER, parseOrientation, passesFor, recordOrientation } from './orientation';
-import { nextPassMs, parseCameraSession, parseSettings } from './settings';
+import { COUNT_EVERY, crossedCheckpoint, defaultSettings, nextPassMs, parseCameraSession, parseSettings } from './settings';
 import {
+  alreadyInPile,
   applyRecognition,
   betterShot,
   confirmShot,
@@ -28,6 +30,8 @@ import {
   nextToReview,
   previousShot,
   refOf,
+  REPEAT,
+  repeatOf,
   REPLACED,
   reviveShot,
   SAME_SLIP,
@@ -35,6 +39,7 @@ import {
   sameSlipOf,
   shotCounts,
   shotsToRows,
+  skipAsRepeat,
   skipSameSlip,
   skipShot,
   sortShots,
@@ -73,7 +78,30 @@ function brighter(g: Grey, by: number): Grey {
   return { ...g, data: g.data.map((v) => Math.min(255, v + by)) };
 }
 
+/** The top `rows` rows of a slip with the sheet below: a slip only part of the way into the box. */
+function partOf(g: Grey, rows: number): Grey {
+  const out = sheet();
+  out.data.set(g.data.subarray(0, rows * W));
+  return out;
+}
+
+/** A bright blob over the middle of a slip: a hand resting on it. */
+function hand(g: Grey): Grey {
+  const data = g.data.slice();
+  for (let y = 8; y < 36; y++) for (let x = 6; x < 26; x++) data[y * W + x] = 200;
+  return { ...g, data };
+}
+
+/** The leftmost `cols` columns darkened by `by`: a shadow creeping over the box. */
+function shaded(g: Grey, cols: number, by: number): Grey {
+  const data = g.data.slice();
+  for (let y = 0; y < H; y++) for (let x = 0; x < cols; x++) data[y * W + x] = Math.max(0, data[y * W + x] - by);
+  return { ...g, data };
+}
+
 const empty = sheet();
+/** The empty sheet in half-shadow: neither clearly empty nor clearly a slip. */
+const shade = sheet(210);
 const baseline: Baseline = { ...greyStats(empty), sheet: [230, 230, 230] };
 
 function run(frames: Grey[], state: LoopState = initialLoop()) {
@@ -194,6 +222,105 @@ describe('capture: one photo per visit', () => {
     const taken = run([slip(), slip(), slip()]).state;
     expect(loopPhase(taken)).toBe('captured');
   });
+
+  it('measures the difference between pictures with the exposure taken out', () => {
+    const a = slip();
+    expect(normalisedMeanAbsDiff(a, a)).toBe(0);
+    // Uniformly brighter is the same picture: nothing is left once each mean is removed.
+    expect(meanAbsDiff(a, brighter(a, 10))).toBeCloseTo(10, 6);
+    expect(normalisedMeanAbsDiff(a, brighter(a, 10))).toBeCloseTo(0, 6);
+    // A change in the picture survives, with or without a change of exposure on top.
+    const covered = hand(a);
+    expect(normalisedMeanAbsDiff(a, covered)).toBeGreaterThanOrEqual(DEFAULT_LOOP_OPTIONS.settledDiff);
+    expect(normalisedMeanAbsDiff(a, brighter(covered, 10))).toBeCloseTo(normalisedMeanAbsDiff(a, covered), 6);
+    expect(normalisedMeanAbsDiff(a, { data: new Uint8Array(4), width: 2, height: 2 })).toBe(Infinity);
+  });
+
+  it('captures a slip pushed fully in after a photo of it half-way (the lost slip)', () => {
+    const other = slip(7);
+    const half = partOf(other, 24);
+    // Slip B slides in over A and pauses half-way: the swap run takes that photo.
+    const first = run([empty, slip(), slip(), slip(), partOf(other, 12), partOf(other, 18), half, half, half]);
+    expect(first.captures).toEqual([3, 8]);
+    expect(first.state.lastCaptured).toBe(half);
+    // One quick push, then B lies still fully in. A single moving frame is no swap run, but the
+    // picture that settles is unlike the half-way photo.
+    expect(normalisedMeanAbsDiff(other, half)).toBeGreaterThanOrEqual(DEFAULT_LOOP_OPTIONS.settledDiff);
+    expect(run([other, other, other], first.state).captures).toEqual([2]);
+  });
+
+  it('captures the clean slip after the hand that was in its photo has left', () => {
+    const covered = hand(slip());
+    expect(normalisedMeanAbsDiff(covered, slip())).toBeGreaterThanOrEqual(DEFAULT_LOOP_OPTIONS.settledDiff);
+    // The hand lifts in one frame: the swap rule needs two, the settled picture is enough.
+    expect(run([empty, covered, covered, covered, slip(), slip(), slip()]).captures).toEqual([3, 6]);
+  });
+
+  it('does not capture a slip that settles after a nudge which left the picture the same', () => {
+    const taken = slip();
+    // Lit a little differently, with a sliver of shadow on the margin: moving frames, same picture.
+    const nudged = [brighter(taken, 10), shaded(brighter(taken, 20), 2, 30)];
+    for (const n of nudged) {
+      expect(meanAbsDiff(taken, n)).toBeGreaterThan(DEFAULT_LOOP_OPTIONS.stableDiff);
+      expect(normalisedMeanAbsDiff(taken, n)).toBeLessThan(DEFAULT_LOOP_OPTIONS.settledDiff);
+    }
+    const { captures, state } = run([empty, taken, taken, taken, nudged[0]!, nudged[1]!, nudged[1]!, nudged[1]!, nudged[1]!]);
+    expect(captures).toEqual([3]);
+    expect(loopPhase(state)).toBe('captured');
+  });
+
+  it('does not capture again when a shadow creeps over a still slip', () => {
+    // One column every four frames: every frame counts as still, and after sixty the picture is
+    // far from the capture, but no frame ever settles after motion, so the check never runs.
+    const frames = [empty, slip(), slip(), slip()];
+    for (let i = 1; i <= 60; i++) frames.push(shaded(slip(), Math.floor(i / 4), 40));
+    for (let i = 4; i < frames.length; i++) expect(meanAbsDiff(frames[i - 1]!, frames[i]!)).toBeLessThanOrEqual(DEFAULT_LOOP_OPTIONS.stableDiff);
+    expect(normalisedMeanAbsDiff(slip(), frames[frames.length - 1]!)).toBeGreaterThanOrEqual(DEFAULT_LOOP_OPTIONS.settledDiff);
+    expect(run(frames).captures).toEqual([3]);
+  });
+
+  it('never photographs a frame that is only half-way present, even settled while armed or swapped', () => {
+    expect(presence(greyStats(shade), baseline)).toBe('unsure');
+    // Armed: a slip slid through and the box settled on the sheet in half-shadow.
+    const armed = run([empty, slip(0), slip(1), slip(2), shade, shade, shade, shade]);
+    expect(armed.captures).toEqual([]);
+    expect(armed.state.armed).toBe(true);
+    expect(armed.state.stable).toBeGreaterThanOrEqual(DEFAULT_LOOP_OPTIONS.stableFrames);
+    // The status line says so, instead of asking the Owner to hold still forever.
+    expect(loopPhase(armed.state)).toBe('unclear');
+    // Swapped: a capture, a swap run, then the box settled in half-shadow.
+    const swapped = run([empty, slip(), slip(), slip(), slip(3), slip(5), slip(7), shade, shade, shade, shade]);
+    expect(swapped.captures).toEqual([3]);
+    expect(swapped.state.swapped).toBe(true);
+    expect(loopPhase(swapped.state)).toBe('unclear');
+  });
+
+  it('compares the settled picture on the first still frame that clearly shows a slip, not only the first still one', () => {
+    // After the photo of A, one moving frame (no swap run), then the box settles on something that
+    // reads unsure for two frames and clearly present from the next, without moving in between.
+    const unsure = sheet(201);
+    const clear = sheet(199);
+    expect(presence(greyStats(unsure), baseline)).toBe('unsure');
+    expect(presence(greyStats(clear), baseline)).toBe('present');
+    expect(meanAbsDiff(unsure, clear)).toBeLessThanOrEqual(DEFAULT_LOOP_OPTIONS.stableDiff);
+    const { captures, state } = run([empty, slip(), slip(), slip(), unsure, unsure, unsure, clear, clear]);
+    expect(state.swapped).toBe(false);
+    expect(captures).toEqual([3, 7]);
+    // Once compared, the still run is done with: more still frames never compare again.
+    expect(run([clear, clear, clear], state).captures).toEqual([]);
+  });
+
+  it('takes a change of gain out of the difference as well as a shift of brightness', () => {
+    const a = slip();
+    const gained = { ...a, data: a.data.map((v) => Math.min(255, Math.round(v * 1.08))) };
+    expect(meanAbsDiff(a, gained)).toBeGreaterThan(DEFAULT_LOOP_OPTIONS.stableDiff);
+    expect(normalisedMeanAbsDiff(a, gained)).toBeLessThan(1);
+    // A stronger gain clips the sheet at white; what is left stays well under settledDiff.
+    const clipped = { ...a, data: a.data.map((v) => Math.min(255, Math.round(v * 1.15))) };
+    expect(normalisedMeanAbsDiff(a, clipped)).toBeLessThan(DEFAULT_LOOP_OPTIONS.settledDiff);
+    // A different picture at the same exposure is not taken out.
+    expect(normalisedMeanAbsDiff(a, slip(7))).toBeGreaterThanOrEqual(DEFAULT_LOOP_OPTIONS.settledDiff);
+  });
 });
 
 describe('orientation lock', () => {
@@ -268,7 +395,7 @@ describe('shots', () => {
     const s = shot('a', '2026-10-25T10:00:00Z');
     expect(s.status).toBe('review');
     expect(s.decision).toBe(null);
-    expect(shotCounts([s])).toEqual({ captured: 1, matched: 0, toReview: 1, skipped: 0 });
+    expect(shotCounts([s])).toEqual({ captured: 1, matched: 0, toReview: 1, skipped: 0, repeats: 0 });
   });
 
   it('chooses the best Printing of a match and nothing for review', () => {
@@ -306,7 +433,7 @@ describe('shots', () => {
       { name: 'Sol Ring', quantity: 1, scryfall_id: 'lea-270', set: 'lea', collector_number: '270', foil: null, language: null },
       { name: 'Sol Ring', quantity: 1, scryfall_id: 'c21-263', set: 'c21', collector_number: '263', foil: null, language: null },
     ]);
-    expect(shotCounts(shots)).toEqual({ captured: 7, matched: 4, toReview: 2, skipped: 1 });
+    expect(shotCounts(shots)).toEqual({ captured: 7, matched: 4, toReview: 2, skipped: 1, repeats: 0 });
     expect(filterShots(shots, 'review').map((s) => s.id)).toEqual(['5', '6']);
     expect(filterShots(shots, 'matched').map((s) => s.id)).toEqual(['1', '2', '3', '4']);
     expect(filterShots(shots, 'skipped').map((s) => s.id)).toEqual(['7']);
@@ -340,6 +467,97 @@ describe('shots', () => {
     expect(back?.source).toBe('camera');
     expect(back?.chosen?.name).toBe('Lightning Bolt');
   });
+
+  const at = (s: number) => new Date(Date.UTC(2026, 9, 25, 11, 0, 0) + s * 1000).toISOString();
+  const matched = (id: string, t: number, c: ShotCandidate[], e?: Float32Array) => applyRecognition(shot(id, at(t)), result('match', c, e));
+
+  it('sets a later match of a Printing already in the pile aside as a repeat', () => {
+    const first = matched('a', 0, [bolt]);
+    const again = matched('b', 30, [bolt]);
+    expect(repeatOf([again, first], again)?.id).toBe('a');
+    expect(repeatOf([first], matched('c', 31, [ring]))).toBe(null);
+    const aside = skipAsRepeat(again);
+    expect(aside.status).toBe('skipped');
+    expect(aside.chosen).toBe(null);
+    expect(aside.reason).toBe(REPEAT);
+    // The recognition stays, so Review can keep it as a second copy.
+    expect(aside.decision).toEqual(again.decision);
+    expect(aside.candidates).toEqual(again.candidates);
+    expect(aside.embedding).toBe(again.embedding);
+    expect(isSameSlip(aside)).toBe(true);
+    expect(shotCounts([first, aside])).toEqual({ captured: 1, matched: 1, toReview: 0, skipped: 1, repeats: 1 });
+    expect(shotsToRows([first, aside])).toEqual([expect.objectContaining({ name: 'Lightning Bolt', quantity: 1 })]);
+    expect(reviveShot(structuredClone(aside))?.reason).toBe(REPEAT);
+  });
+
+  it('finds the repeat by name, set and number when an id is missing', () => {
+    const unknownId = { ...bolt, scryfall_id: '' };
+    const first = matched('a', 0, [unknownId]);
+    expect(repeatOf([first], matched('b', 10, [bolt]))?.id).toBe('a');
+    expect(repeatOf([first], matched('b', 10, [{ ...unknownId, collector_number: '162' }]))).toBe(null);
+    // With ids on both, the id decides: another Printing of the same card is not a repeat.
+    const confirmed = confirmShot(shot('c', at(20)), ring);
+    expect(repeatOf([confirmed], matched('d', 25, [ring]))?.id).toBe('c');
+    expect(repeatOf([confirmed], matched('d', 25, [ringC21]))).toBe(null);
+  });
+
+  it('never takes a doubtful shot, a photo, or a match before the kept shot for a repeat', () => {
+    const first = matched('a', 0, [bolt]);
+    const doubt = applyRecognition(shot('b', at(10)), result('review', [bolt]));
+    expect(repeatOf([doubt, first], doubt)).toBe(null);
+    const photo = applyRecognition({ ...shot('p', at(11)), source: 'photo' as const }, result('match', [bolt]));
+    expect(repeatOf([photo, first], photo)).toBe(null);
+    // A skipped shot is not in the pile, and a shot is no repeat of itself or of a later one.
+    const later = matched('c', 20, [bolt]);
+    expect(repeatOf([later, skipShot(first)], later)).toBe(null);
+    expect(repeatOf([later, skipAsRepeat(first)], later)).toBe(null);
+    expect(repeatOf([later, first], first)).toBe(null);
+    expect(repeatOf([first], first)).toBe(null);
+    // The Owner's confirmation is their word, even of a card already in the pile.
+    const confirmed = confirmShot(later, bolt);
+    expect(repeatOf([confirmed, first], confirmed)).toBe(null);
+  });
+
+  it('keeps a repeat as a second copy, back to what its recognition gave', () => {
+    const first = matched('a', 0, [bolt]);
+    const copy = keepSecondCopy(skipAsRepeat(matched('b', 10, [bolt])));
+    expect(copy.status).toBe('match');
+    expect(copy.chosen?.scryfall_id).toBe('lea-161');
+    expect(copy.reason).toBeUndefined();
+    expect(shotCounts([first, copy])).toEqual({ captured: 2, matched: 2, toReview: 0, skipped: 0, repeats: 0 });
+    expect(shotsToRows([first, copy])[0]!.quantity).toBe(2);
+    // A doubtful photo the Owner called a repeat in Review comes back doubtful.
+    const doubtful = keepSecondCopy(skipAsRepeat(applyRecognition(shot('c', at(20)), result('review', [bolt]))));
+    expect(doubtful.status).toBe('review');
+    expect(doubtful.chosen).toBe(null);
+  });
+
+  it('tells which candidates are already in the pile', () => {
+    const first = matched('a', 0, [bolt]);
+    const byName = confirmShot(shot('b', at(1)), { ...ring, scryfall_id: '' });
+    const shots = [skipShot(matched('c', 2, [ringC21])), byName, first];
+    expect(alreadyInPile(shots, bolt)?.id).toBe('a');
+    expect(alreadyInPile(shots, ring)?.id).toBe('b');
+    expect(alreadyInPile(shots, ringC21)).toBe(null);
+    // A shot is not in the pile on its own account.
+    expect(alreadyInPile(shots, bolt, 'a')).toBe(null);
+  });
+
+  it('keeps a repeat set aside when the slip is nudged', () => {
+    const first = matched('a', 0, [{ ...bolt, score: 0.7 }], unit());
+    const repeat = skipAsRepeat(matched('b', 20, [{ ...bolt, score: 0.6 }], unit()));
+    const nudged = matched('c', 21, [{ ...bolt, score: 0.8 }], unit());
+    expect(sameSlipOf([nudged, repeat, first], nudged)?.id).toBe('b');
+    const out = skipSameSlip(repeat, nudged);
+    expect(out.kept).toBe('next');
+    expect(out.previous.reason).toBe(REPLACED);
+    // Judged on the pile as settled, the better photo is still a repeat of the first slip.
+    expect(repeatOf([out.next, out.previous, first], out.next)?.id).toBe('a');
+    expect(shotCounts([skipAsRepeat(out.next), out.previous, first])).toEqual({ captured: 1, matched: 1, toReview: 0, skipped: 2, repeats: 1 });
+    // A worse photo of the nudged slip loses to the repeat as the same slip.
+    const worse = matched('d', 22, [{ ...bolt, score: 0.5 }], unit());
+    expect(skipSameSlip(repeat, worse).next.reason).toBe(SAME_SLIP);
+  });
 });
 
 /** A unit vector along axis `i`, turned towards axis `j` so that its dot with the axis-i vector is `cos`. */
@@ -367,7 +585,7 @@ describe('same slip twice', () => {
     expect(skipped.status).toBe('skipped');
     expect(skipped.reason).toBe(SAME_SLIP);
     expect(isSameSlip(skipped)).toBe(true);
-    expect(shotCounts([a, skipped])).toEqual({ captured: 1, matched: 1, toReview: 0, skipped: 1 });
+    expect(shotCounts([a, skipped])).toEqual({ captured: 1, matched: 1, toReview: 0, skipped: 1, repeats: 0 });
   });
 
   it('treats two unmatched recognitions as naming the same thing', () => {
@@ -411,7 +629,7 @@ describe('same slip twice', () => {
     expect(kept.status).toBe('match');
     expect(kept.chosen?.scryfall_id).toBe('lea-161');
     expect(kept.reason).toBeUndefined();
-    expect(shotCounts([a, kept])).toEqual({ captured: 2, matched: 2, toReview: 0, skipped: 0 });
+    expect(shotCounts([a, kept])).toEqual({ captured: 2, matched: 2, toReview: 0, skipped: 0, repeats: 0 });
     expect(shotsToRows([a, kept])[0]!.quantity).toBe(2);
     const doubtful = keepSecondCopy(skipSameSlip(a, recognised('c', 2, 'review', [bolt], unit())).next);
     expect(doubtful.status).toBe('review');
@@ -432,7 +650,7 @@ describe('same slip twice', () => {
     expect(out.next.status).toBe('match');
     expect(out.next.chosen?.scryfall_id).toBe('lea-161');
     expect(out.next.reason).toBeUndefined();
-    expect(shotCounts([out.next, out.previous])).toEqual({ captured: 1, matched: 1, toReview: 0, skipped: 1 });
+    expect(shotCounts([out.next, out.previous])).toEqual({ captured: 1, matched: 1, toReview: 0, skipped: 1, repeats: 0 });
     expect(shotsToRows([out.next, out.previous])).toEqual([expect.objectContaining({ name: 'Lightning Bolt', quantity: 1 })]);
   });
 
@@ -459,7 +677,7 @@ describe('same slip twice', () => {
     expect(out.next.status).toBe('skipped');
     expect(out.next.reason).toBe(SAME_SLIP);
     expect(out.recordOrientation).toBe(false);
-    expect(shotCounts([out.next, out.previous])).toEqual({ captured: 1, matched: 1, toReview: 0, skipped: 1 });
+    expect(shotCounts([out.next, out.previous])).toEqual({ captured: 1, matched: 1, toReview: 0, skipped: 1, repeats: 0 });
   });
 
   it('carries the confirmed Printing of the first photo over to a better second one', () => {
@@ -472,7 +690,7 @@ describe('same slip twice', () => {
     expect(out.next.chosen?.scryfall_id).toBe('lea-161');
     expect(out.previous.reason).toBe(REPLACED);
     expect(out.previous.chosen).toBe(null);
-    expect(shotCounts([out.next, out.previous])).toEqual({ captured: 1, matched: 1, toReview: 0, skipped: 1 });
+    expect(shotCounts([out.next, out.previous])).toEqual({ captured: 1, matched: 1, toReview: 0, skipped: 1, repeats: 0 });
     expect(shotsToRows([out.next, out.previous]).map((r) => [r.scryfall_id, r.quantity])).toEqual([['lea-161', 1]]);
   });
 
@@ -499,12 +717,12 @@ describe('same slip twice', () => {
     const first = keepSecondCopy(replaced.previous);
     expect(first.status).toBe('review');
     expect(first.reason).toBeUndefined();
-    expect(shotCounts([replaced.next, first])).toEqual({ captured: 2, matched: 1, toReview: 1, skipped: 0 });
+    expect(shotCounts([replaced.next, first])).toEqual({ captured: 2, matched: 1, toReview: 1, skipped: 0, repeats: 0 });
 
     const lost = skipSameSlip(clean, recognised('c', 2, 'match', [{ ...bolt, score: 0.6 }], unit()));
     const second = keepSecondCopy(lost.next);
     expect(second.status).toBe('match');
-    expect(shotCounts([second, lost.previous])).toEqual({ captured: 2, matched: 2, toReview: 0, skipped: 0 });
+    expect(shotCounts([second, lost.previous])).toEqual({ captured: 2, matched: 2, toReview: 0, skipped: 0, repeats: 0 });
   });
 
   it('compares a third photo with the one that counts, past a skipped one', () => {
@@ -514,7 +732,7 @@ describe('same slip twice', () => {
     expect(sameSlipOf([c, b, a], c)?.id).toBe('a');
     const out = skipSameSlip(a, c);
     expect(out.kept).toBe('next');
-    expect(shotCounts([out.next, b, out.previous])).toEqual({ captured: 1, matched: 1, toReview: 0, skipped: 2 });
+    expect(shotCounts([out.next, b, out.previous])).toEqual({ captured: 1, matched: 1, toReview: 0, skipped: 2, repeats: 0 });
     // A different slip is not compared at all.
     const d = recognised('d', 3, 'match', [ring], unit(0.5));
     expect(sameSlipOf([d, c, b, a], d)).toBe(null);
@@ -613,5 +831,34 @@ describe('camera settings', () => {
     expect(parseCameraSession(null, now)).toEqual({ startedAt: now.toISOString(), exported: null });
     const m = parseCameraSession(JSON.stringify({ startedAt: 'a', exported: { at: 'b', label: 'Camera', cards: 3 } }), now);
     expect(m.exported).toEqual({ at: 'b', label: 'Camera', cards: 3 });
+  });
+
+  it('keeps the speak choice and falls back to off', () => {
+    expect(parseSettings(null).speak).toBe('off');
+    for (const speak of ['off', 'count', 'names'] as const) {
+      expect(parseSettings(JSON.stringify({ ...defaultSettings(), speak })).speak).toBe(speak);
+    }
+    expect(parseSettings(JSON.stringify({ speak: 'loud' })).speak).toBe('off');
+    expect(parseSettings(JSON.stringify({ speak: 1 })).speak).toBe('off');
+    expect(parseSettings(JSON.stringify({ flipped: true })).speak).toBe('off');
+  });
+
+  it('marks a count checkpoint when the count crosses a multiple, once on the way up', () => {
+    expect(COUNT_EVERY).toBe(25);
+    expect(crossedCheckpoint(24, 25)).toBe(true);
+    expect(crossedCheckpoint(49, 50)).toBe(true);
+    expect(crossedCheckpoint(23, 24)).toBe(false);
+    expect(crossedCheckpoint(25, 26)).toBe(false);
+    // A photo added in between landed on the multiple: the next slip still marks it.
+    expect(crossedCheckpoint(24, 26)).toBe(true);
+    // A count that fell marks nothing; nor does a count that stayed, or no checkpoints at all.
+    expect(crossedCheckpoint(26, 25)).toBe(false);
+    expect(crossedCheckpoint(25, 25)).toBe(false);
+    expect(crossedCheckpoint(0, 0)).toBe(false);
+    expect(crossedCheckpoint(9, 10, 10)).toBe(true);
+    expect(crossedCheckpoint(9, 10, 0)).toBe(false);
+    // Counted up one slip at a time, a run of 60 slips passes a checkpoint exactly twice.
+    const hits = Array.from({ length: 60 }, (_, i) => i + 1).filter((n) => crossedCheckpoint(n - 1, n));
+    expect(hits).toEqual([25, 50]);
   });
 });

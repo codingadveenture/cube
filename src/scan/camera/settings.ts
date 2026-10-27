@@ -7,6 +7,15 @@ import { initialOrientation, parseOrientation, type OrientationState } from './o
 export const SETTINGS_KEY = 'cube.camera-settings.v1';
 export const CAMERA_SESSION_KEY = 'cube.camera-session.v1';
 
+/**
+ * Slips are counted off in stacks of this size: the phone marks every multiple with a long double
+ * buzz, so a stack counted by hand before it is fed shows at once whether a slip was missed.
+ */
+export const COUNT_EVERY = 25;
+
+/** What the phone says while feeding: nothing, the count at each checkpoint, or each card's name. */
+export type Speak = 'off' | 'count' | 'names';
+
 export interface CameraSettings {
   guide: Guide;
   /** The empty sheet, from "Set the empty sheet"; null until it has been set. */
@@ -15,13 +24,29 @@ export interface CameraSettings {
   flipped: boolean;
   /** A short beep on capture, after the first tap. */
   beep: boolean;
+  speak: Speak;
   orientation: OrientationState;
   /** Running mean of the time of one recognition pass, in ms. */
   passMs: number | null;
 }
 
 export function defaultSettings(): CameraSettings {
-  return { guide: parseGuide(null), baseline: null, flipped: false, beep: false, orientation: initialOrientation(), passMs: null };
+  return { guide: parseGuide(null), baseline: null, flipped: false, beep: false, speak: 'off', orientation: initialOrientation(), passMs: null };
+}
+
+export function parseSpeak(raw: unknown): Speak {
+  return raw === 'count' || raw === 'names' ? raw : 'off';
+}
+
+/**
+ * Whether the slip count crossed a checkpoint (a multiple of `every`) on its way from `before` to
+ * `count`. Judged when a slip settles, against the count at the previous settle, so a multiple
+ * reached in between (a photo from Try a photo, a copy kept in Review) is still marked on the next
+ * slip, a count that fell (a shot deleted in Review) marks nothing, and climbing back over the same
+ * multiple marks it again, since the stack's last slip is then a different slip.
+ */
+export function crossedCheckpoint(before: number, count: number, every: number = COUNT_EVERY): boolean {
+  return every > 0 && count > before && Math.floor(count / every) > Math.floor(before / every);
 }
 
 function parseBaseline(raw: unknown): Baseline | null {
@@ -43,6 +68,7 @@ export function parseSettings(raw: string | null): CameraSettings {
       baseline: parseBaseline(r.baseline),
       flipped: r.flipped === true,
       beep: r.beep === true,
+      speak: parseSpeak(r.speak),
       orientation: parseOrientation(r.orientation),
       passMs: typeof r.passMs === 'number' && r.passMs > 0 ? r.passMs : null,
     };

@@ -22,15 +22,29 @@ import { clearShots, deleteShot, loadShots, putShot } from '../../scan/camera/db
 import { guideRect, turnGuide, type Guide } from '../../scan/camera/guide';
 import { initialOrientation, LOCK_AFTER, passesFor, recordOrientation } from '../../scan/camera/orientation';
 import {
+  COUNT_EVERY,
+  crossedCheckpoint,
   loadCameraSession,
   loadSettings,
   nextPassMs,
+  parseSpeak,
   saveCameraSession,
   saveSettings,
   type CameraSessionMeta,
   type CameraSettings,
+  type Speak,
 } from '../../scan/camera/settings';
-import { applyRecognition, needsReview, newShot, sameSlipOf, shotCounts, skipSameSlip, type Shot } from '../../scan/camera/shots';
+import {
+  applyRecognition,
+  needsReview,
+  newShot,
+  repeatOf,
+  sameSlipOf,
+  shotCounts,
+  skipAsRepeat,
+  skipSameSlip,
+  type Shot,
+} from '../../scan/camera/shots';
 import { createVisionClient, type VisionClient, type VisionMode } from '../../scan/vision/client';
 import type { PrepareInfo, RecogniseRequest } from '../../scan/vision/protocol';
 import { GuideOverlay } from './GuideOverlay';
@@ -53,6 +67,8 @@ const LOOP_MS = 66;
  * 2.3 MB), so when the phone falls behind, a further slip keeps only its photo and goes to Review.
  */
 const MAX_WAITING = 4;
+/** The count checkpoint's long double buzz, unlike any of a slip's own. */
+const COUNT_BUZZ = [250, 120, 250];
 
 type CameraState =
   | { state: 'starting' }
@@ -66,6 +82,26 @@ type VisionState =
 
 let idCounter = 0;
 const newId = () => `${Date.now().toString(36)}-${(++idCounter).toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+
+/**
+ * Says a few words through the phone's speech synthesis, dropping whatever it was still saying:
+ * slips come faster than names are spoken, and a name that lags behind its slip misleads. An empty
+ * text only silences it. Quiet, and never an error, where speech is unavailable.
+ */
+function speak(text: string) {
+  try {
+    const synth = window.speechSynthesis;
+    if (!synth || typeof SpeechSynthesisUtterance === 'undefined') return;
+    synth.cancel();
+    if (!text) return;
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'en-US';
+    utterance.rate = 1.1;
+    synth.speak(utterance);
+  } catch {
+    // No speech on this device.
+  }
+}
 
 export default function CameraView({ cards }: { cards: Card[] | null }) {
   const [settings, setSettings] = useState<CameraSettings>(loadSettings);
@@ -218,7 +254,13 @@ export default function CameraView({ cards }: { cards: Card[] | null }) {
 
   // Sound: an AudioContext may only start after a tap.
   const audioRef = useRef<AudioContext | null>(null);
+  /** Whether the voice has spoken since the page loaded: phones want a touch before the first words. */
+  const spokeRef = useRef(false);
   function ensureAudio() {
+    if (!spokeRef.current && settingsRef.current.speak !== 'off') {
+      spokeRef.current = true;
+      speak('ready');
+    }
     if (audioRef.current || !settingsRef.current.beep) {
       void audioRef.current?.resume().catch(() => undefined);
       return;
@@ -231,32 +273,61 @@ export default function CameraView({ cards }: { cards: Card[] | null }) {
   }
   useEffect(() => () => void audioRef.current?.close().catch(() => undefined), []);
 
+  // Leaving the view stops the voice mid-word.
+  useEffect(() => () => speak(''), []);
+
   /**
    * Buzz (and beep): one short buzz when a slip is photographed, one long buzz when it matched,
    * two buzzes when it needs review, one short buzz when it was the same slip as the one before
-   * (counted once, whichever photo of it is kept). The result comes after the capture, so each slip
-   * ends with one of the last three.
+   * (counted once, whichever photo of it is kept) or a repeat. The result comes after the capture,
+   * so each slip ends with one of the last three. At a count checkpoint the long double buzz
+   * follows the slip's own after a pause, in one pattern so that neither cuts the other short.
    */
-  function feedback(kind: 'capture' | 'match' | 'doubt' | 'same') {
+  function feedback(kind: 'capture' | 'match' | 'doubt' | 'same', checkpoint = false) {
+    const buzz = kind === 'capture' || kind === 'same' ? [40] : kind === 'match' ? [180] : [90, 70, 90];
     try {
-      navigator.vibrate?.(kind === 'capture' || kind === 'same' ? 40 : kind === 'match' ? 180 : [90, 70, 90]);
+      navigator.vibrate?.(checkpoint ? [...buzz, 400, ...COUNT_BUZZ] : buzz);
     } catch {
       // Vibration is not available.
     }
     const ctx = audioRef.current;
-    if (!settingsRef.current.beep || !ctx) return;
-    const tones =
-      kind === 'capture' ? [[0, 880]] : kind === 'same' ? [[0, 660]] : kind === 'match' ? [[0, 1320]] : [[0, 330], [0.16, 330]];
-    for (const [at, freq] of tones) {
+    if (!settingsRef.current.beep || !ctx || ctx.state === 'closed') return;
+    const tones: [number, number, number][] =
+      kind === 'capture' ? [[0, 880, 0.1]] : kind === 'same' ? [[0, 660, 0.1]] : kind === 'match' ? [[0, 1320, 0.1]] : [[0, 330, 0.1], [0.16, 330, 0.1]];
+    if (checkpoint) tones.push([0.5, 523, 0.25], [0.85, 523, 0.25]);
+    for (const [at, freq, length] of tones) {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      osc.frequency.value = freq!;
-      gain.gain.setValueAtTime(0.15, ctx.currentTime + at!);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + at! + 0.1);
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.15, ctx.currentTime + at);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + at + length);
       osc.connect(gain).connect(ctx.destination);
-      osc.start(ctx.currentTime + at!);
-      osc.stop(ctx.currentTime + at! + 0.11);
+      osc.start(ctx.currentTime + at);
+      osc.stop(ctx.currentTime + at + length + 0.01);
     }
+  }
+
+  /** The slip count at the last settle, so a multiple reached in between (Try a photo, a copy kept in Review) is marked on the next slip. */
+  const lastSettledRef = useRef<number | null>(null);
+  /**
+   * The end of a camera slip, once its photo is matched, sent to review, or set aside as the same
+   * slip or a repeat: the slip's buzz, the count checkpoint, and the spoken word. The count is of
+   * the slips the recogniser has answered: a photo still waiting may yet turn out to be the same
+   * slip again, so it counts when it settles, and the checkpoint lands on the stack's last slip
+   * even when recognition is a slip or two behind. A slip set aside did not add to the count, so it
+   * cannot reach a checkpoint; that is how each multiple is announced once on the way up.
+   */
+  function slipSettled(kind: 'match' | 'doubt' | 'same', name: string | null, waitingOthers: number) {
+    const settled = shotCounts(shotsRef.current).captured - waitingOthers;
+    const before = lastSettledRef.current ?? Math.max(0, settled - 1);
+    lastSettledRef.current = settled;
+    const checkpoint = kind !== 'same' && crossedCheckpoint(before, settled);
+    feedback(kind, checkpoint);
+    const mode = settingsRef.current.speak;
+    const word = mode === 'names' ? (kind === 'same' ? 'again' : kind === 'match' && name ? name : 'check') : null;
+    const number = checkpoint && mode !== 'off' ? String(settled) : null;
+    const said = [word, number].filter((x): x is string => x !== null);
+    if (said.length) speak(said.join(', '));
   }
 
   /**
@@ -299,7 +370,7 @@ export default function CameraView({ cards }: { cards: Card[] | null }) {
     if (from === 'camera' && waitingRef.current >= MAX_WAITING) {
       // Recognition is behind: keep only the photo (the shot is already 'review') and say so.
       setScanError('Recognition is behind, so that slip went to Review unrecognised. Slow down a little.');
-      feedback('doubt');
+      slipSettled('doubt', null, waitingRef.current);
       return;
     }
     const image = ctx.getImageData(0, 0, w, h);
@@ -319,14 +390,22 @@ export default function CameraView({ cards }: { cards: Card[] | null }) {
       // and only the better one counts (a thumb over the first photo loses to a clean second one).
       const kept = from === 'camera' && current.status === 'review' ? sameSlipOf(shotsRef.current, next) : null;
       const same = kept ? skipSameSlip(kept, next) : null;
-      const changed = same ? [same.next, ...(same.kept === 'next' ? [same.previous] : [])] : [next];
       if (same) next = same.next;
+      const others = same?.kept === 'next' ? [same.previous] : [];
+      // A match of a Printing the pile already has is most often the same slip fed again (its first
+      // photo may have had a hand in it): set aside as a repeat, which Review can keep as a second
+      // copy. Judged on the pile as it will be, so a photo that just replaced the slip's earlier one
+      // is not a repeat of it.
+      const settled = new Map([next, ...others].map((x) => [x.id, x]));
+      const repeat = repeatOf(shotsRef.current.map((x) => settled.get(x.id) ?? x), next);
+      if (repeat) next = skipAsRepeat(next);
+      const changed = [next, ...others];
       const byId = new Map(changed.map((x) => [x.id, x]));
       updateShots((cur) => cur.map((x) => byId.get(x.id) ?? x));
       for (const x of changed) putShot(x).catch((e: unknown) => console.warn('Could not store the shot', e));
       setScanError(null);
       // The orientation lock sees each slip once: a better photo only adds to it when the photo it
-      // replaced was not a match.
+      // replaced was not a match. A repeat was a good match, so it still counts for the lock.
       const countsForLock = same ? same.recordOrientation : true;
       setSettings((cur) => ({
         ...cur,
@@ -336,11 +415,11 @@ export default function CameraView({ cards }: { cards: Card[] | null }) {
             ? recordOrientation(cur.orientation, result.orientation)
             : cur.orientation,
       }));
-      if (from === 'camera') feedback(same ? 'same' : needsReview(next) ? 'doubt' : 'match');
+      if (from === 'camera') slipSettled(same || repeat ? 'same' : needsReview(next) ? 'doubt' : 'match', next.chosen?.name ?? null, waitingRef.current - 1);
     } catch (e) {
       console.warn('Recognition failed', e);
       setScanError(`Could not recognise the last slip (${e instanceof Error ? e.message : String(e)}). The photo is kept for review.`);
-      if (from === 'camera') feedback('doubt');
+      if (from === 'camera') slipSettled('doubt', null, waitingRef.current - 1);
     } finally {
       waitingRef.current--;
       setReading((r) => {
@@ -369,7 +448,7 @@ export default function CameraView({ cards }: { cards: Card[] | null }) {
     // A last capture of another box shape cannot be compared, so it is forgotten.
     const last = loopRef.current.lastCaptured;
     const sameSize = last !== null && last.width === canvas.width && last.height === canvas.height;
-    loopRef.current = { ...loopRef.current, prev: null, stable: 0, lastCaptured: sameSize ? last : null };
+    loopRef.current = { ...loopRef.current, prev: null, stable: 0, checked: false, lastCaptured: sameSize ? last : null };
     // A tick is skipped while the previous one is still at work (its photo is being kept).
     let busy = false;
     let live = true;
@@ -477,6 +556,7 @@ export default function CameraView({ cards }: { cards: Card[] | null }) {
   const phaseText: Record<LoopPhase, string> = {
     empty: 'Waiting for a slip',
     settling: 'Hold still',
+    unclear: 'Nothing clear in the box. Move the slip, or set the empty sheet again on the Setup tab.',
     captured: 'Taken. Slide the next slip in.',
   };
 
@@ -490,6 +570,11 @@ export default function CameraView({ cards }: { cards: Card[] | null }) {
           <span>{counts.captured} captured</span>
           <span>{counts.matched} matched</span>
           <span className={counts.toReview ? 'warn' : undefined}>{counts.toReview} to review</span>
+          {counts.repeats > 0 && (
+            <span>
+              {counts.repeats} {counts.repeats === 1 ? 'repeat' : 'repeats'}
+            </span>
+          )}
           {reading.size > 0 && <span className={reading.size >= MAX_WAITING ? 'warn' : undefined}>{reading.size} recognising</span>}
         </p>
         <button
@@ -546,9 +631,16 @@ export default function CameraView({ cards }: { cards: Card[] | null }) {
           {camera.state === 'starting' && <p className="camera-starting">Starting the camera…</p>}
         </div>
         {tab === 'scan' && camera.state === 'on' && (
-          <p className={`loop-phase tone-${tone}`} role="status">
-            {settings.baseline ? phaseText[phase] : 'Set the empty sheet first, on the Setup tab.'}
-          </p>
+          <>
+            {/* The header's count writ large, under the picture so the guide box stays clear; aria-hidden, since the header already announces it. */}
+            <p className="camera-big-count num" aria-hidden="true">
+              <strong>{counts.captured}</strong>
+              <span>slips</span>
+            </p>
+            <p className={`loop-phase tone-${tone}`} role="status">
+              {settings.baseline ? phaseText[phase] : 'Set the empty sheet first, on the Setup tab.'}
+            </p>
+          </>
         )}
       </section>
 
@@ -592,6 +684,12 @@ export default function CameraView({ cards }: { cards: Card[] | null }) {
                 // No audio on this device.
               }
             }
+          }}
+          onSpeak={(mode) => {
+            setSettings((s) => ({ ...s, speak: mode }));
+            // Said from the tap itself: the first words wake the voice on phones that want a touch for it.
+            spokeRef.current = true;
+            speak(mode === 'count' ? `Count every ${COUNT_EVERY}` : mode === 'names' ? 'Each card’s name' : '');
           }}
           onResetOrientation={() => setSettings((s) => ({ ...s, orientation: initialOrientation() }))}
           onPhoto={(f) => void tryPhoto(f)}
@@ -721,6 +819,7 @@ function SetupPanel({
   onSetSheet,
   onTurn,
   onBeep,
+  onSpeak,
   onResetOrientation,
   onPhoto,
   onDone,
@@ -732,6 +831,7 @@ function SetupPanel({
   onSetSheet: () => void;
   onTurn: () => void;
   onBeep: (on: boolean) => void;
+  onSpeak: (mode: Speak) => void;
   onResetOrientation: () => void;
   onPhoto: (f: File | undefined) => void;
   onDone: () => void;
@@ -763,8 +863,12 @@ function SetupPanel({
       </div>
       <h2>Slips</h2>
       <p className="muted">
-        A new slip is noticed by its content, so the box need not show the sheet between slips; a slip put back within a few seconds is
-        not counted twice.
+        A slip is photographed once it lies still in the box. A new slip is noticed by its content, so the box need not show the sheet
+        between slips; a slip whose picture changed after it settled (a hand moved away, the slip was pushed further in) is photographed
+        again and the extra photo is set aside, and a slip put back within a few seconds is not counted twice. A slip that matches a card
+        already in this pile is set aside as a repeat, not counted, and shown among the repeats in the header; its photo stays in Review,
+        where “Keep as a second copy” counts it after all when it really is a second copy. In Review, use “Repeat, already taken” for a
+        second photo of a slip, and “Not a card” only for the empty sheet or a hand.
       </p>
       <p>
         {o.locked === 'rotated'
@@ -785,12 +889,23 @@ function SetupPanel({
       </p>
       <h2>Feedback</h2>
       <p className="muted">
-        {`The phone buzzes briefly for each photo, then long when the slip matched, twice when it needs review, or briefly again when it was the slip just taken. When recognition falls behind, the header shows how many slips are still recognising; past ${MAX_WAITING}, a slip keeps only its photo and goes to Review.`}
+        {`The phone buzzes briefly for each photo, then long when the slip matched, twice when it needs review, or briefly again when it was the slip just taken or a repeat. Every ${COUNT_EVERY} slips it adds a long double buzz: the count checkpoint. When recognition falls behind, the header shows how many slips are still recognising; past ${MAX_WAITING}, a slip keeps only its photo and goes to Review.`}
       </p>
       <label className="check">
         <input type="checkbox" checked={settings.beep} onChange={(e) => onBeep(e.target.checked)} />
         Beep too
       </label>
+      <label className="field">
+        <span>Speak</span>
+        <select value={settings.speak} onChange={(e) => onSpeak(parseSpeak(e.target.value))}>
+          <option value="off">Off</option>
+          <option value="count">Count every {COUNT_EVERY}</option>
+          <option value="names">Each card’s name</option>
+        </select>
+      </label>
+      <p className="muted">
+        {`Count a stack of ${COUNT_EVERY} (or ${COUNT_EVERY * 2}) slips before feeding it: the long double buzz and the spoken number should land on the stack’s last slip; if they come a slip later, a slip in that stack was missed, and if earlier, a photo that is not a slip was counted.`}
+      </p>
       <h2>Without the camera</h2>
       <p className="muted">Run one picture of a slip through the same recognition, for example a slip the camera missed.</p>
       <PhotoButton onPhoto={onPhoto} />

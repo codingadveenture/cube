@@ -20,7 +20,7 @@ export function GuideOverlay({
   editable: boolean;
   /** The view is rotated 180 degrees, so screen drags run the other way in the video. */
   flipped: boolean;
-  tone: 'idle' | 'empty' | 'settling' | 'captured';
+  tone: 'idle' | 'empty' | 'settling' | 'unclear' | 'captured';
   onChange: (g: Guide) => void;
 }) {
   const layer = useRef<HTMLDivElement>(null);

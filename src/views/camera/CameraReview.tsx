@@ -9,6 +9,7 @@ import { recordSharedFrom, setPhotosPending } from '../../store/scanPrefs';
 import { NameField, useDisplayName } from '../common';
 import type { CameraSessionMeta } from '../../scan/camera/settings';
 import {
+  alreadyInPile,
   confirmShot,
   defaultPileLabel,
   filterShots,
@@ -18,7 +19,9 @@ import {
   nextToReview,
   shotCounts,
   shotsToRows,
+  skipAsRepeat,
   skipShot,
+  type PrintingLike,
   type PrintingRef,
   type Shot,
   type ShotFilter,
@@ -75,9 +78,11 @@ export function CameraReview({
       <ShotDetail
         key={open.id}
         shot={open}
+        shots={shots}
         reading={reading.has(open.id)}
         onPick={(c) => decided(confirmShot(open, c))}
         onSkip={() => decided(skipShot(open))}
+        onRepeat={() => decided(skipAsRepeat(open))}
         onRetake={() => {
           const after = nextToReview(shots, open.id);
           onRetake(open.id);
@@ -133,21 +138,33 @@ export function CameraReview({
 
 function ShotDetail({
   shot,
+  shots,
   reading,
   onPick,
   onSkip,
+  onRepeat,
   onRetake,
   onClose,
 }: {
   shot: Shot;
+  /** The whole session, to say which candidates the pile already has. */
+  shots: readonly Shot[];
   reading: boolean;
   onPick: (c: PrintingRef) => void;
+  /** Not a card: a sheet or a hand. */
   onSkip: () => void;
+  /** A second photo of a slip already taken. */
+  onRepeat: () => void;
   onRetake: () => void;
   onClose: () => void;
 }) {
   const [searching, setSearching] = useState(false);
   const [confirmRetake, setConfirmRetake] = useState(false);
+  // Another kept shot of the same Printing: a tap on such a candidate adds a second copy, which is
+  // right now and then, but a second photo of the same slip is a repeat.
+  const inPile = (c: PrintingLike) => alreadyInPile(shots, c, shot.id) !== null;
+  const secondCopy = shot.chosen !== null && inPile(shot.chosen);
+  const offersCopy = !secondCopy && shot.candidates.some(inPile);
   return (
     <section className="shot-detail" aria-label="Photo">
       <button type="button" className="link" onClick={onClose}>
@@ -160,6 +177,7 @@ function ShotDetail({
             {shot.chosen.name} <span className="muted num">{setNumber(shot.chosen)}</span>
           </span>
         )}
+        {shot.reason && <span className="muted">{shot.reason[0]!.toUpperCase() + shot.reason.slice(1)}.</span>}
       </div>
       <div className="shot-compare">
         <ShotPhoto shot={shot} className="shot-large" />
@@ -174,6 +192,7 @@ function ShotDetail({
                   <span className="muted num">
                     {setNumber(c)} · {score(c.score)}
                   </span>
+                  {inPile(c) && <span className="candidate-tag">already in this pile</span>}
                 </button>
               </li>
             );
@@ -181,10 +200,19 @@ function ShotDetail({
           {shot.candidates.length === 0 && <li className="muted">{reading ? 'Recognising…' : 'No candidates. Search by name.'}</li>}
         </ol>
       </div>
-      <p className="muted">Tap the card that is in the photo.</p>
+      <p className="muted">
+        {secondCopy
+          ? `Counted as a second copy of ${shot.chosen!.name}, which is already in this pile.`
+          : offersCopy
+            ? 'Tap the card that is in the photo. A card already in this pile adds a second copy of it; a second photo of the same slip is a repeat.'
+            : 'Tap the card that is in the photo.'}
+      </p>
       <div className="actions">
         <button type="button" aria-expanded={searching} onClick={() => setSearching((v) => !v)}>
           Search by name
+        </button>
+        <button type="button" onClick={onRepeat}>
+          Repeat, already taken
         </button>
         <button type="button" onClick={onSkip}>
           Not a card
