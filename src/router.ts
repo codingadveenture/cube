@@ -1,6 +1,6 @@
 // A tiny hash router: #/cube (default), #/cube?q=<search>, #/cube/<oracle_id>, #/scan,
 // #/cube/<oracle_id>/printings, #/cycles, #/cycles/<name>, #/print, #/print?section=tokens, #/suggestions, #/upstream,
-// #/log, #/about, #/camera (the camera capture view; its state never goes into the URL),
+// #/log, #/about, #/shuffling, #/camera (the camera capture view; its state never goes into the URL),
 // #/review?pile=<shared pile id> (the desk review of the camera photos).
 import { useEffect, useState } from 'react';
 
@@ -15,7 +15,8 @@ export type Route =
   | { view: 'suggestions' }
   | { view: 'upstream' }
   | { view: 'log' }
-  | { view: 'about' };
+  | { view: 'about' }
+  | { view: 'shuffling' };
 
 export function parseHash(hash: string): Route {
   const raw = hash.replace(/^#/, '');
@@ -25,6 +26,7 @@ export function parseHash(hash: string): Route {
   if (parts[0] === 'camera') return { view: 'camera' };
   if (parts[0] === 'review') return { view: 'review', query: new URLSearchParams(query) };
   if (parts[0] === 'about') return { view: 'about' };
+  if (parts[0] === 'shuffling') return { view: 'shuffling' };
   if (parts[0] === 'print') return { view: 'print', query: new URLSearchParams(query) };
   if (parts[0] === 'suggestions') return { view: 'suggestions' };
   if (parts[0] === 'upstream') return { view: 'upstream' };

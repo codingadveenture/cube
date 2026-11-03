@@ -35,23 +35,6 @@ export function AboutView({ data }: { data: CardsFile | null }) {
           <dd>A pass over the Cube with a phone scanner, ending in a diff against the List.</dd>
         </div>
       </dl>
-      <h2>Shuffling the Cube</h2>
-      <p>
-        Nobody can riffle 540 cards, and dealing them one by one is slow, so the Cube is shuffled in eight piles
-        that trade halves around the table. Each pile stays at about 68 cards the whole time.
-      </p>
-      <ol>
-        <li>Split the Cube into eight rough stacks by eye, one per person. Last draft&rsquo;s decks are fine as stacks.</li>
-        <li>
-          Everyone riffles or mash-shuffles their pile four or five times, then passes the top half to the right and
-          takes the half that arrives from the left. The next round goes to the left, then right again, and so on.
-        </li>
-        <li>Eight rounds, one last shuffle, and each person counts 45 cards off the top: three packs of 15. The rest goes back in the box.</li>
-      </ol>
-      <p>
-        Passing halves is what mixes the piles; the riffles are what make the mixing random. Passing whole piles
-        mixes nothing, and an overhand shuffle barely moves a card, so riffle or mash.
-      </p>
       <h2>Data</h2>
       <ul>
         <li>

@@ -9,6 +9,7 @@ import { CubeView } from './views/CubeView';
 import { CardDetail } from './views/CardDetail';
 import { ScanView } from './views/ScanView';
 import { AboutView } from './views/AboutView';
+import { ShufflingView } from './views/ShufflingView';
 import { SuggestionsView } from './views/SuggestionsView';
 import { LogView } from './views/LogView';
 import { BaselinePanel } from './views/BaselinePanel';
@@ -33,6 +34,7 @@ const NAV = [
   { view: 'print', href: '#/print', label: 'Print' },
   { view: 'suggestions', href: '#/suggestions', label: 'Suggest' },
   { view: 'upstream', href: '#/upstream', label: 'Update' },
+  { view: 'shuffling', href: '#/shuffling', label: 'Shuffle' },
 ] as const;
 
 export function App() {
@@ -61,6 +63,8 @@ function Shell() {
   let body: ReactNode;
   if (route.view === 'about') {
     body = <AboutView data={cards.status === 'ready' ? cards.data : null} />;
+  } else if (route.view === 'shuffling') {
+    body = <ShufflingView />;
   } else if (route.view === 'log') {
     body = <LogView />;
   } else if (route.view === 'camera') {

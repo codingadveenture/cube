@@ -34,6 +34,7 @@ describe('router', () => {
   it('knows the Suggestions and Log views', () => {
     expect(parseHash('#/suggestions').view).toBe('suggestions');
     expect(parseHash('#/log').view).toBe('log');
+    expect(parseHash('#/shuffling').view).toBe('shuffling');
     expect(parseHash('#/about').view).toBe('about');
   });
 
