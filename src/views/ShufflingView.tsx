@@ -62,9 +62,8 @@ export function ShufflingView() {
         </tbody>
       </table>
       <p>
-        Not shuffles at all: passing whole piles around (a pile is the same cards wherever it goes), overhand shuffling
-        (a handful of overhands barely moves a card), and dealing into piles without shuffling the piles (a deal is a fixed
-        rearrangement, however many piles).
+        Riffle or mash the piles: a handful of overhand shuffles barely moves a card. Dealing into piles on its own does
+        not shuffle either, so every deal is followed by shuffling the piles.
       </p>
 
       <h2>The house routine</h2>
