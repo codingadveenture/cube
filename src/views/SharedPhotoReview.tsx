@@ -36,7 +36,7 @@ const STATUS_WORD: Record<SharedShot['status'], string> = {
   confirmed: 'Confirmed',
   review: 'Review',
   none: 'Unknown',
-  skipped: 'Not a card',
+  skipped: 'Set aside',
   repeat: 'Repeat',
 };
 

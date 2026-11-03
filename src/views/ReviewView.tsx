@@ -271,6 +271,8 @@ function PileDesk({
       const art = illustration === undefined ? await illustrationOf(ref) : illustration;
       await store.updateCard(card.oracle_id, { kind: 'in_box', in_box: inBoxFromPrinting(ref, art) });
       setBoxNote({ error: false, text: `In-box printing of ${card.name} set to ${ref.set.toUpperCase()} ${ref.collector_number}.` });
+      // The photo showed this printing: a doubtful photo is decided as it in the same click, by the usual rule.
+      if (current && sharedNeedsReview(current.shot) && canPick()) choose(ref);
     } catch (e) {
       console.warn('Box has this printing failed', e);
       setBoxNote({ error: true, text: errorText(e) });
@@ -528,6 +530,15 @@ function PileDesk({
                     <kbd aria-hidden="true">N</kbd> Not a card
                   </button>
                 </div>
+              )}
+              {decidable && s && !sharedNeedsReview(s) && (
+                <p className="muted">
+                  {s.status === 'repeat'
+                    ? `Decided: a repeat${s.chosen ? ` of ${s.chosen.name}` : ''}. Nothing more to do here; Next moves on.`
+                    : s.status === 'skipped'
+                      ? 'Decided: set aside (not a card, or a repeat from before repeats were named). Nothing more to do here; Next moves on.'
+                      : `Decided: ${s.chosen?.name ?? 'matched'}. Pick a candidate only to change that; Next moves on.`}
+                </p>
               )}
               {searching && decidable && <NameSearch onPick={pickFromSearch} />}
               {picker && decidable && (

@@ -101,7 +101,11 @@ export function namesInPiles(piles: readonly Pick<SharedPile, 'id' | 'label' | '
   return names;
 }
 
-export type CandidateTag = { kind: 'inBox' } | { kind: 'inBoxOtherPrinting' } | { kind: 'alreadyIn'; label: string };
+export type CandidateTag =
+  | { kind: 'inBox' }
+  /** The card is in the box as another printing: the one named here. */
+  | { kind: 'inBoxOtherPrinting'; set: string; collector_number: string }
+  | { kind: 'alreadyIn'; label: string };
 
 /**
  * What the desk says beside a candidate: it is the Printing in the box, or another printing of
@@ -114,7 +118,13 @@ export function candidateTags(
 ): CandidateTag[] {
   const tags: CandidateTag[] = [];
   const inBox = cards?.get(c.oracle_id)?.in_box ?? null;
-  if (inBox) tags.push(inBox.scryfall_id === c.scryfall_id ? { kind: 'inBox' } : { kind: 'inBoxOtherPrinting' });
+  if (inBox) {
+    tags.push(
+      inBox.scryfall_id === c.scryfall_id
+        ? { kind: 'inBox' }
+        : { kind: 'inBoxOtherPrinting', set: inBox.set, collector_number: inBox.collector_number },
+    );
+  }
   const label = names.get(nameKey(c.name));
   if (label !== undefined) tags.push({ kind: 'alreadyIn', label });
   return tags;
@@ -125,7 +135,7 @@ export function tagText(t: CandidateTag): string {
     case 'inBox':
       return 'in the box';
     case 'inBoxOtherPrinting':
-      return 'In-box card, other printing';
+      return t.set ? `box has ${t.set.toUpperCase()} ${t.collector_number}` : 'box has another printing';
     default:
       return `already in ${t.label}`;
   }

@@ -102,7 +102,7 @@ describe('queue of a pile', () => {
 
 describe('candidate tags', () => {
   const cards = new Map([
-    ['o-bolt', { in_box: { scryfall_id: 'sf-bolt-box' } as never }],
+    ['o-bolt', { in_box: { scryfall_id: 'sf-bolt-box', set: 'lea', collector_number: '161' } as never }],
     ['o-ponder', { in_box: null }],
   ]);
   const names = new Map([['lightning bolt', 'Stack 1']]);
@@ -110,7 +110,7 @@ describe('candidate tags', () => {
   it('says in the box, or another printing of an In-box card', () => {
     expect(candidateTags({ scryfall_id: 'sf-bolt-box', oracle_id: 'o-bolt', name: 'Lightning Bolt' }, cards, new Map())).toEqual([{ kind: 'inBox' }]);
     expect(candidateTags({ scryfall_id: 'sf-bolt-m10', oracle_id: 'o-bolt', name: 'Lightning Bolt' }, cards, new Map())).toEqual([
-      { kind: 'inBoxOtherPrinting' },
+      { kind: 'inBoxOtherPrinting', set: 'lea', collector_number: '161' },
     ]);
     expect(candidateTags({ scryfall_id: 'sf-ponder', oracle_id: 'o-ponder', name: 'Ponder' }, cards, new Map())).toEqual([]);
     expect(candidateTags({ scryfall_id: 'sf-x', oracle_id: 'o-unknown', name: 'X' }, cards, new Map())).toEqual([]);
@@ -141,7 +141,8 @@ describe('candidate tags', () => {
 
   it('has a word for every tag', () => {
     expect(tagText({ kind: 'inBox' })).toBe('in the box');
-    expect(tagText({ kind: 'inBoxOtherPrinting' })).toBe('In-box card, other printing');
+    expect(tagText({ kind: 'inBoxOtherPrinting', set: 'lea', collector_number: '161' })).toBe('box has LEA 161');
+    expect(tagText({ kind: 'inBoxOtherPrinting', set: '', collector_number: '' })).toBe('box has another printing');
     expect(tagText({ kind: 'alreadyIn', label: 'Stack 1' })).toBe('already in Stack 1');
   });
 });
