@@ -67,9 +67,6 @@ const LOOP_MS = 66;
  * 2.3 MB), so when the phone falls behind, a further slip keeps only its photo and goes to Review.
  */
 const MAX_WAITING = 4;
-/** The count checkpoint's long double buzz, unlike any of a slip's own. */
-const COUNT_BUZZ = [250, 120, 250];
-
 type CameraState =
   | { state: 'starting' }
   | { state: 'on'; width: number; height: number }
@@ -277,19 +274,13 @@ export default function CameraView({ cards }: { cards: Card[] | null }) {
   useEffect(() => () => speak(''), []);
 
   /**
-   * Buzz (and beep): one short buzz when a slip is photographed, one long buzz when it matched,
-   * two buzzes when it needs review, one short buzz when it was the same slip as the one before
-   * (counted once, whichever photo of it is kept) or a repeat. The result comes after the capture,
-   * so each slip ends with one of the last three. At a count checkpoint the long double buzz
-   * follows the slip's own after a pause, in one pattern so that neither cuts the other short.
+   * Beep, when "Beep too" is on: one short tone when a slip is photographed, a high tone when it
+   * matched, two low tones when it needs review, a middle tone when it was the same slip as the one
+   * before (counted once, whichever photo of it is kept) or a repeat. The result comes after the
+   * capture, so each slip ends with one of the last three. At a count checkpoint two long tones
+   * follow the slip's own. The phone does not vibrate: the Owner found the buzzing a nuisance.
    */
   function feedback(kind: 'capture' | 'match' | 'doubt' | 'same', checkpoint = false) {
-    const buzz = kind === 'capture' || kind === 'same' ? [40] : kind === 'match' ? [180] : [90, 70, 90];
-    try {
-      navigator.vibrate?.(checkpoint ? [...buzz, 400, ...COUNT_BUZZ] : buzz);
-    } catch {
-      // Vibration is not available.
-    }
     const ctx = audioRef.current;
     if (!settingsRef.current.beep || !ctx || ctx.state === 'closed') return;
     const tones: [number, number, number][] =
@@ -311,7 +302,7 @@ export default function CameraView({ cards }: { cards: Card[] | null }) {
   const lastSettledRef = useRef<number | null>(null);
   /**
    * The end of a camera slip, once its photo is matched, sent to review, or set aside as the same
-   * slip or a repeat: the slip's buzz, the count checkpoint, and the spoken word. The count is of
+   * slip or a repeat: the slip's beep, the count checkpoint, and the spoken word. The count is of
    * the slips the recogniser has answered: a photo still waiting may yet turn out to be the same
    * slip again, so it counts when it settles, and the checkpoint lands on the stack's last slip
    * even when recognition is a slip or two behind. A slip set aside did not add to the count, so it
@@ -889,11 +880,11 @@ function SetupPanel({
       </p>
       <h2>Feedback</h2>
       <p className="muted">
-        {`The phone buzzes briefly for each photo, then long when the slip matched, twice when it needs review, or briefly again when it was the slip just taken or a repeat. Every ${COUNT_EVERY} slips it adds a long double buzz: the count checkpoint. When recognition falls behind, the header shows how many slips are still recognising; past ${MAX_WAITING}, a slip keeps only its photo and goes to Review.`}
+        {`With Beep on, the phone plays a short tone for each photo, then a high tone when the slip matched, two low tones when it needs review, or a middle tone when it was the slip just taken or a repeat. Every ${COUNT_EVERY} slips it adds two long tones: the count checkpoint. The phone does not vibrate. When recognition falls behind, the header shows how many slips are still recognising; past ${MAX_WAITING}, a slip keeps only its photo and goes to Review.`}
       </p>
       <label className="check">
         <input type="checkbox" checked={settings.beep} onChange={(e) => onBeep(e.target.checked)} />
-        Beep too
+        Beep
       </label>
       <label className="field">
         <span>Speak</span>
@@ -904,7 +895,7 @@ function SetupPanel({
         </select>
       </label>
       <p className="muted">
-        {`Count a stack of ${COUNT_EVERY} (or ${COUNT_EVERY * 2}) slips before feeding it: the long double buzz and the spoken number should land on the stack’s last slip; if they come a slip later, a slip in that stack was missed, and if earlier, a photo that is not a slip was counted.`}
+        {`Count a stack of ${COUNT_EVERY} (or ${COUNT_EVERY * 2}) slips before feeding it: the two long tones or the spoken number should land on the stack’s last slip; if they come a slip later, a slip in that stack was missed, and if earlier, a photo that is not a slip was counted.`}
       </p>
       <h2>Without the camera</h2>
       <p className="muted">Run one picture of a slip through the same recognition, for example a slip the camera missed.</p>

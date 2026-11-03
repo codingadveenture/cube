@@ -8,8 +8,9 @@ export const SETTINGS_KEY = 'cube.camera-settings.v1';
 export const CAMERA_SESSION_KEY = 'cube.camera-session.v1';
 
 /**
- * Slips are counted off in stacks of this size: the phone marks every multiple with a long double
- * buzz, so a stack counted by hand before it is fed shows at once whether a slip was missed.
+ * Slips are counted off in stacks of this size: the phone marks every multiple with two long tones
+ * or a spoken number, so a stack counted by hand before it is fed shows at once whether a slip was
+ * missed.
  */
 export const COUNT_EVERY = 25;
 
