@@ -191,12 +191,16 @@ export interface SharedShotCandidate extends SharedShotRef {
   score: number;
 }
 
-/** The status words of a camera shot (src/scan/camera/shots.ts ShotStatus). */
-export type SharedShotStatus = 'match' | 'review' | 'none' | 'confirmed' | 'skipped';
+/**
+ * The status words of a camera shot (src/scan/camera/shots.ts ShotStatus), plus 'repeat': a photo
+ * of a card a pile already has, set aside with the card it names in `chosen` (a camera shot keeps
+ * that as 'skipped' with the reason REPEAT). firestore.rules does not check the word.
+ */
+export type SharedShotStatus = 'match' | 'review' | 'none' | 'confirmed' | 'skipped' | 'repeat';
 
 /** One camera photo inside a chunk document. */
 export interface SharedShot {
-  /** Index into the parent pile's rows, or -1 when the shot has no row (to review, unknown, not a card). */
+  /** Index into the parent pile's rows, or -1 when the shot has no row (to review, unknown, not a card, a repeat). */
   row: number;
   /** The camera shot id. */
   id: string;
@@ -227,8 +231,12 @@ export const SHOT_CHUNK_KEYS = ['index', 'shots', 'count', 'createdAt', 'created
 /** The fields of one shot inside a chunk. */
 export const SHARED_SHOT_KEYS = ['row', 'id', 'at', 'thumb', 'status', 'score', 'chosen', 'candidates'] as const;
 
-/** A decision on one shared shot, made in the photo review. */
-export type ShotDecisionInput = { kind: 'pick'; ref: SharedShotRef } | { kind: 'not_a_card' };
+/**
+ * A decision on one shared shot, made in the photo review: the Printing in the photo (a row of the
+ * pile), not a card at all (the empty sheet, a hand), or a repeat of `ref`, a card a pile already
+ * has (no row; the card is named, so it is certainly a repeat and not another card).
+ */
+export type ShotDecisionInput = { kind: 'pick'; ref: SharedShotRef } | { kind: 'not_a_card' } | { kind: 'repeat'; ref: SharedShotRef };
 
 export type LogType = 'winner_pick' | 'ban';
 

@@ -22,11 +22,14 @@ const PrintView = lazy(() => import('./views/print/PrintView'));
 const UpstreamView = lazy(() => import('./views/upstream/UpstreamView'));
 // The camera capture view; the recogniser (onnxruntime-web, the model) loads from it, in a worker.
 const CameraView = lazy(() => import('./views/camera/CameraView'));
+// The desk review of the camera photos (and the art catalog of its Search by name) loads on demand.
+const ReviewView = lazy(() => import('./views/ReviewView'));
 
 const NAV = [
   { view: 'cube', href: '#/cube', label: 'Cube' },
   { view: 'cycles', href: '#/cycles', label: 'Cycles' },
   { view: 'scan', href: '#/scan', label: 'Scan' },
+  { view: 'review', href: '#/review', label: 'Review' },
   { view: 'print', href: '#/print', label: 'Print' },
   { view: 'suggestions', href: '#/suggestions', label: 'Suggest' },
   { view: 'upstream', href: '#/upstream', label: 'Update' },
@@ -63,6 +66,9 @@ function Shell() {
   } else if (route.view === 'camera') {
     // Works before the card data has loaded; the In-box Printings join in when it has.
     body = <CameraView cards={merged} />;
+  } else if (route.view === 'review') {
+    // The same: the photos and the shared piles are live; the In-box tags join in with the card data.
+    body = <ReviewView cards={merged} pileId={route.query.get('pile')} />;
   } else if (cards.status === 'loading' || !base || !merged) {
     body =
       cards.status === 'error' ? (
@@ -119,7 +125,7 @@ function Shell() {
   );
 }
 
-/** The nav entry a view belongs to: the picker is part of the Cube and the camera of Scan; About and Log have no bar entry (they are in the account menu). */
+/** The nav entry a view belongs to: the picker is part of the Cube and the camera of Scan; Review has its own; About and Log have no bar entry (they are in the account menu). */
 function navView(view: string): string | null {
   if (view === 'about' || view === 'log') return null;
   if (view === 'camera') return 'scan';

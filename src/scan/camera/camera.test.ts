@@ -26,6 +26,7 @@ import {
   earlierPileOf,
   earlierPilesIndex,
   filterShots,
+  isMatched,
   isSameSlip,
   keepSecondCopy,
   keysOf,
@@ -482,9 +483,11 @@ describe('shots', () => {
     const again = matched('b', 30, [bolt]);
     expect(repeatOf([again, first], again)?.id).toBe('a');
     expect(repeatOf([first], matched('c', 31, [ring]))).toBe(null);
-    const aside = skipAsRepeat(again);
+    const aside = skipAsRepeat(again, again.chosen!);
     expect(aside.status).toBe('skipped');
-    expect(aside.chosen).toBe(null);
+    // A repeat names its card, so it is certainly a repeat and not another card; it is still not in the pile.
+    expect(aside.chosen).toEqual(again.chosen);
+    expect(isMatched(aside)).toBe(false);
     expect(aside.reason).toBe(REPEAT);
     // The recognition stays, so Review can keep it as a second copy.
     expect(aside.decision).toEqual(again.decision);
@@ -494,6 +497,18 @@ describe('shots', () => {
     expect(shotCounts([first, aside])).toEqual({ captured: 1, matched: 1, toReview: 0, skipped: 1, repeats: 1, fed: 2 });
     expect(shotsToRows([first, aside])).toEqual([expect.objectContaining({ name: 'Lightning Bolt', quantity: 1 })]);
     expect(reviveShot(structuredClone(aside))?.reason).toBe(REPEAT);
+    expect(reviveShot(structuredClone(aside))?.chosen).toEqual(again.chosen);
+  });
+
+  it('records a repeat of the card the Owner named, not the one recognition chose', () => {
+    const doubt = applyRecognition(shot('a', at(0)), result('review', [bolt, ring]));
+    const aside = skipAsRepeat(doubt, refOf(ring), 'already in pile Earlier');
+    expect(aside.status).toBe('skipped');
+    expect(aside.reason).toBe(REPEAT);
+    expect(aside.chosen?.scryfall_id).toBe('lea-270');
+    expect(aside.note).toBe('already in pile Earlier');
+    expect(shotCounts([aside])).toEqual({ captured: 0, matched: 0, toReview: 0, skipped: 1, repeats: 1, fed: 1 });
+    expect(shotsToRows([aside])).toEqual([]);
   });
 
   it('finds the repeat by name, set and number when an id is missing', () => {
@@ -554,13 +569,13 @@ describe('shots', () => {
 
   it('keeps the note of a repeat from an earlier pile until the shot is kept or decided', () => {
     const note = 'already in pile Camera 2026-10-25 23:18, 172 slips';
-    const aside = skipAsRepeat(matched('a', 0, [bolt]), note);
+    const aside = skipAsRepeat(matched('a', 0, [bolt]), refOf(bolt), note);
     expect(aside.reason).toBe(REPEAT);
     expect(aside.note).toBe(note);
     expect(reviveShot(structuredClone(aside))?.note).toBe(note);
     // A repeat within the session carries no note, and a note does not linger on a later one.
-    expect(skipAsRepeat(matched('b', 1, [bolt])).note).toBeUndefined();
-    expect(skipAsRepeat(aside).note).toBeUndefined();
+    expect(skipAsRepeat(matched('b', 1, [bolt]), refOf(bolt)).note).toBeUndefined();
+    expect(skipAsRepeat(aside, refOf(bolt)).note).toBeUndefined();
     const copy = keepSecondCopy(aside);
     expect(copy.status).toBe('match');
     expect(copy.reason).toBeUndefined();
@@ -573,7 +588,7 @@ describe('shots', () => {
     const first = matched('a', 0, [bolt], unit());
     const again = skipSameSlip(first, matched('b', 1, [bolt], unit())).next;
     expect(again.reason).toBe(SAME_SLIP);
-    const repeat = skipAsRepeat(matched('c', 30, [bolt]), 'already in pile Earlier');
+    const repeat = skipAsRepeat(matched('c', 30, [bolt]), refOf(bolt), 'already in pile Earlier');
     const other = matched('d', 31, [ring]);
     const counts = shotCounts([other, repeat, again, first]);
     expect(counts.captured).toBe(2);
@@ -595,7 +610,7 @@ describe('shots', () => {
     // A skipped shot is not in the pile, and a shot is no repeat of itself or of a later one.
     const later = matched('c', 20, [bolt]);
     expect(repeatOf([later, skipShot(first)], later)).toBe(null);
-    expect(repeatOf([later, skipAsRepeat(first)], later)).toBe(null);
+    expect(repeatOf([later, skipAsRepeat(first, refOf(bolt))], later)).toBe(null);
     expect(repeatOf([later, first], first)).toBe(null);
     expect(repeatOf([first], first)).toBe(null);
     // The Owner's confirmation is their word, even of a card already in the pile.
@@ -605,16 +620,22 @@ describe('shots', () => {
 
   it('keeps a repeat as a second copy, back to what its recognition gave', () => {
     const first = matched('a', 0, [bolt]);
-    const copy = keepSecondCopy(skipAsRepeat(matched('b', 10, [bolt])));
+    const copy = keepSecondCopy(skipAsRepeat(matched('b', 10, [bolt]), refOf(bolt)));
     expect(copy.status).toBe('match');
     expect(copy.chosen?.scryfall_id).toBe('lea-161');
     expect(copy.reason).toBeUndefined();
     expect(shotCounts([first, copy])).toEqual({ captured: 2, matched: 2, toReview: 0, skipped: 0, repeats: 0, fed: 2 });
     expect(shotsToRows([first, copy])[0]!.quantity).toBe(2);
-    // A doubtful photo the Owner called a repeat in Review comes back doubtful.
-    const doubtful = keepSecondCopy(skipAsRepeat(applyRecognition(shot('c', at(20)), result('review', [bolt]))));
-    expect(doubtful.status).toBe('review');
-    expect(doubtful.chosen).toBe(null);
+    // A doubtful photo the Owner called a repeat of a card in Review comes back as that card: the Owner identified it.
+    const named = keepSecondCopy(skipAsRepeat(applyRecognition(shot('c', at(20)), result('review', [bolt])), refOf(ring)));
+    expect(named.status).toBe('confirmed');
+    expect(named.chosen?.scryfall_id).toBe('lea-270');
+    expect(named.reason).toBeUndefined();
+    // So does a match the Owner called a repeat of another card than its recognition chose.
+    const other = keepSecondCopy(skipAsRepeat(matched('d', 30, [bolt]), refOf(ring), 'already in pile Earlier'));
+    expect(other.status).toBe('confirmed');
+    expect(other.chosen?.scryfall_id).toBe('lea-270');
+    expect(other.note).toBeUndefined();
   });
 
   it('tells which candidates are already in the pile', () => {
@@ -632,7 +653,7 @@ describe('shots', () => {
 
   it('keeps a repeat set aside when the slip is nudged', () => {
     const first = matched('a', 0, [{ ...bolt, score: 0.7 }], unit());
-    const repeat = skipAsRepeat(matched('b', 20, [{ ...bolt, score: 0.6 }], unit()));
+    const repeat = skipAsRepeat(matched('b', 20, [{ ...bolt, score: 0.6 }], unit()), refOf(bolt));
     const nudged = matched('c', 21, [{ ...bolt, score: 0.8 }], unit());
     expect(sameSlipOf([nudged, repeat, first], nudged)?.id).toBe('b');
     const out = skipSameSlip(repeat, nudged);
@@ -640,7 +661,7 @@ describe('shots', () => {
     expect(out.previous.reason).toBe(REPLACED);
     // Judged on the pile as settled, the better photo is still a repeat of the first slip.
     expect(repeatOf([out.next, out.previous, first], out.next)?.id).toBe('a');
-    expect(shotCounts([skipAsRepeat(out.next), out.previous, first])).toEqual({ captured: 1, matched: 1, toReview: 0, skipped: 2, repeats: 1, fed: 2 });
+    expect(shotCounts([skipAsRepeat(out.next, refOf(bolt)), out.previous, first])).toEqual({ captured: 1, matched: 1, toReview: 0, skipped: 2, repeats: 1, fed: 2 });
     // A worse photo of the nudged slip loses to the repeat as the same slip.
     const worse = matched('d', 22, [{ ...bolt, score: 0.5 }], unit());
     expect(skipSameSlip(repeat, worse).next.reason).toBe(SAME_SLIP);

@@ -1181,11 +1181,11 @@ button.tile-button {
   border-top: 1px solid var(--border);
 }
 
-/* Six entries in the bottom bar (About is in the account menu): 60 px each at 360 px, still 44 px tall. */
+/* Seven entries in the bottom bar (About and Log are in the account menu): 51 px each at 360 px, still 44 px tall. */
 @media (max-width: 400px) {
   .nav a {
     padding: 0 2px;
-    font-size: 0.82rem;
+    font-size: 0.78rem;
   }
 }
 
@@ -1869,6 +1869,22 @@ a.button {
   text-align: left;
   font-size: 0.85rem;
 }
+/* A candidate and, under it, its small controls ("Second copy" on a card a pile already has, "Other printing…" at the desk). */
+.candidates > li {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.2rem;
+  min-width: 0;
+}
+.candidates > li > .candidate {
+  flex: 1 1 auto;
+  height: auto;
+}
+.candidates > li > .link {
+  align-self: flex-start;
+  font-size: 0.85rem;
+}
 .candidates li.chosen .candidate {
   border: 3px solid var(--tone-match);
 }
@@ -1953,7 +1969,8 @@ a.button {
 .shared-shot .candidates {
   grid-template-columns: repeat(auto-fill, minmax(110px, 160px));
 }
-.shot-status.tone-skipped {
+.shot-status.tone-skipped,
+.shot-status.tone-repeat {
   background: var(--chip);
 }
 @media (max-width: 560px) {
@@ -1962,5 +1979,163 @@ a.button {
   }
   .shared-photo {
     width: min(100%, 240px);
+  }
+}
+
+/* Desk review (#/review): the photo large on the left, the candidates as big cards on the right. */
+.desk-piles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.5rem 0;
+}
+.desk-piles a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 40px;
+  max-width: 100%;
+  padding: 0 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
+}
+.desk-piles a[aria-current='page'] {
+  background: var(--chip);
+  font-weight: 600;
+}
+.desk-piles .count {
+  color: var(--muted);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.desk-piles .count.open {
+  color: var(--warn);
+  font-weight: 600;
+}
+.desk-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin: 0.5rem 0;
+}
+.desk {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+  margin-top: 0.5rem;
+}
+.desk[aria-busy='true'] {
+  opacity: 0.7;
+}
+/* The thumbnail (at most 240x336) at twice its size, so the name on the slip reads from a chair. */
+.desk-photo {
+  display: block;
+  width: min(100%, 480px);
+  height: auto;
+  aspect-ratio: 5 / 7;
+  object-fit: contain;
+  background: var(--chip);
+}
+.desk-photo.turned {
+  transform: rotate(180deg);
+}
+.desk-photo-box {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+}
+.desk-body {
+  min-width: 0;
+}
+.desk-candidates {
+  grid-template-columns: repeat(auto-fill, minmax(190px, 230px));
+  gap: 0.75rem;
+}
+.desk .candidate {
+  font-size: 0.95rem;
+}
+/* Scryfall's normal image at about 300 px tall: the set symbol and the frame tell printings apart. */
+.desk-candidate-art {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 5 / 7;
+  border-radius: 4.75% / 3.5%;
+  background: var(--chip);
+}
+.candidate-tag.in-box {
+  border-color: var(--ok);
+  color: var(--ok);
+}
+.desk-picker {
+  margin: 0.5rem 0;
+}
+.desk-printings {
+  list-style: none;
+  margin: 0.5rem 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+/* 143 px wide is 200 px tall at the card's ratio; "Second copy" goes under a printing of a card a pile already has. */
+.desk-printings > li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.desk-printings > li > .link {
+  align-self: flex-start;
+  font-size: 0.85rem;
+}
+.desk-printings .candidate {
+  width: 143px;
+}
+.desk-printings li.chosen .candidate {
+  border: 3px solid var(--tone-match);
+}
+.desk-printing-art {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 5 / 7;
+  border-radius: 4.75% / 3.5%;
+  background: var(--chip);
+}
+.desk kbd,
+.desk-nav kbd {
+  display: inline-block;
+  min-width: 1.4em;
+  padding: 0 0.3em;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.8em;
+  line-height: 1.5;
+  text-align: center;
+}
+.desk-keys {
+  font-size: 0.85rem;
+}
+/* The bulk clean-up above the queue: the button and, beside it, what it would set aside. */
+.desk-sweep {
+  align-items: center;
+  margin: 0.5rem 0;
+}
+.desk-sweep .muted {
+  font-size: 0.85rem;
+}
+@media (min-width: 900px) {
+  .desk {
+    grid-template-columns: 480px minmax(0, 1fr);
   }
 }

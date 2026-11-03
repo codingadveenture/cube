@@ -28,6 +28,10 @@ export interface Shot {
   /** The top three cards, best first. */
   candidates: ShotCandidate[];
   status: ShotStatus;
+  /**
+   * The Printing of a match or a confirmed shot, and the card a repeat was taken to be (a repeat
+   * always names its card, else it could be another card); null otherwise.
+   */
   chosen: PrintingRef | null;
   /** The orientation whose pass won; null until recognised. */
   orientation: Orientation | null;
@@ -297,16 +301,25 @@ export function alreadyInPile(shots: readonly Shot[], candidate: PrintingLike, e
 }
 
 /**
- * Sets a shot aside as a repeat of a slip already taken; its recognition stays for keepSecondCopy.
- * `note` says where the card was seen before when that was an earlier pile, not this session.
+ * Sets a shot aside as a repeat of `ref`, a card already taken; its recognition stays for
+ * keepSecondCopy. A repeat always names its card (chosen stays set, the status says it is not in
+ * the pile): without a Printing it could be another card. `note` says where the card was seen
+ * before when that was an earlier pile, not this session.
  */
-export function skipAsRepeat(shot: Shot, note?: string): Shot {
-  return skippedAs(shot, REPEAT, note);
+export function skipAsRepeat(shot: Shot, ref: PrintingRef, note?: string): Shot {
+  return { ...skippedAs(shot, REPEAT, note), chosen: refOf(ref) };
 }
 
-/** Keeps a shot set aside as the same slip, or as a repeat, as a second copy: back to what its recognition gave. */
+/**
+ * Keeps a shot set aside as the same slip, or as a repeat, as a second copy: back to what its
+ * recognition gave. A repeat of a card the Owner named in Review (not the card its recognition
+ * chose) comes back confirmed as that card, since the Owner has already identified it.
+ */
 export function keepSecondCopy(shot: Shot): Shot {
-  return { ...withoutReason(shot), ...fromDecision(shot) };
+  const given = fromDecision(shot);
+  const named = shot.reason === REPEAT ? shot.chosen : null;
+  if (named && !(given.chosen && samePrinting(given.chosen, named))) return confirmShot(shot, named);
+  return { ...withoutReason(shot), ...given };
 }
 
 /** A shot set aside without the Owner: another photo of the slip that counts, or a repeat (not counted as captured). */

@@ -1,6 +1,7 @@
 // A tiny hash router: #/cube (default), #/cube?q=<search>, #/cube/<oracle_id>, #/scan,
 // #/cube/<oracle_id>/printings, #/cycles, #/cycles/<name>, #/print, #/print?section=tokens, #/suggestions, #/upstream,
-// #/log, #/about, #/camera (the camera capture view; its state never goes into the URL).
+// #/log, #/about, #/camera (the camera capture view; its state never goes into the URL),
+// #/review?pile=<shared pile id> (the desk review of the camera photos).
 import { useEffect, useState } from 'react';
 
 export type Route =
@@ -9,6 +10,7 @@ export type Route =
   | { view: 'cycles'; cycle: string | null }
   | { view: 'scan'; query: URLSearchParams }
   | { view: 'camera' }
+  | { view: 'review'; query: URLSearchParams }
   | { view: 'print'; query: URLSearchParams }
   | { view: 'suggestions' }
   | { view: 'upstream' }
@@ -21,6 +23,7 @@ export function parseHash(hash: string): Route {
   const parts = path.split('/').filter(Boolean);
   if (parts[0] === 'scan') return { view: 'scan', query: new URLSearchParams(query) };
   if (parts[0] === 'camera') return { view: 'camera' };
+  if (parts[0] === 'review') return { view: 'review', query: new URLSearchParams(query) };
   if (parts[0] === 'about') return { view: 'about' };
   if (parts[0] === 'print') return { view: 'print', query: new URLSearchParams(query) };
   if (parts[0] === 'suggestions') return { view: 'suggestions' };
@@ -59,6 +62,11 @@ export function cycleHash(cycle: string): string {
 
 /** The Tokens section of the Print view. */
 export const TOKENS_HASH = '#/print?section=tokens';
+
+/** The desk review, open on one shared pile; without a pile it opens the newest with something to review. */
+export function reviewHash(pileId: string | null): string {
+  return pileId ? `#/review?pile=${encodeURIComponent(pileId)}` : '#/review';
+}
 
 /** The hash of the Cube list with a search. */
 export function cubeHash(q: string): string {

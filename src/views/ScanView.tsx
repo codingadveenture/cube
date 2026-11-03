@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import type { Card } from '../types';
 import { normalizeName } from '../lib/normalize';
-import { replaceHash } from '../router';
+import { replaceHash, reviewHash } from '../router';
 import { parseScanText, type Pile } from '../scan/parse';
 import {
   diffScan,
@@ -986,6 +986,7 @@ function SharedPiles({
                   <button type="button" className="link" onClick={() => onReview(p)}>
                     Review photos
                   </button>
+                  <a href={reviewHash(p.id)}>Review at the desk</a>
                 </>
               )}
               {canDelete(p) && (

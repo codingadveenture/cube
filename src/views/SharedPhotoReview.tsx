@@ -22,6 +22,7 @@ const FILTERS: { id: SharedShotFilter; label: string }[] = [
   { id: 'all', label: 'All' },
   { id: 'review', label: 'To review' },
   { id: 'matched', label: 'Matched' },
+  { id: 'repeats', label: 'Repeats' },
   { id: 'unknown', label: 'Unknown' },
 ];
 
@@ -36,6 +37,7 @@ const STATUS_WORD: Record<SharedShot['status'], string> = {
   review: 'Review',
   none: 'Unknown',
   skipped: 'Not a card',
+  repeat: 'Repeat',
 };
 
 const TONE: Record<SharedShot['status'], string> = {
@@ -44,13 +46,15 @@ const TONE: Record<SharedShot['status'], string> = {
   review: 'review',
   none: 'none',
   skipped: 'skipped',
+  repeat: 'repeat',
 };
 
-function Pill({ shot }: { shot: SharedShot }) {
+/** The status pill of a shared shot; the desk review (ReviewView) shows the same one. */
+export function Pill({ shot }: { shot: SharedShot }) {
   return <span className={`shot-status tone-${TONE[shot.status]}`}>{STATUS_WORD[shot.status]}</span>;
 }
 
-function SharedPhoto({ shot, className }: { shot: SharedShot; className: string }) {
+export function SharedPhoto({ shot, className }: { shot: SharedShot; className: string }) {
   return shot.thumb ? (
     <img className={className} src={`data:image/jpeg;base64,${shot.thumb}`} alt="Photo of the slip" decoding="async" />
   ) : (
@@ -58,8 +62,8 @@ function SharedPhoto({ shot, className }: { shot: SharedShot; className: string 
   );
 }
 
-/** The name under a photo: the chosen Printing, a guess with a question mark, or why there is none. */
-function shownName(s: SharedShot): string {
+/** The name under a photo: the chosen Printing (the card a repeat names), a guess with a question mark, or why there is none. */
+export function shownName(s: SharedShot): string {
   if (s.status === 'skipped') return 'Not a card';
   const c = s.chosen ?? s.candidates[0] ?? null;
   if (!c) return 'Not recognised';

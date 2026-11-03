@@ -1,7 +1,7 @@
 // Small pieces shared by the camera view and its review list.
 import { useEffect, useState } from 'react';
 import { scryfallImage } from '../../store/baseline';
-import type { Shot } from '../../scan/camera/shots';
+import { REPEAT, type Shot } from '../../scan/camera/shots';
 import type { ShotCandidate } from '../../scan/vision/protocol';
 
 /** The photo of a shot, from its JPEG Blob; turned the right way up when the slip lay upside down. */
@@ -53,6 +53,24 @@ export function statusOf(shot: Shot, reading: boolean): { word: string; tone: St
 export function StatusPill({ shot, reading, big = false }: { shot: Shot; reading: boolean; big?: boolean }) {
   const s = statusOf(shot, reading);
   return <span className={`shot-status tone-${s.tone}${big ? ' big' : ''}`}>{s.word}</span>;
+}
+
+/** A line that starts with a capital. */
+const sentence = (s: string) => s[0]!.toUpperCase() + s.slice(1);
+
+/**
+ * Why a shot was set aside, for the Owner: "Repeat of <card>" for a repeat (it always names its
+ * card), else the reason as it is; null when the shot was not set aside automatically.
+ */
+export function reasonText(shot: Pick<Shot, 'reason' | 'chosen'>): string | null {
+  if (!shot.reason) return null;
+  if (shot.reason === REPEAT && shot.chosen) return `Repeat of ${shot.chosen.name}`;
+  return sentence(shot.reason);
+}
+
+/** The note beside the reason ("Already in pile ..."), or null. */
+export function noteText(shot: Pick<Shot, 'note'>): string | null {
+  return shot.note ? sentence(shot.note) : null;
 }
 
 export const setNumber = (c: { set: string; collector_number: string }) => `${c.set.toUpperCase()} ${c.collector_number}`;

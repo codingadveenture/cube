@@ -1,5 +1,7 @@
 // Review of a camera session: the shots with their photos, a detail view to pick the right
-// Printing, skip or retake a slip, and the export to the Scan session as a Pile.
+// Printing, skip or retake a slip, and the export to the Scan session as a Pile. A repeat always
+// names its card: tapping a candidate a pile already has records a repeat of that card, and
+// "Second copy" beside it adds it to the pile after all.
 import { useState } from 'react';
 import { addShotsToScan } from '../../scan/camera/exportPile';
 import { progressText, resumeCameraPhotos, shareCameraPile, type UploadProgress } from '../../scan/camera/sharePhotos';
@@ -14,6 +16,7 @@ import {
   defaultPileLabel,
   earlierPileOf,
   filterShots,
+  isMatched,
   isSameSlip,
   keepSecondCopy,
   needsReview,
@@ -28,7 +31,7 @@ import {
   type ShotFilter,
 } from '../../scan/camera/shots';
 import { NameSearch } from './NameSearch';
-import { ArtImage, score, setNumber, ShotPhoto, StatusPill } from './parts';
+import { ArtImage, noteText, reasonText, score, setNumber, ShotPhoto, StatusPill } from './parts';
 
 const FILTERS: { id: ShotFilter; label: string }[] = [
   { id: 'all', label: 'All' },
@@ -87,7 +90,7 @@ export function CameraReview({
         reading={reading.has(open.id)}
         onPick={(c) => decided(confirmShot(open, c))}
         onSkip={() => decided(skipShot(open))}
-        onRepeat={() => decided(skipAsRepeat(open))}
+        onRepeat={(c, note) => decided(skipAsRepeat(open, c, note))}
         onRetake={() => {
           const after = nextToReview(shots, open.id);
           onRetake(open.id);
@@ -124,8 +127,8 @@ export function CameraReview({
                     <StatusPill shot={s} reading={reading.has(s.id)} />
                     <span className="shot-name">{shown ? (needsReview(s) ? `${shown.name}?` : shown.name) : 'Not recognised'}</span>
                     {shown && <span className="muted num">{setNumber(shown)}</span>}
-                    {s.reason && <span className="muted">{s.reason[0]!.toUpperCase() + s.reason.slice(1)}.</span>}
-                    {s.note && <span className="muted">{s.note[0]!.toUpperCase() + s.note.slice(1)}.</span>}
+                    {s.reason && <span className="muted">{reasonText(s)}.</span>}
+                    {s.note && <span className="muted">{noteText(s)}.</span>}
                   </span>
                 </button>
                 {same && (
@@ -159,27 +162,33 @@ function ShotDetail({
   /** The cards of the piles added before, to say which candidates an earlier pile has. */
   earlier: ReadonlyMap<string, string>;
   reading: boolean;
+  /** The card in the photo, a row of the pile (a second copy when the pile has it already). */
   onPick: (c: PrintingRef) => void;
   /** Not a card: a sheet or a hand. */
   onSkip: () => void;
-  /** A second photo of a slip already taken. */
-  onRepeat: () => void;
+  /** A repeat of `c`, a card a pile already has; the note says which earlier pile. */
+  onRepeat: (c: PrintingRef, note?: string) => void;
   onRetake: () => void;
   onClose: () => void;
 }) {
   const [searching, setSearching] = useState(false);
   const [confirmRetake, setConfirmRetake] = useState(false);
-  // Another kept shot of the same card: a tap on such a candidate adds a second copy, which is
-  // right now and then, but a second photo of the same slip is a repeat.
   const inPile = (c: PrintingLike) => alreadyInPile(shots, c, shot.id) !== null;
-  /** The tag of a candidate the pile, or an earlier pile, already has; null when it is new. */
-  const tagOf = (c: PrintingLike): string | null => {
-    if (inPile(c)) return 'already in this pile';
+  /** Where a candidate's card already is (its tag, and the note a repeat of it carries); null when it is new. */
+  const placeOf = (c: PrintingLike): { tag: string; note?: string } | null => {
+    if (inPile(c)) return { tag: 'already in this pile' };
     const label = earlierPileOf(earlier, c);
-    return label === null ? null : `already in pile ${label}`;
+    return label === null ? null : { tag: `already in pile ${label}`, note: `already in pile ${label}` };
   };
-  const secondCopy = shot.chosen !== null && inPile(shot.chosen);
-  const offersCopy = !secondCopy && shot.candidates.some(inPile);
+  // The Owner's rule: a card a pile already has is a repeat of that card (the repeat names it, so
+  // it is certainly a repeat and not another card); any other card is the card in the photo.
+  const choose = (c: PrintingRef) => {
+    const place = placeOf(c);
+    if (place) onRepeat(c, place.note);
+    else onPick(c);
+  };
+  const secondCopy = isMatched(shot) && inPile(shot.chosen!);
+  const offersCopy = !secondCopy && shot.candidates.some((c) => placeOf(c) !== null);
   return (
     <section className="shot-detail" aria-label="Photo">
       <button type="button" className="link" onClick={onClose}>
@@ -192,25 +201,30 @@ function ShotDetail({
             {shot.chosen.name} <span className="muted num">{setNumber(shot.chosen)}</span>
           </span>
         )}
-        {shot.reason && <span className="muted">{shot.reason[0]!.toUpperCase() + shot.reason.slice(1)}.</span>}
-        {shot.note && <span className="muted">{shot.note[0]!.toUpperCase() + shot.note.slice(1)}.</span>}
+        {shot.reason && <span className="muted">{reasonText(shot)}.</span>}
+        {shot.note && <span className="muted">{noteText(shot)}.</span>}
       </div>
       <div className="shot-compare">
         <ShotPhoto shot={shot} className="shot-large" />
         <ol className="candidates">
           {shot.candidates.map((c) => {
             const chosen = shot.chosen?.scryfall_id === c.scryfall_id;
-            const tag = tagOf(c);
+            const place = placeOf(c);
             return (
               <li key={c.oracle_id} className={chosen ? 'chosen' : undefined}>
-                <button type="button" className="candidate" onClick={() => onPick(c)} aria-pressed={chosen}>
+                <button type="button" className="candidate" onClick={() => choose(c)} aria-pressed={chosen}>
                   <ArtImage c={c} className="candidate-art" />
                   <span className="candidate-name">{c.name}</span>
                   <span className="muted num">
                     {setNumber(c)} · {score(c.score)}
                   </span>
-                  {tag && <span className="candidate-tag">{tag}</span>}
+                  {place && <span className="candidate-tag">{place.tag}</span>}
                 </button>
+                {place && (
+                  <button type="button" className="link" onClick={() => onPick(c)}>
+                    Second copy
+                  </button>
+                )}
               </li>
             );
           })}
@@ -221,15 +235,12 @@ function ShotDetail({
         {secondCopy
           ? `Counted as a second copy of ${shot.chosen!.name}, which is already in this pile.`
           : offersCopy
-            ? 'Tap the card that is in the photo. A card already in this pile adds a second copy of it; a second photo of the same slip is a repeat.'
+            ? 'Tap the card that is in the photo. A card already in a pile is recorded as a repeat of it; “Second copy” beside it adds it to the pile after all.'
             : 'Tap the card that is in the photo.'}
       </p>
       <div className="actions">
         <button type="button" aria-expanded={searching} onClick={() => setSearching((v) => !v)}>
           Search by name
-        </button>
-        <button type="button" onClick={onRepeat}>
-          Repeat, already taken
         </button>
         <button type="button" onClick={onSkip}>
           Not a card
@@ -249,8 +260,12 @@ function ShotDetail({
           </button>
         )}
       </div>
+      <p className="muted">
+        “Not a card” is for the empty sheet or a hand only. A second photo of a slip is a repeat of its card: tap the card, so the repeat
+        names it.
+      </p>
       {confirmRetake && <p className="muted">The photo is deleted; slide the slip under the camera again.</p>}
-      {searching && <NameSearch onPick={onPick} />}
+      {searching && <NameSearch onPick={choose} />}
     </section>
   );
 }

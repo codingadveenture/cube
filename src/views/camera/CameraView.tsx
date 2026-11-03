@@ -57,7 +57,7 @@ import { pilesForDiff } from '../../store/piles';
 import { loadPhotosPending, loadSharedFrom } from '../../store/scanPrefs';
 import { GuideOverlay } from './GuideOverlay';
 import { CameraReview } from './CameraReview';
-import { ArtImage, score, setNumber, ShotPhoto, StatusPill } from './parts';
+import { ArtImage, noteText, reasonText, score, setNumber, ShotPhoto, StatusPill } from './parts';
 
 type Tab = 'setup' | 'scan' | 'review';
 
@@ -422,10 +422,12 @@ export default function CameraView({ cards }: { cards: Card[] | null }) {
       // is not a repeat of it. A card an earlier pile holds is the stack fed again (one session per
       // stack): set aside the same way, with a note saying which pile.
       const settled = new Map([next, ...others].map((x) => [x.id, x]));
-      const repeat = repeatOf(shotsRef.current.map((x) => settled.get(x.id) ?? x), next);
-      const earlierLabel = !repeat && from === 'camera' && next.status === 'match' && next.chosen ? earlierPileOf(earlierRef.current, next.chosen) : null;
-      if (repeat) next = skipAsRepeat(next);
-      else if (earlierLabel !== null) next = skipAsRepeat(next, `already in pile ${earlierLabel}`);
+      // Only a confident match is set aside by itself, and a repeat names its card: the match's own Printing.
+      const match = next.status === 'match' ? next.chosen : null;
+      const repeat = match ? repeatOf(shotsRef.current.map((x) => settled.get(x.id) ?? x), next) : null;
+      const earlierLabel = match && !repeat && from === 'camera' ? earlierPileOf(earlierRef.current, match) : null;
+      if (match && repeat) next = skipAsRepeat(next, match);
+      else if (match && earlierLabel !== null) next = skipAsRepeat(next, match, `already in pile ${earlierLabel}`);
       const changed = [next, ...others];
       const byId = new Map(changed.map((x) => [x.id, x]));
       updateShots((cur) => cur.map((x) => byId.get(x.id) ?? x));
@@ -833,9 +835,9 @@ function LatestResult({ shot, reading, onReview }: { shot: Shot; reading: boolea
           <p className="muted">{reading ? 'Recognising…' : 'Not recognised.'}</p>
         )}
         {shot.reason && (
-          <p className="muted">{`${shot.reason[0]!.toUpperCase()}${shot.reason.slice(1)}; ${shot.reason === REPEAT ? 'counted as fed, not added to the pile' : 'not counted'}.`}</p>
+          <p className="muted">{`${reasonText(shot)}; ${shot.reason === REPEAT ? 'counted as fed, not added to the pile' : 'not counted'}.`}</p>
         )}
-        {shot.note && <p className="muted">{`${shot.note[0]!.toUpperCase()}${shot.note.slice(1)}.`}</p>}
+        {shot.note && <p className="muted">{`${noteText(shot)}.`}</p>}
         {(shot.status === 'review' || shot.status === 'none') && (
           <button type="button" className="link" onClick={onReview}>
             Review
@@ -949,9 +951,10 @@ function SetupPanel({
         between slips; a slip whose picture changed after it settled (a hand moved away, the slip was pushed further in) is photographed
         again and the extra photo is set aside, and a slip put back within a few seconds is not counted twice. A slip that matches a card
         already in this pile, or in a pile added to Scan before (this device’s and the shared ones), is set aside as a repeat: it counts
-        among the slips fed, not among the cards of the pile, and the header shows how many. Its photo stays in Review, where “Keep as a
-        second copy” adds it after all when it really is a second copy. In Review, use “Repeat, already taken” for a second photo of a
-        slip, and “Not a card” only for the empty sheet or a hand.
+        among the slips fed, not among the cards of the pile, and the header shows how many. A repeat always names its card, so it is
+        certain to be a repeat and not another card. Its photo stays in Review, where “Keep as a second copy” adds it after all when it
+        really is a second copy. In Review, tapping a card marked as already in a pile records a repeat of that card (“Second copy”
+        beside it adds it instead), and “Not a card” is only for the empty sheet or a hand.
       </p>
       <p className="muted">
         One stack per session: feed the stack, then on the Review tab “Add to Scan as a pile” and “Start a new session”. The count starts

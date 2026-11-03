@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { uploadShotChunks } from '../scan/camera/sharePhotos';
-import { shotsToRows, type Shot } from '../scan/camera/shots';
+import { REPEAT, shotsToRows, type Shot } from '../scan/camera/shots';
 import type { Pile } from '../scan/parse';
 import { mergedRows } from '../scan/session';
 import { fromShared, pilesForDiff, scanPileDoc, toSharedRows } from './piles';
@@ -242,6 +242,21 @@ describe('planSharedShots', () => {
     expect(b.row).toBe(-1);
     expect(b.status).toBe('review');
   });
+
+  it('shares a shot skipped as a repeat as a repeat of its card, without a row', () => {
+    // The camera keeps a repeat as 'skipped' with the reason REPEAT and the card it names in chosen.
+    const repeat: Shot = { ...shot('g', '2026-10-25T10:00:07Z', 'skipped', lotus), reason: REPEAT, note: 'already in pile Earlier' };
+    const plan = planSharedShots([...shots, repeat], rows);
+    const g = plan.find((s) => s.id === 'g')!;
+    expect(g).toMatchObject({ row: -1, status: 'repeat', chosen: lotus });
+    expect(countToReview(plan)).toBe(2);
+    // The Lotus row still has its two photos pointing at it; the repeat claims none.
+    expect(plan.filter((s) => s.row === 0).map((s) => s.id)).toEqual(['a', 'f']);
+    // A shot skipped for another reason, or a repeat from before repeats named their card, stays skipped.
+    const other: Shot = { ...shot('h', '2026-10-25T10:00:08Z', 'skipped', null), reason: 'same slip as the one before' };
+    const nameless: Shot = { ...shot('i', '2026-10-25T10:00:09Z', 'skipped', null), reason: REPEAT };
+    expect(planSharedShots([other, nameless], rows).map((s) => s.status)).toEqual(['skipped', 'skipped']);
+  });
 });
 
 describe('applyShotDecision', () => {
@@ -300,6 +315,32 @@ describe('applyShotDecision', () => {
     expect(r.shot.row).toBe(1);
   });
 
+  it('a repeat takes the shot off its row and names the card it repeats', () => {
+    const rows = [pileRow(lotus, 2), pileRow(ring)];
+    const r = applyShotDecision(rows, shared('1', { row: 0, status: 'match', chosen: lotus }), { kind: 'repeat', ref: lotus });
+    expect(r.rows).toEqual([pileRow(lotus, 1), pileRow(ring)]);
+    expect(r.shot).toMatchObject({ row: -1, status: 'repeat', chosen: lotus });
+    // A doubtful photo called a repeat of a card: no row to release, the card named all the same.
+    const doubt = applyShotDecision(rows, shared('2', { status: 'review', candidates: [{ ...lotus, score: 0.4 }] }), { kind: 'repeat', ref: mox });
+    expect(doubt.rows).toEqual(rows);
+    expect(doubt.shot).toMatchObject({ row: -1, status: 'repeat', chosen: mox });
+    // The last photo of a row takes it down to 0, never below.
+    const last = applyShotDecision([pileRow(ring)], shared('3', { row: 0, status: 'confirmed', chosen: ring }), { kind: 'repeat', ref: ring });
+    expect(last.rows).toEqual([pileRow(ring, 0)]);
+  });
+
+  it('a later pick on a repeat adds a row: a second copy after all', () => {
+    const rows = [pileRow(lotus)];
+    const repeat = shared('1', { row: -1, status: 'repeat', chosen: lotus });
+    const r = applyShotDecision(rows, repeat, { kind: 'pick', ref: lotus });
+    expect(r.rows).toEqual([pileRow(lotus), pileRow(lotus)]);
+    expect(r.shot).toMatchObject({ row: 1, status: 'confirmed', chosen: lotus });
+    // Not a card on a repeat drops the card it named.
+    const none = applyShotDecision(rows, repeat, { kind: 'not_a_card' });
+    expect(none.rows).toEqual(rows);
+    expect(none.shot).toMatchObject({ row: -1, status: 'skipped', chosen: null });
+  });
+
   it('leaves a 0-quantity row out of the diff', () => {
     const pile: SharedPile = {
       id: 'p',
@@ -322,14 +363,24 @@ describe('shared shots in the review', () => {
     shared('3', { status: 'none' }),
     shared('4', { status: 'skipped' }),
     shared('5', { status: 'confirmed', chosen: lotus, row: 0 }),
+    shared('6', { status: 'repeat', chosen: lotus }),
   ];
 
-  it('counts and filters All, To review, Matched and Unknown', () => {
-    expect(sharedShotCounts(shots)).toEqual({ all: 5, review: 2, matched: 2, unknown: 2 });
+  it('counts and filters All, To review, Matched, Repeats and Unknown', () => {
+    // A repeat is neither to review nor matched nor unknown: it names its card and is not in the pile.
+    expect(sharedShotCounts(shots)).toEqual({ all: 6, review: 2, matched: 2, repeats: 1, unknown: 2 });
+    expect(countToReview(shots)).toBe(2);
     const items = shots.map((shot) => ({ chunk: 0, shot }));
     expect(filterSharedShots(items, 'review').map((x) => x.shot.id)).toEqual(['2', '3']);
     expect(filterSharedShots(items, 'matched').map((x) => x.shot.id)).toEqual(['1', '5']);
+    expect(filterSharedShots(items, 'repeats').map((x) => x.shot.id)).toEqual(['6']);
     expect(filterSharedShots(items, 'unknown').map((x) => x.shot.id)).toEqual(['3', '4']);
+    expect(filterSharedShots(items, 'all')).toHaveLength(6);
+  });
+
+  it('reads a repeat back with the card it names', () => {
+    const c = parseShotChunk('c0000', { index: 0, shots: [{ id: 'r', thumb: 'abc', status: 'repeat', row: -1, chosen: lotus, candidates: [] }] });
+    expect(c.shots[0]).toMatchObject({ id: 'r', row: -1, status: 'repeat', chosen: lotus });
   });
 
   it('flattens chunks in chunk order', () => {
@@ -357,7 +408,7 @@ describe('shared shots in the review', () => {
 
   it('writes a chunk document with exactly the chunk fields', () => {
     const d = shotChunkDoc({ index: 3, shots }, 'u1', '2026-10-25T10:00:00Z');
-    expect(d).toEqual({ index: 3, shots, count: 5, createdAt: '2026-10-25T10:00:00Z', createdByUid: 'u1' });
+    expect(d).toEqual({ index: 3, shots, count: 6, createdAt: '2026-10-25T10:00:00Z', createdByUid: 'u1' });
   });
 });
 

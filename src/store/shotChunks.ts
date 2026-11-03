@@ -1,6 +1,7 @@
 // shotChunks.ts: the camera photos of a shared pile, in chunk documents under
 // cubes/main/scans/{pileId}/shots/{chunkId}. Pure: chunking, size estimates, resuming an upload,
 // and what a review decision does to the shot and to the parent pile's rows.
+import { REPEAT } from '../scan/camera/shots';
 import type {
   SharedPileRow,
   SharedShot,
@@ -21,7 +22,7 @@ export const MAX_THUMB_CHARS = 12 * 1024;
 export const THUMB_SHORT = 240;
 export const THUMB_LONG = 336;
 
-const STATUSES: readonly SharedShotStatus[] = ['match', 'review', 'none', 'confirmed', 'skipped'];
+const STATUSES: readonly SharedShotStatus[] = ['match', 'review', 'none', 'confirmed', 'skipped', 'repeat'];
 
 /** Characters of the base64 text of `bytes` bytes (with padding). */
 export function base64Length(bytes: number): number {
@@ -142,6 +143,8 @@ export interface CameraShotLike {
   decision: { score: number } | null;
   candidates: readonly SharedShotCandidate[];
   chosen: SharedShotRef | null;
+  /** Why a 'skipped' shot was set aside; REPEAT makes it a shared 'repeat'. */
+  reason?: string;
 }
 
 const isMatchedStatus = (s: { status: SharedShotStatus; chosen: SharedShotRef | null }) =>
@@ -152,7 +155,8 @@ const isMatchedStatus = (s: { status: SharedShotStatus; chosen: SharedShotRef | 
  * shot points at the row of its Printing in `rows` (the pile's rows, made by shotsToRows), and a
  * row gets at most `quantity` shots pointing at it. A matched shot whose Printing has no row, or
  * whose row already has as many shots as its quantity (it was decided after the pile was made),
- * goes back to review with row -1, so the review adds its row. Every other shot has row -1.
+ * goes back to review with row -1, so the review adds its row. A shot skipped as a REPEAT is
+ * shared as 'repeat', keeping the card it names. Every other shot has row -1.
  */
 export function planSharedShots(shots: readonly CameraShotLike[], rows: readonly SharedPileRow[]): Omit<SharedShot, 'thumb'>[] {
   const ordered = [...shots].sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
@@ -165,7 +169,8 @@ export function planSharedShots(shots: readonly CameraShotLike[], rows: readonly
       if (n >= rows[row]!.quantity) row = -1;
       else claimed.set(row, n + 1);
     }
-    const status: SharedShotStatus = isMatchedStatus(s) && row < 0 ? 'review' : s.status;
+    const repeat = s.status === 'skipped' && s.reason === REPEAT && chosen !== null;
+    const status: SharedShotStatus = repeat ? 'repeat' : isMatchedStatus(s) && row < 0 ? 'review' : s.status;
     return {
       row,
       id: s.id,
@@ -191,15 +196,21 @@ export function sharedIsUnknown(s: Pick<SharedShot, 'status'>): boolean {
   return s.status === 'none' || s.status === 'skipped';
 }
 
+/** A repeat: a photo of a card a pile already has, set aside with the card it names. Neither to review nor matched. */
+export function sharedIsRepeat(s: Pick<SharedShot, 'status'>): boolean {
+  return s.status === 'repeat';
+}
+
 export function countToReview(shots: readonly Pick<SharedShot, 'status'>[]): number {
   return shots.filter(sharedNeedsReview).length;
 }
 
-export type SharedShotFilter = 'all' | 'review' | 'matched' | 'unknown';
+export type SharedShotFilter = 'all' | 'review' | 'matched' | 'repeats' | 'unknown';
 
 export function filterSharedShots<T extends { shot: SharedShot }>(list: readonly T[], f: SharedShotFilter): T[] {
   if (f === 'review') return list.filter((x) => sharedNeedsReview(x.shot));
   if (f === 'matched') return list.filter((x) => sharedIsMatched(x.shot));
+  if (f === 'repeats') return list.filter((x) => sharedIsRepeat(x.shot));
   if (f === 'unknown') return list.filter((x) => sharedIsUnknown(x.shot));
   return [...list];
 }
@@ -209,6 +220,7 @@ export function sharedShotCounts(shots: readonly SharedShot[]): Record<SharedSho
     all: shots.length,
     review: shots.filter(sharedNeedsReview).length,
     matched: shots.filter(sharedIsMatched).length,
+    repeats: shots.filter(sharedIsRepeat).length,
     unknown: shots.filter(sharedIsUnknown).length,
   };
 }
@@ -272,10 +284,11 @@ function samePrinting(row: SharedPileRow, ref: SharedShotRef): boolean {
 
 /**
  * What a decision does to one shot and to the parent pile's rows. Picking a Printing confirms the
- * shot: a shot without a row appends a row and points at it; a shot with a row replaces that
- * row's Printing, or, when the row counts more than this one slip, takes one off it and appends a
- * row of its own. Not a card skips the shot and takes it off its row (a row may reach quantity 0;
- * rows are never removed, so the other shots' row indexes stay right).
+ * shot: a shot without a row (a repeat the Owner calls a second copy after all among them)
+ * appends a row and points at it; a shot with a row replaces that row's Printing, or, when the
+ * row counts more than this one slip, takes one off it and appends a row of its own. Not a card
+ * and a repeat take the shot off its row (a row may reach quantity 0; rows are never removed, so
+ * the other shots' row indexes stay right); a repeat keeps the card it names in `chosen`.
  */
 export function applyShotDecision(
   rows: readonly SharedPileRow[],
@@ -284,12 +297,16 @@ export function applyShotDecision(
 ): { rows: SharedPileRow[]; shot: SharedShot } {
   const next = rows.map((r) => ({ ...r }));
   const has = shot.row >= 0 && shot.row < next.length;
-  if (decision.kind === 'not_a_card') {
+  if (decision.kind === 'not_a_card' || decision.kind === 'repeat') {
     if (has) {
       const r = next[shot.row]!;
       r.quantity = Math.max(0, r.quantity - 1);
     }
-    return { rows: next, shot: { ...shot, row: -1, status: 'skipped', chosen: null } };
+    const aside: SharedShot =
+      decision.kind === 'repeat'
+        ? { ...shot, row: -1, status: 'repeat', chosen: refOfShared(decision.ref) }
+        : { ...shot, row: -1, status: 'skipped', chosen: null };
+    return { rows: next, shot: aside };
   }
   const ref = refOfShared(decision.ref);
   const fresh: SharedPileRow = {

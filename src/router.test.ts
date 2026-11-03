@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cubeHash, isDetailHash, isListHash, parseHash, previousHash, recordNavigation } from './router';
+import { cubeHash, isDetailHash, isListHash, parseHash, previousHash, recordNavigation, reviewHash } from './router';
 
 describe('router', () => {
   it('keeps the Cube search in the hash', () => {
@@ -21,6 +21,14 @@ describe('router', () => {
   it('knows the camera view, which keeps no state in the hash', () => {
     expect(parseHash('#/camera')).toEqual({ view: 'camera' });
     expect(isListHash('#/camera')).toBe(false);
+  });
+
+  it('knows the desk review and the pile it is open on', () => {
+    expect(parseHash('#/review').view).toBe('review');
+    const r = parseHash(reviewHash('pile 1'));
+    expect(r.view === 'review' && r.query.get('pile')).toBe('pile 1');
+    expect(reviewHash(null)).toBe('#/review');
+    expect(isListHash('#/review')).toBe(false);
   });
 
   it('knows the Suggestions and Log views', () => {
