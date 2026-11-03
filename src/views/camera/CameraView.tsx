@@ -44,6 +44,7 @@ import {
   repeatOf,
   sameSlipOf,
   shotCounts,
+  type ShotCounts,
   skipAsRepeat,
   skipSameSlip,
   type Shot,
@@ -53,7 +54,7 @@ import { createVisionClient, type VisionClient, type VisionMode } from '../../sc
 import type { PrepareInfo, RecogniseRequest } from '../../scan/vision/protocol';
 import { useScans } from '../../store/context';
 import { pilesForDiff } from '../../store/piles';
-import { loadSharedFrom } from '../../store/scanPrefs';
+import { loadPhotosPending, loadSharedFrom } from '../../store/scanPrefs';
 import { GuideOverlay } from './GuideOverlay';
 import { CameraReview } from './CameraReview';
 import { ArtImage, score, setNumber, ShotPhoto, StatusPill } from './parts';
@@ -725,6 +726,9 @@ export default function CameraView({ cards }: { cards: Card[] | null }) {
           onResetOrientation={() => setSettings((s) => ({ ...s, orientation: initialOrientation() }))}
           onPhoto={(f) => void tryPhoto(f)}
           onDone={() => setTab('scan')}
+          meta={meta}
+          counts={counts}
+          onNewSession={() => void newSession()}
         />
       )}
 
@@ -858,6 +862,9 @@ function SetupPanel({
   onResetOrientation,
   onPhoto,
   onDone,
+  meta,
+  counts,
+  onNewSession,
 }: {
   settings: CameraSettings;
   vision: VisionState;
@@ -870,8 +877,15 @@ function SetupPanel({
   onResetOrientation: () => void;
   onPhoto: (f: File | undefined) => void;
   onDone: () => void;
+  meta: CameraSessionMeta;
+  counts: ShotCounts;
+  onNewSession: () => void;
 }) {
   const o = settings.orientation;
+  // Two taps to delete a session, as on the Review tab; none while its photos are still uploading.
+  const [confirmNew, setConfirmNew] = useState(false);
+  const uploading = Object.keys(loadPhotosPending()).length > 0;
+  const photos = counts.captured + counts.repeats;
   const passMs = settings.passMs ?? (vision.state === 'ready' ? vision.info.warmupMs : null);
   const passes = o.locked ? 1 : 2;
   return (
@@ -896,6 +910,39 @@ function SetupPanel({
           Start scanning
         </button>
       </div>
+      <h2>Session</h2>
+      <p className="muted num">
+        {photos === 0
+          ? 'No photos in this session yet.'
+          : `${photos} ${photos === 1 ? 'slip' : 'slips'} in this session${counts.repeats > 0 ? ` (${counts.repeats} ${counts.repeats === 1 ? 'repeat' : 'repeats'})` : ''}, ${
+              meta.exported ? `added to Scan as ${meta.exported.label}` : 'not added to Scan yet'
+            }.`}
+      </p>
+      <div className="actions">
+        {confirmNew ? (
+          <>
+            <button
+              type="button"
+              className="danger"
+              onClick={() => {
+                setConfirmNew(false);
+                onNewSession();
+              }}
+            >
+              Delete {photos} {photos === 1 ? 'photo' : 'photos'} and start again
+            </button>
+            <button type="button" onClick={() => setConfirmNew(false)}>
+              Keep them
+            </button>
+          </>
+        ) : (
+          <button type="button" onClick={() => setConfirmNew(true)} disabled={photos === 0 || uploading}>
+            Start a new session
+          </button>
+        )}
+      </div>
+      {confirmNew && !meta.exported && counts.matched > 0 && <p className="status error">This session has not been added to Scan yet.</p>}
+      {uploading && <p className="muted">The photos of the last pile are still being shared; a new session would delete them before they are up.</p>}
       <h2>Slips</h2>
       <p className="muted">
         A slip is photographed once it lies still in the box. A new slip is noticed by its content, so the box need not show the sheet
