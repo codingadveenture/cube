@@ -34,7 +34,7 @@ import { knownPrintings } from '../scan/resolve';
 import { scryfallImage } from '../store/baseline';
 import { errorText, PHOTOS_DENIED, useScans, useShotChunks, useStore } from '../store/context';
 import { lookupById } from '../store/lookup';
-import { flattenChunks, photosComplete, refOfShared, sharedNeedsReview, sharedShotCounts } from '../store/shotChunks';
+import { flattenChunks, photosComplete, refOfShared, sharedIsMatched, sharedNeedsReview, sharedShotCounts } from '../store/shotChunks';
 import type { SharedPile, SharedShot, SharedShotRef, ShotDecisionInput, SharedShotCandidate } from '../store/types';
 import type { Card } from '../types';
 import { NameSearch } from './camera/NameSearch';
@@ -288,8 +288,13 @@ function PileDesk({
       const art = illustration === undefined ? await illustrationOf(ref) : illustration;
       await store.updateCard(card.oracle_id, { kind: 'in_box', in_box: inBoxFromPrinting(ref, art) });
       setBoxNote({ error: false, text: `In-box printing of ${card.name} set to ${ref.set.toUpperCase()} ${ref.collector_number}.` });
-      // The photo showed this printing: a doubtful photo is decided as it in the same click, by the usual rule.
-      if (current && sharedNeedsReview(current.shot) && canPick()) choose(ref);
+      // The photo showed this printing, and the card is to be in the Cube once: a doubtful photo is
+      // decided as it by the usual rule, and a photo already counted as a row becomes a repeat when
+      // another pile (or an earlier photo of this pile) already holds the card.
+      if (current && canPick()) {
+        if (sharedNeedsReview(current.shot)) choose(ref);
+        else if (sharedIsMatched(current.shot) && alreadyIn(tagsOf(ref)) !== null) void decide(current, { kind: 'repeat', ref: refOfShared(ref) });
+      }
     } catch (e) {
       console.warn('Box has this printing failed', e);
       setBoxNote({ error: true, text: errorText(e) });
