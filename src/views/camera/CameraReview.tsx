@@ -12,6 +12,7 @@ import {
   alreadyInPile,
   confirmShot,
   defaultPileLabel,
+  earlierPileOf,
   filterShots,
   isSameSlip,
   keepSecondCopy,
@@ -40,6 +41,7 @@ export function CameraReview({
   shots,
   reading,
   meta,
+  earlier,
   onSave,
   onRetake,
   onExported,
@@ -49,6 +51,8 @@ export function CameraReview({
   shots: Shot[];
   reading: ReadonlySet<string>;
   meta: CameraSessionMeta;
+  /** The cards of the piles added to Scan before, each to its pile's label (earlierPilesIndex). */
+  earlier: ReadonlyMap<string, string>;
   onSave: (s: Shot) => void;
   onRetake: (id: string) => void;
   /** The pile is in the Scan session (its photos may still be uploading). */
@@ -79,6 +83,7 @@ export function CameraReview({
         key={open.id}
         shot={open}
         shots={shots}
+        earlier={earlier}
         reading={reading.has(open.id)}
         onPick={(c) => decided(confirmShot(open, c))}
         onSkip={() => decided(skipShot(open))}
@@ -120,6 +125,7 @@ export function CameraReview({
                     <span className="shot-name">{shown ? (needsReview(s) ? `${shown.name}?` : shown.name) : 'Not recognised'}</span>
                     {shown && <span className="muted num">{setNumber(shown)}</span>}
                     {s.reason && <span className="muted">{s.reason[0]!.toUpperCase() + s.reason.slice(1)}.</span>}
+                    {s.note && <span className="muted">{s.note[0]!.toUpperCase() + s.note.slice(1)}.</span>}
                   </span>
                 </button>
                 {same && (
@@ -139,6 +145,7 @@ export function CameraReview({
 function ShotDetail({
   shot,
   shots,
+  earlier,
   reading,
   onPick,
   onSkip,
@@ -149,6 +156,8 @@ function ShotDetail({
   shot: Shot;
   /** The whole session, to say which candidates the pile already has. */
   shots: readonly Shot[];
+  /** The cards of the piles added before, to say which candidates an earlier pile has. */
+  earlier: ReadonlyMap<string, string>;
   reading: boolean;
   onPick: (c: PrintingRef) => void;
   /** Not a card: a sheet or a hand. */
@@ -160,9 +169,15 @@ function ShotDetail({
 }) {
   const [searching, setSearching] = useState(false);
   const [confirmRetake, setConfirmRetake] = useState(false);
-  // Another kept shot of the same Printing: a tap on such a candidate adds a second copy, which is
+  // Another kept shot of the same card: a tap on such a candidate adds a second copy, which is
   // right now and then, but a second photo of the same slip is a repeat.
   const inPile = (c: PrintingLike) => alreadyInPile(shots, c, shot.id) !== null;
+  /** The tag of a candidate the pile, or an earlier pile, already has; null when it is new. */
+  const tagOf = (c: PrintingLike): string | null => {
+    if (inPile(c)) return 'already in this pile';
+    const label = earlierPileOf(earlier, c);
+    return label === null ? null : `already in pile ${label}`;
+  };
   const secondCopy = shot.chosen !== null && inPile(shot.chosen);
   const offersCopy = !secondCopy && shot.candidates.some(inPile);
   return (
@@ -178,12 +193,14 @@ function ShotDetail({
           </span>
         )}
         {shot.reason && <span className="muted">{shot.reason[0]!.toUpperCase() + shot.reason.slice(1)}.</span>}
+        {shot.note && <span className="muted">{shot.note[0]!.toUpperCase() + shot.note.slice(1)}.</span>}
       </div>
       <div className="shot-compare">
         <ShotPhoto shot={shot} className="shot-large" />
         <ol className="candidates">
           {shot.candidates.map((c) => {
             const chosen = shot.chosen?.scryfall_id === c.scryfall_id;
+            const tag = tagOf(c);
             return (
               <li key={c.oracle_id} className={chosen ? 'chosen' : undefined}>
                 <button type="button" className="candidate" onClick={() => onPick(c)} aria-pressed={chosen}>
@@ -192,7 +209,7 @@ function ShotDetail({
                   <span className="muted num">
                     {setNumber(c)} · {score(c.score)}
                   </span>
-                  {inPile(c) && <span className="candidate-tag">already in this pile</span>}
+                  {tag && <span className="candidate-tag">{tag}</span>}
                 </button>
               </li>
             );
@@ -423,32 +440,38 @@ function ExportPanel({
             </div>
           </>
         ) : (
-          <div className="actions">
-            <button type="button" className="primary" onClick={openForm} disabled={store ? shots.length === 0 : cards === 0}>
-              Add to Scan as a pile
-            </button>
-            {confirmNew ? (
-              <>
-                <button
-                  type="button"
-                  className="danger"
-                  onClick={() => {
-                    setConfirmNew(false);
-                    onNewSession();
-                  }}
-                >
-                  Delete {shots.length} {shots.length === 1 ? 'photo' : 'photos'} and start again
-                </button>
-                <button type="button" onClick={() => setConfirmNew(false)}>
-                  Keep them
-                </button>
-              </>
-            ) : (
-              <button type="button" onClick={() => setConfirmNew(true)} disabled={shots.length === 0}>
-                Start a new session
+          <>
+            <p className="muted">
+              One stack per session: when the stack is done, add it to Scan as a pile, then start a new session, and the count starts
+              again at 0. Cards already in an earlier pile are set aside as repeats, so the pile holds only the new ones.
+            </p>
+            <div className="actions">
+              <button type="button" className="primary" onClick={openForm} disabled={store ? shots.length === 0 : cards === 0}>
+                Add to Scan as a pile
               </button>
-            )}
-          </div>
+              {confirmNew ? (
+                <>
+                  <button
+                    type="button"
+                    className="danger"
+                    onClick={() => {
+                      setConfirmNew(false);
+                      onNewSession();
+                    }}
+                  >
+                    Delete {shots.length} {shots.length === 1 ? 'photo' : 'photos'} and start again
+                  </button>
+                  <button type="button" onClick={() => setConfirmNew(false)}>
+                    Keep them
+                  </button>
+                </>
+              ) : (
+                <button type="button" onClick={() => setConfirmNew(true)} disabled={shots.length === 0}>
+                  Start a new session
+                </button>
+              )}
+            </div>
+          </>
         ))}
       {confirmNew && !meta.exported && counts.matched > 0 && (
         <p className="status error">This session has not been added to Scan yet.</p>

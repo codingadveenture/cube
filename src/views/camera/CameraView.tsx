@@ -36,8 +36,11 @@ import {
 } from '../../scan/camera/settings';
 import {
   applyRecognition,
+  earlierPileOf,
+  earlierPilesIndex,
   needsReview,
   newShot,
+  REPEAT,
   repeatOf,
   sameSlipOf,
   shotCounts,
@@ -45,8 +48,12 @@ import {
   skipSameSlip,
   type Shot,
 } from '../../scan/camera/shots';
+import { loadSession } from '../../scan/session';
 import { createVisionClient, type VisionClient, type VisionMode } from '../../scan/vision/client';
 import type { PrepareInfo, RecogniseRequest } from '../../scan/vision/protocol';
+import { useScans } from '../../store/context';
+import { pilesForDiff } from '../../store/piles';
+import { loadSharedFrom } from '../../store/scanPrefs';
 import { GuideOverlay } from './GuideOverlay';
 import { CameraReview } from './CameraReview';
 import { ArtImage, score, setNumber, ShotPhoto, StatusPill } from './parts';
@@ -108,6 +115,21 @@ export default function CameraView({ cards }: { cards: Card[] | null }) {
 
   const [meta, setMeta] = useState<CameraSessionMeta>(loadCameraSession);
   useEffect(() => saveCameraSession(meta), [meta]);
+
+  // The cards of the piles added before, this device's and the shared ones: with one camera session
+  // per stack, a slip whose card an earlier pile holds is the stack fed again, and is set aside as a
+  // repeat. Rebuilt when the shared piles change and when meta does (an export adds a local pile; a
+  // new session starts); read through a ref, since capture outlives the render it was made in.
+  const scans = useScans();
+  const earlier = useMemo(
+    // As the Scan diff sees them: a local pile whose shared copy a photo review changed counts with the reviewed rows.
+    () => earlierPilesIndex(pilesForDiff(loadSession().piles, scans.data, new Set(scans.data.map((p) => p.id)), loadSharedFrom())),
+    // meta is the signal, not an input.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [scans.data, meta],
+  );
+  const earlierRef = useRef(earlier);
+  earlierRef.current = earlier;
 
   const [shots, setShots] = useState<Shot[]>([]);
   const shotsRef = useRef<Shot[]>([]);
@@ -280,11 +302,17 @@ export default function CameraView({ cards }: { cards: Card[] | null }) {
    * capture, so each slip ends with one of the last three. At a count checkpoint two long tones
    * follow the slip's own. The phone does not vibrate: the Owner found the buzzing a nuisance.
    */
-  function feedback(kind: 'capture' | 'match' | 'doubt' | 'same', checkpoint = false) {
+  function feedback(kind: 'capture' | 'match' | 'doubt' | 'same' | 'repeat', checkpoint = false) {
     const ctx = audioRef.current;
     if (!settingsRef.current.beep || !ctx || ctx.state === 'closed') return;
     const tones: [number, number, number][] =
-      kind === 'capture' ? [[0, 880, 0.1]] : kind === 'same' ? [[0, 660, 0.1]] : kind === 'match' ? [[0, 1320, 0.1]] : [[0, 330, 0.1], [0.16, 330, 0.1]];
+      kind === 'capture'
+        ? [[0, 880, 0.1]]
+        : kind === 'same' || kind === 'repeat'
+          ? [[0, 660, 0.1]]
+          : kind === 'match'
+            ? [[0, 1320, 0.1]]
+            : [[0, 330, 0.1], [0.16, 330, 0.1]];
     if (checkpoint) tones.push([0.5, 523, 0.25], [0.85, 523, 0.25]);
     for (const [at, freq, length] of tones) {
       const osc = ctx.createOscillator();
@@ -303,19 +331,21 @@ export default function CameraView({ cards }: { cards: Card[] | null }) {
   /**
    * The end of a camera slip, once its photo is matched, sent to review, or set aside as the same
    * slip or a repeat: the slip's beep, the count checkpoint, and the spoken word. The count is of
-   * the slips the recogniser has answered: a photo still waiting may yet turn out to be the same
-   * slip again, so it counts when it settles, and the checkpoint lands on the stack's last slip
-   * even when recognition is a slip or two behind. A slip set aside did not add to the count, so it
-   * cannot reach a checkpoint; that is how each multiple is announced once on the way up.
+   * the slips fed (ShotCounts.fed: a repeat went under the camera, so it counts; a second photo of
+   * one slip does not) that the recogniser has answered: a photo still waiting may yet turn out to
+   * be the same slip again, so it counts when it settles, and the checkpoint lands on the stack's
+   * last slip even when recognition is a slip or two behind. A same-slip photo did not add to the
+   * count, so it cannot reach a checkpoint; that is how each multiple is announced once on the way
+   * up. A repeat sounds and says "again" like a same-slip photo, but can reach the checkpoint.
    */
-  function slipSettled(kind: 'match' | 'doubt' | 'same', name: string | null, waitingOthers: number) {
-    const settled = shotCounts(shotsRef.current).captured - waitingOthers;
+  function slipSettled(kind: 'match' | 'doubt' | 'same' | 'repeat', name: string | null, waitingOthers: number) {
+    const settled = shotCounts(shotsRef.current).fed - waitingOthers;
     const before = lastSettledRef.current ?? Math.max(0, settled - 1);
     lastSettledRef.current = settled;
     const checkpoint = kind !== 'same' && crossedCheckpoint(before, settled);
     feedback(kind, checkpoint);
     const mode = settingsRef.current.speak;
-    const word = mode === 'names' ? (kind === 'same' ? 'again' : kind === 'match' && name ? name : 'check') : null;
+    const word = mode === 'names' ? (kind === 'same' || kind === 'repeat' ? 'again' : kind === 'match' && name ? name : 'check') : null;
     const number = checkpoint && mode !== 'off' ? String(settled) : null;
     const said = [word, number].filter((x): x is string => x !== null);
     if (said.length) speak(said.join(', '));
@@ -383,13 +413,16 @@ export default function CameraView({ cards }: { cards: Card[] | null }) {
       const same = kept ? skipSameSlip(kept, next) : null;
       if (same) next = same.next;
       const others = same?.kept === 'next' ? [same.previous] : [];
-      // A match of a Printing the pile already has is most often the same slip fed again (its first
+      // A match of a card the pile already has is most often the same slip fed again (its first
       // photo may have had a hand in it): set aside as a repeat, which Review can keep as a second
       // copy. Judged on the pile as it will be, so a photo that just replaced the slip's earlier one
-      // is not a repeat of it.
+      // is not a repeat of it. A card an earlier pile holds is the stack fed again (one session per
+      // stack): set aside the same way, with a note saying which pile.
       const settled = new Map([next, ...others].map((x) => [x.id, x]));
       const repeat = repeatOf(shotsRef.current.map((x) => settled.get(x.id) ?? x), next);
+      const earlierLabel = !repeat && from === 'camera' && next.status === 'match' && next.chosen ? earlierPileOf(earlierRef.current, next.chosen) : null;
       if (repeat) next = skipAsRepeat(next);
+      else if (earlierLabel !== null) next = skipAsRepeat(next, `already in pile ${earlierLabel}`);
       const changed = [next, ...others];
       const byId = new Map(changed.map((x) => [x.id, x]));
       updateShots((cur) => cur.map((x) => byId.get(x.id) ?? x));
@@ -406,7 +439,9 @@ export default function CameraView({ cards }: { cards: Card[] | null }) {
             ? recordOrientation(cur.orientation, result.orientation)
             : cur.orientation,
       }));
-      if (from === 'camera') slipSettled(same || repeat ? 'same' : needsReview(next) ? 'doubt' : 'match', next.chosen?.name ?? null, waitingRef.current - 1);
+      // A second photo of a slip is no slip fed, even when the better photo is then set aside as a repeat.
+      const kind = same ? 'same' : next.reason === REPEAT ? 'repeat' : needsReview(next) ? 'doubt' : 'match';
+      if (from === 'camera') slipSettled(kind, next.chosen?.name ?? null, waitingRef.current - 1);
     } catch (e) {
       console.warn('Recognition failed', e);
       setScanError(`Could not recognise the last slip (${e instanceof Error ? e.message : String(e)}). The photo is kept for review.`);
@@ -623,10 +658,13 @@ export default function CameraView({ cards }: { cards: Card[] | null }) {
         </div>
         {tab === 'scan' && camera.state === 'on' && (
           <>
-            {/* The header's count writ large, under the picture so the guide box stays clear; aria-hidden, since the header already announces it. */}
+            {/* The slips fed writ large, under the picture so the guide box stays clear: the number the
+                Owner counted off by hand, repeats included, and under it how many of them are new to
+                the pile. aria-hidden, since the header already announces the counts. */}
             <p className="camera-big-count num" aria-hidden="true">
-              <strong>{counts.captured}</strong>
+              <strong>{counts.fed}</strong>
               <span>slips</span>
+              {counts.repeats > 0 && <small>{counts.captured} new</small>}
             </p>
             <p className={`loop-phase tone-${tone}`} role="status">
               {settings.baseline ? phaseText[phase] : 'Set the empty sheet first, on the Setup tab.'}
@@ -695,6 +733,7 @@ export default function CameraView({ cards }: { cards: Card[] | null }) {
           shots={shots}
           reading={reading}
           meta={meta}
+          earlier={earlier}
           onSave={saveShot}
           onRetake={(id) => void retake(id)}
           onExported={(label, cards) => {
@@ -787,7 +826,10 @@ function LatestResult({ shot, reading, onReview }: { shot: Shot; reading: boolea
         ) : (
           <p className="muted">{reading ? 'Recognising…' : 'Not recognised.'}</p>
         )}
-        {shot.reason && <p className="muted">{`${shot.reason[0]!.toUpperCase()}${shot.reason.slice(1)}; not counted.`}</p>}
+        {shot.reason && (
+          <p className="muted">{`${shot.reason[0]!.toUpperCase()}${shot.reason.slice(1)}; ${shot.reason === REPEAT ? 'counted as fed, not added to the pile' : 'not counted'}.`}</p>
+        )}
+        {shot.note && <p className="muted">{`${shot.note[0]!.toUpperCase()}${shot.note.slice(1)}.`}</p>}
         {(shot.status === 'review' || shot.status === 'none') && (
           <button type="button" className="link" onClick={onReview}>
             Review
@@ -857,9 +899,15 @@ function SetupPanel({
         A slip is photographed once it lies still in the box. A new slip is noticed by its content, so the box need not show the sheet
         between slips; a slip whose picture changed after it settled (a hand moved away, the slip was pushed further in) is photographed
         again and the extra photo is set aside, and a slip put back within a few seconds is not counted twice. A slip that matches a card
-        already in this pile is set aside as a repeat, not counted, and shown among the repeats in the header; its photo stays in Review,
-        where “Keep as a second copy” counts it after all when it really is a second copy. In Review, use “Repeat, already taken” for a
-        second photo of a slip, and “Not a card” only for the empty sheet or a hand.
+        already in this pile, or in a pile added to Scan before (this device’s and the shared ones), is set aside as a repeat: it counts
+        among the slips fed, not among the cards of the pile, and the header shows how many. Its photo stays in Review, where “Keep as a
+        second copy” adds it after all when it really is a second copy. In Review, use “Repeat, already taken” for a second photo of a
+        slip, and “Not a card” only for the empty sheet or a hand.
+      </p>
+      <p className="muted">
+        One stack per session: feed the stack, then on the Review tab “Add to Scan as a pile” and “Start a new session”. The count starts
+        again at 0, and a stack fed a second time leaves only its new cards in the pile; the rest are set aside as repeats of the earlier
+        pile.
       </p>
       <p>
         {o.locked === 'rotated'
@@ -895,7 +943,7 @@ function SetupPanel({
         </select>
       </label>
       <p className="muted">
-        {`Count a stack of ${COUNT_EVERY} (or ${COUNT_EVERY * 2}) slips before feeding it: the two long tones or the spoken number should land on the stack’s last slip; if they come a slip later, a slip in that stack was missed, and if earlier, a photo that is not a slip was counted.`}
+        {`Count a stack of ${COUNT_EVERY} (or ${COUNT_EVERY * 2}) slips before feeding it: the two long tones or the spoken number should land on the stack’s last slip; if they come a slip later, a slip in that stack was missed, and if earlier, a photo that is not a slip was counted. Repeats count as slips fed, so a stack of repeats still lands on its checkpoint.`}
       </p>
       <h2>Without the camera</h2>
       <p className="muted">Run one picture of a slip through the same recognition, for example a slip the camera missed.</p>

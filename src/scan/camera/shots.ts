@@ -1,5 +1,6 @@
 // shots.ts: the photos of one camera session and what became of them. Pure; db.ts stores them.
-import type { ScannedRow } from '../parse';
+import { normalizeName } from '../../lib/normalize';
+import type { Pile, ScannedRow } from '../parse';
 import type { Orientation, RecogniseResult, ShotCandidate, ShotDecision } from '../vision/protocol';
 
 export type ShotStatus = 'match' | 'review' | 'none' | 'confirmed' | 'skipped';
@@ -36,8 +37,11 @@ export interface Shot {
   embedding?: Float32Array | null;
   /** Why the shot was skipped without the Owner: SAME_SLIP for a slip put back that lost to the photo
    *  before it, REPLACED for a photo that a better one of the same slip took over from (skipSameSlip),
-   *  REPEAT for a match of a Printing the pile already has (repeatOf, or the Owner's word in Review). */
+   *  REPEAT for a match of a card the pile already has (repeatOf, or the Owner's word in Review). */
   reason?: string;
+  /** A line for the Owner beside the reason, such as "already in pile Camera 2026-10-25 23:18, 172 slips"
+   *  for a repeat of a card an earlier pile holds (earlierPileOf). Cleared with the reason. */
+  note?: string;
 }
 
 /** The fields that name a Printing, on a candidate as well as on a chosen ref. */
@@ -47,6 +51,54 @@ export type PrintingLike = Pick<PrintingRef, 'scryfall_id' | 'name' | 'set' | 'c
 export function samePrinting(a: PrintingLike, b: PrintingLike): boolean {
   if (a.scryfall_id && b.scryfall_id) return a.scryfall_id === b.scryfall_id;
   return a.name === b.name && a.set === b.set && a.collector_number === b.collector_number;
+}
+
+/** The key of a card's name: the front face, lower-cased (normalizeName, the same key the Scan diff uses). */
+const nameKey = (name: string) => `name:${normalizeName(name)}`;
+
+/**
+ * True when both name the same card: the same Printing, or the same front-face name. The cube is a
+ * singleton, so a slip whose name the pile already has is the same slip fed again, even when
+ * recognition picked another printing of the same art this time.
+ */
+export function sameCard(a: PrintingLike, b: PrintingLike): boolean {
+  return samePrinting(a, b) || nameKey(a.name) === nameKey(b.name);
+}
+
+/**
+ * The keys under which a Printing is found in an earlier-piles index: its scryfall_id when it has
+ * one, "name|set|number", and the name key. A row of a pile is a Printing with empty strings for
+ * what it lacks.
+ */
+export function keysOf(p: PrintingLike): string[] {
+  const keys = p.scryfall_id ? [p.scryfall_id] : [];
+  return [...keys, `${p.name}|${p.set}|${p.collector_number}`, nameKey(p.name)];
+}
+
+/**
+ * The cards of every row of every pile, keyed by keysOf, each to the label of the first pile that
+ * holds it: the piles the Owner added before (this device's Scan session and the shared ones), so
+ * a stack fed a second time is set aside instead of making a second pile of the same cards.
+ */
+export function earlierPilesIndex(piles: readonly Pile[]): Map<string, string> {
+  const index = new Map<string, string>();
+  for (const pile of piles) {
+    for (const r of pile.rows) {
+      if (r.quantity <= 0) continue;
+      const p: PrintingLike = { scryfall_id: r.scryfall_id ?? '', name: r.name, set: r.set ?? '', collector_number: r.collector_number ?? '' };
+      for (const k of keysOf(p)) if (!index.has(k)) index.set(k, pile.label);
+    }
+  }
+  return index;
+}
+
+/** The label of the earlier pile that holds `printing` (by id, by set and number, or by name), or null. */
+export function earlierPileOf(earlier: ReadonlyMap<string, string>, printing: PrintingLike): string | null {
+  for (const k of keysOf(printing)) {
+    const label = earlier.get(k);
+    if (label !== undefined) return label;
+  }
+  return null;
 }
 
 export function refOf(c: PrintingRef): PrintingRef {
@@ -181,8 +233,14 @@ export interface SameSlipOutcome {
   recordOrientation: boolean;
 }
 
-function skippedAs(shot: Shot, reason: string): Shot {
-  return { ...shot, status: 'skipped', chosen: null, reason };
+/** The shot without the automatic reason and its note. */
+function withoutReason(shot: Shot): Shot {
+  const { reason: _reason, note: _note, ...rest } = shot;
+  return rest;
+}
+
+function skippedAs(shot: Shot, reason: string, note?: string): Shot {
+  return { ...withoutReason(shot), status: 'skipped', chosen: null, reason, ...(note ? { note } : {}) };
 }
 
 /**
@@ -197,8 +255,7 @@ export function skipSameSlip(previous: Shot, next: Shot): SameSlipOutcome {
   if (ownerSkipped || betterShot(previous, next) === previous) {
     return { kept: 'previous', previous, next: skippedAs(next, SAME_SLIP), recordOrientation: false };
   }
-  const { reason: _reason, ...rest } = next;
-  const taken = previous.status === 'confirmed' && previous.chosen ? confirmShot(next, previous.chosen) : rest;
+  const taken = previous.status === 'confirmed' && previous.chosen ? confirmShot(next, previous.chosen) : withoutReason(next);
   return {
     kept: 'next',
     previous: skippedAs(previous, REPLACED),
@@ -207,47 +264,49 @@ export function skipSameSlip(previous: Shot, next: Shot): SameSlipOutcome {
   };
 }
 
-/** The reason of a matched shot whose Printing the pile already had: most often the same slip fed again. */
+/** The reason of a matched shot whose card the pile already had: most often the same slip fed again. */
 export const REPEAT = 'repeat of a slip already taken';
 
 /**
- * The kept shot (isMatched) that already names `printing`, newest first, or null. A shot with id
- * `except` is left out, and so is every shot captured at or after `before`.
+ * The kept shot (isMatched) that already names the card of `printing` (sameCard), newest first, or
+ * null. A shot with id `except` is left out, and so is every shot captured at or after `before`.
  */
 function keptWith(shots: readonly Shot[], printing: PrintingLike, except?: string, before?: string): Shot | null {
   let best: Shot | null = null;
   for (const s of shots) {
     if (s.id === except || (before !== undefined && s.at >= before) || !isMatched(s)) continue;
-    if (!samePrinting(s.chosen!, printing)) continue;
+    if (!sameCard(s.chosen!, printing)) continue;
     if (!best || s.at > best.at) best = s;
   }
   return best;
 }
 
 /**
- * The earlier kept shot whose Printing a freshly recognised camera shot matched again, or null.
- * Only a match counts as a repeat by itself: the top candidate of a review may be wrong, and a shot
- * the Owner confirmed is their word. A real second copy is restored with keepSecondCopy.
+ * The earlier kept shot whose card a freshly recognised camera shot matched again, or null. Only a
+ * match counts as a repeat by itself: the top candidate of a review may be wrong, and a shot the
+ * Owner confirmed is their word. A real second copy is restored with keepSecondCopy.
  */
 export function repeatOf(shots: readonly Shot[], next: Shot): Shot | null {
   if (next.source !== 'camera' || next.status !== 'match' || !next.chosen) return null;
   return keptWith(shots, next.chosen, next.id, next.at);
 }
 
-/** The kept shot that already names a candidate's Printing (for the Review UI), or null. */
+/** The kept shot that already names a candidate's card (for the Review UI), or null. */
 export function alreadyInPile(shots: readonly Shot[], candidate: PrintingLike, except?: string): Shot | null {
   return keptWith(shots, candidate, except);
 }
 
-/** Sets a shot aside as a repeat of a slip already taken; its recognition stays for keepSecondCopy. */
-export function skipAsRepeat(shot: Shot): Shot {
-  return skippedAs(shot, REPEAT);
+/**
+ * Sets a shot aside as a repeat of a slip already taken; its recognition stays for keepSecondCopy.
+ * `note` says where the card was seen before when that was an earlier pile, not this session.
+ */
+export function skipAsRepeat(shot: Shot, note?: string): Shot {
+  return skippedAs(shot, REPEAT, note);
 }
 
 /** Keeps a shot set aside as the same slip, or as a repeat, as a second copy: back to what its recognition gave. */
 export function keepSecondCopy(shot: Shot): Shot {
-  const { reason: _reason, ...rest } = shot;
-  return { ...rest, ...fromDecision(shot) };
+  return { ...withoutReason(shot), ...fromDecision(shot) };
 }
 
 /** A shot set aside without the Owner: another photo of the slip that counts, or a repeat (not counted as captured). */
@@ -256,13 +315,11 @@ export function isSameSlip(s: Shot): boolean {
 }
 
 export function confirmShot(shot: Shot, choice: PrintingRef): Shot {
-  const { reason: _reason, ...rest } = shot;
-  return { ...rest, status: 'confirmed', chosen: refOf(choice) };
+  return { ...withoutReason(shot), status: 'confirmed', chosen: refOf(choice) };
 }
 
 export function skipShot(shot: Shot): Shot {
-  const { reason: _reason, ...rest } = shot;
-  return { ...rest, status: 'skipped', chosen: null };
+  return { ...withoutReason(shot), status: 'skipped', chosen: null };
 }
 
 export function isMatched(s: Shot): boolean {
@@ -274,14 +331,20 @@ export function needsReview(s: Shot): boolean {
 }
 
 export interface ShotCounts {
-  /** Shots that count as slips: all but the photos set aside automatically (isSameSlip), repeats among them. */
+  /** Shots that count as slips of the pile: all but the photos set aside automatically (isSameSlip), repeats among them. */
   captured: number;
   matched: number;
   toReview: number;
   /** Every skipped shot, the Owner's and the automatic ones. */
   skipped: number;
-  /** Shots set aside as REPEAT: slips fed again whose card the pile already had. */
+  /** Shots set aside as REPEAT: slips fed again whose card the pile (or an earlier one) already had. */
   repeats: number;
+  /**
+   * Slips fed: captured plus repeats. What the Owner counted off by hand before feeding the stack,
+   * so the count checkpoints are judged on it. A repeat is a slip that went under the camera; a
+   * same-slip photo (SAME_SLIP, REPLACED) is another picture of a slip already counted, not a slip.
+   */
+  fed: number;
 }
 
 export function shotCounts(shots: readonly Shot[]): ShotCounts {
@@ -297,7 +360,8 @@ export function shotCounts(shots: readonly Shot[]): ShotCounts {
     else if (needsReview(s)) toReview++;
     else if (s.status === 'skipped') skipped++;
   }
-  return { captured: shots.length - same, matched, toReview, skipped, repeats };
+  const captured = shots.length - same;
+  return { captured, matched, toReview, skipped, repeats, fed: captured + repeats };
 }
 
 export type ShotFilter = 'all' | 'review' | 'matched' | 'skipped';
@@ -382,5 +446,6 @@ export function reviveShot(raw: unknown): Shot | null {
     source: r.source === 'photo' ? 'photo' : 'camera',
     embedding: r.embedding instanceof Float32Array ? r.embedding : null,
     ...(typeof r.reason === 'string' && r.reason ? { reason: r.reason } : {}),
+    ...(typeof r.note === 'string' && r.note ? { note: r.note } : {}),
   };
 }

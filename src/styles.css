@@ -1616,6 +1616,17 @@ a.button {
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
+/* How many of the slips fed are new to the pile, on its own line under the big number. */
+.camera-big-count small {
+  flex-basis: 100%;
+  text-align: center;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.camera-big-count {
+  flex-wrap: wrap;
+}
 .camera-setup select {
   min-height: 44px;
   font: inherit;

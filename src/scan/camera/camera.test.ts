@@ -23,9 +23,12 @@ import {
   betterShot,
   confirmShot,
   defaultPileLabel,
+  earlierPileOf,
+  earlierPilesIndex,
   filterShots,
   isSameSlip,
   keepSecondCopy,
+  keysOf,
   newShot,
   nextToReview,
   previousShot,
@@ -35,6 +38,8 @@ import {
   REPLACED,
   reviveShot,
   SAME_SLIP,
+  sameCard,
+  samePrinting,
   sameSlipAsBefore,
   sameSlipOf,
   shotCounts,
@@ -45,6 +50,7 @@ import {
   sortShots,
   type Shot,
 } from './shots';
+import type { Pile, ScannedRow } from '../parse';
 import type { RecogniseResult, ShotCandidate } from '../vision/protocol';
 
 const W = 32;
@@ -395,7 +401,7 @@ describe('shots', () => {
     const s = shot('a', '2026-10-25T10:00:00Z');
     expect(s.status).toBe('review');
     expect(s.decision).toBe(null);
-    expect(shotCounts([s])).toEqual({ captured: 1, matched: 0, toReview: 1, skipped: 0, repeats: 0 });
+    expect(shotCounts([s])).toEqual({ captured: 1, matched: 0, toReview: 1, skipped: 0, repeats: 0, fed: 1 });
   });
 
   it('chooses the best Printing of a match and nothing for review', () => {
@@ -433,7 +439,7 @@ describe('shots', () => {
       { name: 'Sol Ring', quantity: 1, scryfall_id: 'lea-270', set: 'lea', collector_number: '270', foil: null, language: null },
       { name: 'Sol Ring', quantity: 1, scryfall_id: 'c21-263', set: 'c21', collector_number: '263', foil: null, language: null },
     ]);
-    expect(shotCounts(shots)).toEqual({ captured: 7, matched: 4, toReview: 2, skipped: 1, repeats: 0 });
+    expect(shotCounts(shots)).toEqual({ captured: 7, matched: 4, toReview: 2, skipped: 1, repeats: 0, fed: 7 });
     expect(filterShots(shots, 'review').map((s) => s.id)).toEqual(['5', '6']);
     expect(filterShots(shots, 'matched').map((s) => s.id)).toEqual(['1', '2', '3', '4']);
     expect(filterShots(shots, 'skipped').map((s) => s.id)).toEqual(['7']);
@@ -485,7 +491,7 @@ describe('shots', () => {
     expect(aside.candidates).toEqual(again.candidates);
     expect(aside.embedding).toBe(again.embedding);
     expect(isSameSlip(aside)).toBe(true);
-    expect(shotCounts([first, aside])).toEqual({ captured: 1, matched: 1, toReview: 0, skipped: 1, repeats: 1 });
+    expect(shotCounts([first, aside])).toEqual({ captured: 1, matched: 1, toReview: 0, skipped: 1, repeats: 1, fed: 2 });
     expect(shotsToRows([first, aside])).toEqual([expect.objectContaining({ name: 'Lightning Bolt', quantity: 1 })]);
     expect(reviveShot(structuredClone(aside))?.reason).toBe(REPEAT);
   });
@@ -494,11 +500,90 @@ describe('shots', () => {
     const unknownId = { ...bolt, scryfall_id: '' };
     const first = matched('a', 0, [unknownId]);
     expect(repeatOf([first], matched('b', 10, [bolt]))?.id).toBe('a');
-    expect(repeatOf([first], matched('b', 10, [{ ...unknownId, collector_number: '162' }]))).toBe(null);
-    // With ids on both, the id decides: another Printing of the same card is not a repeat.
+    // Another number of the same name is still the same card (the test once pinned null here,
+    // when only the Printing counted; in a singleton cube the name is enough).
+    expect(repeatOf([first], matched('b', 10, [{ ...unknownId, collector_number: '162' }]))?.id).toBe('a');
+    expect(repeatOf([first], matched('b', 10, [ring]))).toBe(null);
     const confirmed = confirmShot(shot('c', at(20)), ring);
     expect(repeatOf([confirmed], matched('d', 25, [ring]))?.id).toBe('c');
-    expect(repeatOf([confirmed], matched('d', 25, [ringC21]))).toBe(null);
+    // samePrinting alone still tells the Printings apart by id.
+    expect(samePrinting(ring, ringC21)).toBe(false);
+    expect(samePrinting(unknownId, bolt)).toBe(true);
+    expect(samePrinting(unknownId, { ...unknownId, collector_number: '162' })).toBe(false);
+  });
+
+  it('finds the repeat by name across printings, whatever the case of the name', () => {
+    // Recognition picked another printing of the same art the second time: the same slip again.
+    const confirmed = confirmShot(shot('c', at(20)), ring);
+    expect(repeatOf([confirmed], matched('d', 25, [ringC21]))?.id).toBe('c');
+    const shouted = cand('SOL RING', 'c21', '263', 0.8, 'c21-263-x');
+    expect(repeatOf([confirmed], matched('e', 26, [shouted]))?.id).toBe('c');
+    expect(sameCard(ring, ringC21)).toBe(true);
+    expect(sameCard(ring, bolt)).toBe(false);
+    // A double-faced card is named by its front face.
+    const dfc = cand('Delver of Secrets // Insectile Aberration', 'isd', '51', 0.9);
+    expect(sameCard(dfc, cand('Delver of Secrets', 'isd', '51', 0.9, 'isd-51-front'))).toBe(true);
+  });
+
+  it('indexes the cards of earlier piles and finds a Printing in it by id or by name', () => {
+    const row = (name: string, scryfall_id: string | null, set: string | null, cn: string | null, quantity = 1): ScannedRow => ({
+      name,
+      quantity,
+      scryfall_id,
+      set,
+      collector_number: cn,
+      foil: null,
+      language: null,
+    });
+    const first: Pile = { id: 'p1', label: 'Camera 2026-10-25 23:18, 172 slips', rows: [row('Lightning Bolt', 'lea-161', 'lea', '161'), row('Counterspell', null, 'lea', '54')] };
+    const second: Pile = { id: 'p2', label: 'Camera 2026-10-26 09:02, 16 slips', rows: [row('Lightning Bolt', 'lea-161', 'lea', '161'), row('Sol Ring', 'lea-270', 'lea', '270'), row('Gone', 'x-1', 'x', '1', 0)] };
+    const earlier = earlierPilesIndex([first, second]);
+    // By id, by set and number, and by name; the first pile's label wins.
+    expect(earlierPileOf(earlier, bolt)).toBe(first.label);
+    expect(earlierPileOf(earlier, { ...bolt, scryfall_id: '' })).toBe(first.label);
+    expect(earlierPileOf(earlier, cand('Lightning Bolt', '2ed', '162', 0.9))).toBe(first.label);
+    expect(earlierPileOf(earlier, cand('Counterspell', 'lea', '54', 0.9, ''))).toBe(first.label);
+    expect(earlierPileOf(earlier, cand('counterspell', 'ice', '64', 0.9))).toBe(first.label);
+    expect(earlierPileOf(earlier, ringC21)).toBe(second.label);
+    // A row a photo review took down to nothing, and a card never seen, are not in it.
+    expect(earlierPileOf(earlier, cand('Gone', 'x', '1', 0.9))).toBe(null);
+    expect(earlierPileOf(new Map(), bolt)).toBe(null);
+    expect(keysOf(bolt)).toEqual(['lea-161', 'Lightning Bolt|lea|161', 'name:lightning bolt']);
+    expect(keysOf({ ...bolt, scryfall_id: '' })).toEqual(['Lightning Bolt|lea|161', 'name:lightning bolt']);
+  });
+
+  it('keeps the note of a repeat from an earlier pile until the shot is kept or decided', () => {
+    const note = 'already in pile Camera 2026-10-25 23:18, 172 slips';
+    const aside = skipAsRepeat(matched('a', 0, [bolt]), note);
+    expect(aside.reason).toBe(REPEAT);
+    expect(aside.note).toBe(note);
+    expect(reviveShot(structuredClone(aside))?.note).toBe(note);
+    // A repeat within the session carries no note, and a note does not linger on a later one.
+    expect(skipAsRepeat(matched('b', 1, [bolt])).note).toBeUndefined();
+    expect(skipAsRepeat(aside).note).toBeUndefined();
+    const copy = keepSecondCopy(aside);
+    expect(copy.status).toBe('match');
+    expect(copy.reason).toBeUndefined();
+    expect(copy.note).toBeUndefined();
+    expect(confirmShot(aside, ring).note).toBeUndefined();
+    expect(skipShot(aside).note).toBeUndefined();
+  });
+
+  it('counts a repeat among the slips fed, and a same-slip photo not', () => {
+    const first = matched('a', 0, [bolt], unit());
+    const again = skipSameSlip(first, matched('b', 1, [bolt], unit())).next;
+    expect(again.reason).toBe(SAME_SLIP);
+    const repeat = skipAsRepeat(matched('c', 30, [bolt]), 'already in pile Earlier');
+    const other = matched('d', 31, [ring]);
+    const counts = shotCounts([other, repeat, again, first]);
+    expect(counts.captured).toBe(2);
+    expect(counts.repeats).toBe(1);
+    expect(counts.fed).toBe(3);
+    // The pile holds the new cards only.
+    expect(shotsToRows([other, repeat, again, first]).map((r) => [r.name, r.quantity])).toEqual([
+      ['Lightning Bolt', 1],
+      ['Sol Ring', 1],
+    ]);
   });
 
   it('never takes a doubtful shot, a photo, or a match before the kept shot for a repeat', () => {
@@ -524,7 +609,7 @@ describe('shots', () => {
     expect(copy.status).toBe('match');
     expect(copy.chosen?.scryfall_id).toBe('lea-161');
     expect(copy.reason).toBeUndefined();
-    expect(shotCounts([first, copy])).toEqual({ captured: 2, matched: 2, toReview: 0, skipped: 0, repeats: 0 });
+    expect(shotCounts([first, copy])).toEqual({ captured: 2, matched: 2, toReview: 0, skipped: 0, repeats: 0, fed: 2 });
     expect(shotsToRows([first, copy])[0]!.quantity).toBe(2);
     // A doubtful photo the Owner called a repeat in Review comes back doubtful.
     const doubtful = keepSecondCopy(skipAsRepeat(applyRecognition(shot('c', at(20)), result('review', [bolt]))));
@@ -538,7 +623,9 @@ describe('shots', () => {
     const shots = [skipShot(matched('c', 2, [ringC21])), byName, first];
     expect(alreadyInPile(shots, bolt)?.id).toBe('a');
     expect(alreadyInPile(shots, ring)?.id).toBe('b');
-    expect(alreadyInPile(shots, ringC21)).toBe(null);
+    // Another printing of a name in the pile is in it too (once pinned null, when only the Printing counted).
+    expect(alreadyInPile(shots, ringC21)?.id).toBe('b');
+    expect(alreadyInPile(shots, cand('Counterspell', 'lea', '54', 0.9))).toBe(null);
     // A shot is not in the pile on its own account.
     expect(alreadyInPile(shots, bolt, 'a')).toBe(null);
   });
@@ -553,7 +640,7 @@ describe('shots', () => {
     expect(out.previous.reason).toBe(REPLACED);
     // Judged on the pile as settled, the better photo is still a repeat of the first slip.
     expect(repeatOf([out.next, out.previous, first], out.next)?.id).toBe('a');
-    expect(shotCounts([skipAsRepeat(out.next), out.previous, first])).toEqual({ captured: 1, matched: 1, toReview: 0, skipped: 2, repeats: 1 });
+    expect(shotCounts([skipAsRepeat(out.next), out.previous, first])).toEqual({ captured: 1, matched: 1, toReview: 0, skipped: 2, repeats: 1, fed: 2 });
     // A worse photo of the nudged slip loses to the repeat as the same slip.
     const worse = matched('d', 22, [{ ...bolt, score: 0.5 }], unit());
     expect(skipSameSlip(repeat, worse).next.reason).toBe(SAME_SLIP);
@@ -585,7 +672,7 @@ describe('same slip twice', () => {
     expect(skipped.status).toBe('skipped');
     expect(skipped.reason).toBe(SAME_SLIP);
     expect(isSameSlip(skipped)).toBe(true);
-    expect(shotCounts([a, skipped])).toEqual({ captured: 1, matched: 1, toReview: 0, skipped: 1, repeats: 0 });
+    expect(shotCounts([a, skipped])).toEqual({ captured: 1, matched: 1, toReview: 0, skipped: 1, repeats: 0, fed: 1 });
   });
 
   it('treats two unmatched recognitions as naming the same thing', () => {
@@ -629,7 +716,7 @@ describe('same slip twice', () => {
     expect(kept.status).toBe('match');
     expect(kept.chosen?.scryfall_id).toBe('lea-161');
     expect(kept.reason).toBeUndefined();
-    expect(shotCounts([a, kept])).toEqual({ captured: 2, matched: 2, toReview: 0, skipped: 0, repeats: 0 });
+    expect(shotCounts([a, kept])).toEqual({ captured: 2, matched: 2, toReview: 0, skipped: 0, repeats: 0, fed: 2 });
     expect(shotsToRows([a, kept])[0]!.quantity).toBe(2);
     const doubtful = keepSecondCopy(skipSameSlip(a, recognised('c', 2, 'review', [bolt], unit())).next);
     expect(doubtful.status).toBe('review');
@@ -650,7 +737,7 @@ describe('same slip twice', () => {
     expect(out.next.status).toBe('match');
     expect(out.next.chosen?.scryfall_id).toBe('lea-161');
     expect(out.next.reason).toBeUndefined();
-    expect(shotCounts([out.next, out.previous])).toEqual({ captured: 1, matched: 1, toReview: 0, skipped: 1, repeats: 0 });
+    expect(shotCounts([out.next, out.previous])).toEqual({ captured: 1, matched: 1, toReview: 0, skipped: 1, repeats: 0, fed: 1 });
     expect(shotsToRows([out.next, out.previous])).toEqual([expect.objectContaining({ name: 'Lightning Bolt', quantity: 1 })]);
   });
 
@@ -677,7 +764,7 @@ describe('same slip twice', () => {
     expect(out.next.status).toBe('skipped');
     expect(out.next.reason).toBe(SAME_SLIP);
     expect(out.recordOrientation).toBe(false);
-    expect(shotCounts([out.next, out.previous])).toEqual({ captured: 1, matched: 1, toReview: 0, skipped: 1, repeats: 0 });
+    expect(shotCounts([out.next, out.previous])).toEqual({ captured: 1, matched: 1, toReview: 0, skipped: 1, repeats: 0, fed: 1 });
   });
 
   it('carries the confirmed Printing of the first photo over to a better second one', () => {
@@ -690,7 +777,7 @@ describe('same slip twice', () => {
     expect(out.next.chosen?.scryfall_id).toBe('lea-161');
     expect(out.previous.reason).toBe(REPLACED);
     expect(out.previous.chosen).toBe(null);
-    expect(shotCounts([out.next, out.previous])).toEqual({ captured: 1, matched: 1, toReview: 0, skipped: 1, repeats: 0 });
+    expect(shotCounts([out.next, out.previous])).toEqual({ captured: 1, matched: 1, toReview: 0, skipped: 1, repeats: 0, fed: 1 });
     expect(shotsToRows([out.next, out.previous]).map((r) => [r.scryfall_id, r.quantity])).toEqual([['lea-161', 1]]);
   });
 
@@ -717,12 +804,12 @@ describe('same slip twice', () => {
     const first = keepSecondCopy(replaced.previous);
     expect(first.status).toBe('review');
     expect(first.reason).toBeUndefined();
-    expect(shotCounts([replaced.next, first])).toEqual({ captured: 2, matched: 1, toReview: 1, skipped: 0, repeats: 0 });
+    expect(shotCounts([replaced.next, first])).toEqual({ captured: 2, matched: 1, toReview: 1, skipped: 0, repeats: 0, fed: 2 });
 
     const lost = skipSameSlip(clean, recognised('c', 2, 'match', [{ ...bolt, score: 0.6 }], unit()));
     const second = keepSecondCopy(lost.next);
     expect(second.status).toBe('match');
-    expect(shotCounts([second, lost.previous])).toEqual({ captured: 2, matched: 2, toReview: 0, skipped: 0, repeats: 0 });
+    expect(shotCounts([second, lost.previous])).toEqual({ captured: 2, matched: 2, toReview: 0, skipped: 0, repeats: 0, fed: 2 });
   });
 
   it('compares a third photo with the one that counts, past a skipped one', () => {
@@ -732,7 +819,7 @@ describe('same slip twice', () => {
     expect(sameSlipOf([c, b, a], c)?.id).toBe('a');
     const out = skipSameSlip(a, c);
     expect(out.kept).toBe('next');
-    expect(shotCounts([out.next, b, out.previous])).toEqual({ captured: 1, matched: 1, toReview: 0, skipped: 2, repeats: 0 });
+    expect(shotCounts([out.next, b, out.previous])).toEqual({ captured: 1, matched: 1, toReview: 0, skipped: 2, repeats: 0, fed: 1 });
     // A different slip is not compared at all.
     const d = recognised('d', 3, 'match', [ring], unit(0.5));
     expect(sameSlipOf([d, c, b, a], d)).toBe(null);
