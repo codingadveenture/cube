@@ -345,6 +345,8 @@ function ExportPanel({
 
   // With photos shared, a session of slips that all still need review is worth sharing too.
   const canAdd = wantShare ? shots.length > 0 : cards > 0;
+  // The photos of a pile are uploaded from this session's shots: deleting them mid-way loses them.
+  const uploading = phase.kind === 'sharing' || phase.kind === 'failed';
   return (
     <div className="panel camera-export">
       {meta.exported && (
@@ -466,11 +468,12 @@ function ExportPanel({
                   </button>
                 </>
               ) : (
-                <button type="button" onClick={() => setConfirmNew(true)} disabled={shots.length === 0}>
+                <button type="button" onClick={() => setConfirmNew(true)} disabled={shots.length === 0 || uploading}>
                   Start a new session
                 </button>
               )}
             </div>
+            {uploading && <p className="muted">The photos of the last pile are still being shared; a new session would delete them before they are up.</p>}
           </>
         ))}
       {confirmNew && !meta.exported && counts.matched > 0 && (

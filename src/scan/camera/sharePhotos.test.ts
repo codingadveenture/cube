@@ -144,6 +144,8 @@ describe('sharing without the new rules', () => {
 describe('progressText', () => {
   it('counts photos', () => {
     expect(progressText(null)).toBe('Preparing the photos…');
+    expect(progressText({ stage: 'encoding', done: 3, total: 25 })).toBe('Preparing the photos: 3 of 25');
+    expect(progressText({ stage: 'pile', done: 0, total: 25 })).toBe('Creating the shared pile…');
     expect(progressText({ done: 150, total: 540 })).toBe('Uploading photos: 150 of 540');
   });
 });

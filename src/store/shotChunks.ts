@@ -89,9 +89,11 @@ export function chunkShots<T extends { thumb: string }>(
   return chunks;
 }
 
-/** How far a photo upload has come, in photos. */
+/** How far sharing the photos has come, in photos. */
 export interface UploadProgress {
-  /** Photos on the server. */
+  /** 'encoding' the photos on the device, creating the 'pile' document, or the 'upload' of the chunks (the default). */
+  stage?: 'encoding' | 'pile' | 'upload';
+  /** Photos done at this stage (on the server, for the upload). */
   done: number;
   /** Photos in all. */
   total: number;
@@ -99,6 +101,8 @@ export interface UploadProgress {
 
 export function progressText(p: UploadProgress | null): string {
   if (!p) return 'Preparing the photos…';
+  if (p.stage === 'encoding') return `Preparing the photos: ${p.done} of ${p.total}`;
+  if (p.stage === 'pile') return 'Creating the shared pile…';
   return `Uploading photos: ${p.done} of ${p.total}`;
 }
 

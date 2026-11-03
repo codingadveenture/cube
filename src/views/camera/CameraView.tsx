@@ -151,7 +151,9 @@ export default function CameraView({ cards }: { cards: Card[] | null }) {
       });
   }, []);
 
-  const [tab, setTab] = useState<Tab>(() => (settings.baseline ? 'scan' : 'setup'));
+  // Always Setup first: the capture loop only runs on the Scan tab, so nothing is photographed while
+  // the phone is still being put on the rig.
+  const [tab, setTab] = useState<Tab>('setup');
   const [latestId, setLatestId] = useState<string | null>(null);
   const [reading, setReading] = useState<ReadonlySet<string>>(new Set());
   /** Slips handed to the recogniser and not answered yet, counted at once (state lags a render). */

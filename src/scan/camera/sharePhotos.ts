@@ -34,7 +34,7 @@ export class PhotosGoneError extends Error {
 }
 
 /** A chunk write that has not reached the server after this long counts as stopped. */
-const WRITE_TIMEOUT_MS = 60_000;
+const WRITE_TIMEOUT_MS = 30_000;
 
 const STOPPED = 'The photo upload stopped (no connection?). Try again; it goes on from where it stopped.';
 
@@ -78,11 +78,20 @@ export async function encodeThumb(shot: Pick<Shot, 'thumb' | 'orientation'>): Pr
   }
 }
 
-/** The shots as shared shots with their thumbnails, oldest first. */
-export async function sharedShotsOf(shots: readonly Shot[], rows: readonly SharedPileRow[]): Promise<SharedShot[]> {
+/** The shots as shared shots with their thumbnails, oldest first; reports each photo encoded. */
+export async function sharedShotsOf(
+  shots: readonly Shot[],
+  rows: readonly SharedPileRow[],
+  onProgress?: (p: UploadProgress) => void,
+): Promise<SharedShot[]> {
   const byId = new Map(shots.map((s) => [s.id, s]));
   const out: SharedShot[] = [];
-  for (const p of planSharedShots(shots, rows)) out.push({ ...p, thumb: await encodeThumb(byId.get(p.id)!) });
+  const planned = planSharedShots(shots, rows);
+  onProgress?.({ stage: 'encoding', done: 0, total: planned.length });
+  for (const p of planned) {
+    out.push({ ...p, thumb: await encodeThumb(byId.get(p.id)!) });
+    onProgress?.({ stage: 'encoding', done: out.length, total: planned.length });
+  }
   return out;
 }
 
@@ -195,10 +204,12 @@ export async function shareCameraPile(
   if (pile.rows.length > MAX_PILE_ROWS) throw new Error(`A shared pile holds at most ${MAX_PILE_ROWS} rows; this one has ${pile.rows.length}.`);
   const rows = toSharedRows(pile.rows);
   // Encoded before the pile exists, so a failure here leaves nothing half-shared.
-  const shared = await sharedShotsOf(shots, rows);
+  const shared = await sharedShotsOf(shots, rows, hooks.onProgress);
   const chunks = chunkShots(shared);
   // Kept before the pile exists, so a resume after a reload writes exactly these chunks.
   savePhotoPlan(pile.id, planOf(chunks));
+  // The pile document is the first write: on a poor connection this is where the wait is.
+  hooks.onProgress({ stage: 'pile', done: 0, total: shared.length });
   const { id, written } = store.createScanPile(cameraPileInput(pile, by, shared));
   hooks.onShared(id);
   try {
