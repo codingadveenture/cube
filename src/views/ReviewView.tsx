@@ -8,7 +8,7 @@
 // photo often shows another printing than the one the app has as In-box: "Box has this printing"
 // (Owner only) records the photographed one as the Scan tab does, without deciding the photo.
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { loadPrintings, usePrintings } from '../printings/load';
+import { loadPrintings, useManyPrintings, usePrintings } from '../printings/load';
 import { replaceHash, reviewHash } from '../router';
 import {
   candidateTags,
@@ -35,7 +35,7 @@ import { scryfallImage } from '../store/baseline';
 import { errorText, PHOTOS_DENIED, useScans, useShotChunks, useStore } from '../store/context';
 import { lookupById } from '../store/lookup';
 import { flattenChunks, photosComplete, refOfShared, sharedNeedsReview, sharedShotCounts } from '../store/shotChunks';
-import type { SharedPile, SharedShot, SharedShotRef, ShotDecisionInput } from '../store/types';
+import type { SharedPile, SharedShot, SharedShotRef, ShotDecisionInput, SharedShotCandidate } from '../store/types';
 import type { Card } from '../types';
 import { NameSearch } from './camera/NameSearch';
 import { score, setNumber } from './camera/parts';
@@ -157,6 +157,23 @@ function PileDesk({
   const index = openId ? queue.findIndex((x) => x.shot.id === openId) : -1;
   const at = index >= 0 ? index : 0;
   const current = queue[at] ?? null;
+  // The recogniser tells arts apart, not printings: a candidate that shares the In-box printing's art
+  // is shown AS the In-box printing (its image, set and number), so the desk never claims the box has
+  // another printing when the slip is the one the box has. Needs each candidate's illustration id.
+  const candidateOracles = useMemo(() => (current ? [...new Set(current.shot.candidates.map((c) => c.oracle_id))] : []), [current]);
+  const candidatePrintings = useManyPrintings(candidateOracles);
+  const asBoxPrinting = (c: SharedShotCandidate): SharedShotCandidate => {
+    const inBox = cards?.get(c.oracle_id)?.in_box;
+    if (!inBox || !inBox.illustration_id || inBox.scryfall_id === c.scryfall_id) return c;
+    const art = candidatePrintings.files.get(c.oracle_id)?.find((p) => p.id === c.scryfall_id)?.illustration_id ?? null;
+    if (art !== inBox.illustration_id) return c;
+    return { ...c, scryfall_id: inBox.scryfall_id, set: inBox.set, collector_number: inBox.collector_number };
+  };
+  const shownCandidates = useMemo(
+    () => (current ? current.shot.candidates.map(asBoxPrinting) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [current, cards, candidatePrintings.files],
+  );
   // The queue as of the latest render, for a decision whose promise settles later.
   const queueRef = useRef(queue);
   queueRef.current = queue;
@@ -303,7 +320,7 @@ function PileDesk({
     void decide(current!, { kind: 'pick', ref: refOfShared(ref) });
   };
   const chooseCandidate = (i: number) => {
-    const c = current?.shot.candidates[i];
+    const c = shownCandidates[i];
     if (c) choose(c);
   };
   const notACard = () => {
@@ -469,14 +486,16 @@ function PileDesk({
                 {s.score !== null && <span className="muted num">score {score(s.score)}</span>}
               </div>
               <ol className="candidates desk-candidates">
-                {s.candidates.map((c, i) => {
+                {shownCandidates.map((c, i) => {
                   const chosen = s.chosen?.scryfall_id === c.scryfall_id;
+                  const asBox = c.scryfall_id !== s.candidates[i]!.scryfall_id;
                   const tags = tagsOf(c);
                   const again = alreadyIn(tags) !== null;
                   const toBox = otherPrinting(tags) && canBox(c.oracle_id, c.scryfall_id);
                   const open = picker?.oracle_id === c.oracle_id && picker.pickedId === c.scryfall_id;
                   return (
-                    <li key={`${c.scryfall_id}-${c.oracle_id}`} className={chosen ? 'chosen' : undefined}>
+                    <li key={`${s.candidates[i]!.scryfall_id}-${c.oracle_id}`} className={chosen ? 'chosen' : undefined}>
+                      {asBox && <span className="muted">Shown as the box's printing: same art as the one recognised.</span>}
                       {decidable ? (
                         <button
                           type="button"

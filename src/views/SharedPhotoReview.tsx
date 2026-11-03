@@ -64,7 +64,7 @@ export function SharedPhoto({ shot, className }: { shot: SharedShot; className: 
 
 /** The name under a photo: the chosen Printing (the card a repeat names), a guess with a question mark, or why there is none. */
 export function shownName(s: SharedShot): string {
-  if (s.status === 'skipped') return 'Not a card';
+  if (s.status === 'skipped') return 'Set aside';
   const c = s.chosen ?? s.candidates[0] ?? null;
   if (!c) return 'Not recognised';
   return sharedNeedsReview(s) ? `${c.name}?` : c.name;
