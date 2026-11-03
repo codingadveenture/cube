@@ -1,12 +1,13 @@
 // queue.ts: the order of the desk review (#/review), pure. Which pile opens, the queue of a pile's
 // photos (to review first, in capture order), the next photo to decide, the position line, the
 // tags on a candidate (in the box, another printing of an In-box card, already in this pile or
-// in another), the photos to set aside as repeats in one go, and the order of a card's printings
-// in the picker. ReviewView stays thin over these.
+// in another), the photos to set aside as repeats in one go, the order of a card's printings in
+// the picker, and the In-box record the Owner writes when the photo shows another printing than
+// the one the app has ("Box has this printing"). ReviewView stays thin over these.
 import { normalizeName } from '../lib/normalize';
 import type { IndexPrinting } from '../printings/types';
 import { sharedNeedsReview } from '../store/shotChunks';
-import type { SharedPile, SharedShot, SharedShotRef } from '../store/types';
+import type { InBoxState, SharedPile, SharedShot, SharedShotRef } from '../store/types';
 import type { Card } from '../types';
 
 type PileLike = Pick<SharedPile, 'id' | 'createdAt' | 'to_review' | 'shot_count'>;
@@ -142,6 +143,35 @@ export function orderPrintings<T extends Pick<IndexPrinting, 'id' | 'illustratio
   const art = pickedId === null ? null : (printings.find((p) => p.id === pickedId)?.illustration_id ?? null);
   const rank = (p: T) => (p.id === inBoxId ? 0 : art !== null && p.illustration_id === art ? 1 : 2);
   return [...printings].sort((a, b) => rank(a) - rank(b) || (a.released_at > b.released_at ? -1 : a.released_at < b.released_at ? 1 : 0));
+}
+
+/** A printing the desk can put in the box: a candidate (scryfall_id) or a printings-file entry (id), with the card's name. */
+type PrintingToBox = Pick<SharedShotRef, 'set' | 'collector_number' | 'name'> & ({ scryfall_id: string } | { id: string });
+
+/**
+ * The In-box record of a printing photographed at the desk, as the Scan tab's "Box has this
+ * printing" writes it (source 'scan', confidence 'high'). The illustration is looked up apart
+ * (the known Printings, Scryfall, the printings file); null when none of them has it.
+ */
+export function inBoxFromPrinting(p: PrintingToBox, illustration_id: string | null): InBoxState {
+  return {
+    scryfall_id: 'scryfall_id' in p ? p.scryfall_id : p.id,
+    set: p.set,
+    collector_number: p.collector_number,
+    illustration_id,
+    name: p.name,
+    source: 'scan',
+    confidence: 'high',
+  };
+}
+
+/**
+ * Whether the desk may record `scryfall_id` as a card's In-box Printing: the card is known and on
+ * the List, and the printing is not the one already recorded. A card without an In-box Printing
+ * counts: the photo shows it is in the box after all.
+ */
+export function canSetInBox(card: Pick<Card, 'in_list' | 'in_box'> | null | undefined, scryfall_id: string): boolean {
+  return !!card && card.in_list && card.in_box?.scryfall_id !== scryfall_id;
 }
 
 /** True when pile `a` was created before pile `b`: the pileOrder of the two, the other way round. */

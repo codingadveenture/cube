@@ -68,7 +68,8 @@ function Shell() {
     body = <CameraView cards={merged} />;
   } else if (route.view === 'review') {
     // The same: the photos and the shared piles are live; the In-box tags join in with the card data.
-    body = <ReviewView cards={merged} pileId={route.query.get('pile')} />;
+    // In-box writes wait for a server snapshot of the card state, as on the Scan tab.
+    body = <ReviewView cards={merged} pileId={route.query.get('pile')} cardsReady={states.status === 'ready' && !states.fromCache} />;
   } else if (cards.status === 'loading' || !base || !merged) {
     body =
       cards.status === 'error' ? (

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { SharedPile, SharedShot } from '../store/types';
 import {
   candidateTags,
+  canSetInBox,
+  inBoxFromPrinting,
   namesInPhotos,
   namesInPiles,
   nextPileToReview,
@@ -166,6 +168,42 @@ describe('printing order in the picker', () => {
   it('does not group printings without an illustration', () => {
     const noArt = [p('a', null, '2020-01-01'), p('b', null, '2021-01-01')];
     expect(orderPrintings(noArt, null, 'a').map((x) => x.id)).toEqual(['b', 'a']);
+  });
+});
+
+describe('box has this printing', () => {
+  it('builds the In-box record the way the Scan tab does, from a candidate or a printings-file entry', () => {
+    const candidate = { scryfall_id: 'sf-bolt-m10', oracle_id: 'o-bolt', name: 'Lightning Bolt', set: 'm10', collector_number: '146', score: 0.91 };
+    expect(inBoxFromPrinting(candidate, 'art-1')).toEqual({
+      scryfall_id: 'sf-bolt-m10',
+      set: 'm10',
+      collector_number: '146',
+      illustration_id: 'art-1',
+      name: 'Lightning Bolt',
+      source: 'scan',
+      confidence: 'high',
+    });
+    const printing = { id: 'sf-bolt-lea', set: 'lea', collector_number: '161', illustration_id: 'art-0', released_at: '1993-08-05' };
+    expect(inBoxFromPrinting({ ...printing, name: 'Lightning Bolt' }, null)).toEqual({
+      scryfall_id: 'sf-bolt-lea',
+      set: 'lea',
+      collector_number: '161',
+      illustration_id: null,
+      name: 'Lightning Bolt',
+      source: 'scan',
+      confidence: 'high',
+    });
+  });
+
+  it('allows another printing than the In-box one, for a known card on the List only', () => {
+    const card = (in_list: boolean, inBoxId: string | null) => ({ in_list, in_box: inBoxId === null ? null : ({ scryfall_id: inBoxId } as never) });
+    expect(canSetInBox(card(true, 'sf-box'), 'sf-other')).toBe(true);
+    expect(canSetInBox(card(true, 'sf-box'), 'sf-box')).toBe(false);
+    expect(canSetInBox(card(false, 'sf-box'), 'sf-other')).toBe(false);
+    // Not in the box yet, but photographed there: the photo decides it.
+    expect(canSetInBox(card(true, null), 'sf-other')).toBe(true);
+    expect(canSetInBox(null, 'sf-other')).toBe(false);
+    expect(canSetInBox(undefined, 'sf-other')).toBe(false);
   });
 });
 

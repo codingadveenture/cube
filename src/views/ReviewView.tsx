@@ -4,12 +4,16 @@
 // Scan tab's (Store.decideShot: the shot and the pile's rows in one transaction); which pile opens,
 // the order of the photos, the tags, the repeats to set aside in one go and the printing order
 // come from src/review/queue.ts. A repeat always names its card: a click on a candidate a pile
-// already has records a repeat of that card, and "Second copy" beside it adds it after all.
+// already has records a repeat of that card, and "Second copy" beside it adds it after all. The
+// photo often shows another printing than the one the app has as In-box: "Box has this printing"
+// (Owner only) records the photographed one as the Scan tab does, without deciding the photo.
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { usePrintings } from '../printings/load';
+import { loadPrintings, usePrintings } from '../printings/load';
 import { replaceHash, reviewHash } from '../router';
 import {
   candidateTags,
+  canSetInBox,
+  inBoxFromPrinting,
   namesInPhotos,
   namesInPiles,
   nextPileToReview,
@@ -26,8 +30,10 @@ import {
   toReviewOf,
   type CandidateTag,
 } from '../review/queue';
+import { knownPrintings } from '../scan/resolve';
 import { scryfallImage } from '../store/baseline';
 import { errorText, PHOTOS_DENIED, useScans, useShotChunks, useStore } from '../store/context';
+import { lookupById } from '../store/lookup';
 import { flattenChunks, photosComplete, refOfShared, sharedNeedsReview, sharedShotCounts } from '../store/shotChunks';
 import type { SharedPile, SharedShot, SharedShotRef, ShotDecisionInput } from '../store/types';
 import type { Card } from '../types';
@@ -54,10 +60,18 @@ interface Sweep {
   error: string | null;
 }
 
+/** How "Box has this printing" went: the confirmation, or the error. */
+interface BoxNote {
+  error: boolean;
+  text: string;
+}
+
 /** The label of the pile that already has the card, from its tags; null when no pile has it. */
 const alreadyIn = (tags: readonly CandidateTag[]): string | null => tags.find((t) => t.kind === 'alreadyIn')?.label ?? null;
+/** True when the tags say the candidate is another printing of an In-box card. */
+const otherPrinting = (tags: readonly CandidateTag[]): boolean => tags.some((t) => t.kind === 'inBoxOtherPrinting');
 
-export default function ReviewView({ cards, pileId }: { cards: Card[] | null; pileId: string | null }) {
+export default function ReviewView({ cards, pileId, cardsReady }: { cards: Card[] | null; pileId: string | null; cardsReady: boolean }) {
   const scans = useScans();
   const { auth } = useStore();
   const ordered = useMemo(() => pileOrder(scans.data), [scans.data]);
@@ -96,7 +110,7 @@ export default function ReviewView({ cards, pileId }: { cards: Card[] | null; pi
           ))}
         </nav>
       )}
-      {open && <PileDesk key={open.id} pile={open} piles={piles} allPiles={ordered} canDecide={canDecide} cards={byOracle} names={names} />}
+      {open && <PileDesk key={open.id} pile={open} piles={piles} allPiles={ordered} canDecide={canDecide} cards={byOracle} cardsReady={cardsReady} names={names} />}
     </div>
   );
 }
@@ -106,6 +120,7 @@ function PileDesk({
   piles,
   allPiles,
   canDecide,
+  cardsReady,
   cards,
   names,
 }: {
@@ -115,13 +130,17 @@ function PileDesk({
   /** Every shared pile, CSV ones too, in pileOrder: which were created before this one. */
   allPiles: SharedPile[];
   canDecide: boolean;
+  /** True once the shared card state has come from the server, so an In-box write acts on the current record. */
+  cardsReady: boolean;
   cards: CardsByOracle | null;
   names: ReadonlyMap<string, string>;
 }) {
-  const { store } = useStore();
+  const { store, auth } = useStore();
   // One subscription, for this pile: the desk is keyed by the pile, so a switch mounts a fresh
   // desk that starts loading, instead of one that pins a photo of the previous pile's chunks.
   const live = useShotChunks(pile.id);
+  // The In-box and Wanted Printings of every card, for the illustration of a photographed printing.
+  const known = useMemo(() => knownPrintings(cards ? [...cards.values()] : []), [cards]);
   const items = useMemo(() => flattenChunks(live.data), [live.data]);
   const queue = useMemo(() => queueOrder(items), [items]);
   const counts = useMemo(() => sharedShotCounts(items.map((x) => x.shot)), [items]);
@@ -132,6 +151,9 @@ function PileDesk({
   const [searching, setSearching] = useState(false);
   const [picker, setPicker] = useState<PickerTarget | null>(null);
   const [sweep, setSweep] = useState<Sweep | null>(null);
+  // The printing "Box has this printing" is saving (its scryfall_id), and how the last one went.
+  const [boxBusy, setBoxBusy] = useState<string | null>(null);
+  const [boxNote, setBoxNote] = useState<BoxNote | null>(null);
   const index = openId ? queue.findIndex((x) => x.shot.id === openId) : -1;
   const at = index >= 0 ? index : 0;
   const current = queue[at] ?? null;
@@ -158,6 +180,7 @@ function PileDesk({
     setOpenId(id);
     setSearching(false);
     setPicker(null);
+    setBoxNote(null);
   }
 
   function step(d: 1 | -1) {
@@ -207,6 +230,52 @@ function PileDesk({
       setSweep({ done, total: list.length, running: false, error: errorText(e, PHOTOS_DENIED) });
     } finally {
       setBusy(false);
+    }
+  }
+
+  /** Owner: the printing may be recorded as the card's In-box one (canSetInBox: a List card, another printing than the recorded). */
+  const canBox = (oracleId: string, scryfallId: string) => auth.isOwner && !!store && cardsReady && canSetInBox(cards?.get(oracleId), scryfallId);
+
+  /**
+   * The illustration of a photographed printing: the known Printings and Scryfall (lookupById)
+   * first, then the card's printings file; null when neither has it, so the record is written anyway.
+   */
+  async function illustrationOf(ref: SharedShotRef): Promise<string | null> {
+    try {
+      const hit = await lookupById(ref.scryfall_id, known);
+      if (hit?.illustration_id) return hit.illustration_id;
+    } catch (e) {
+      console.warn('Looking the printing up failed; trying the printings file', e);
+    }
+    try {
+      const file = await loadPrintings(ref.oracle_id);
+      return file.printings.find((p) => p.id === ref.scryfall_id)?.illustration_id ?? null;
+    } catch (e) {
+      console.warn('Loading the printings file failed', e);
+      return null;
+    }
+  }
+
+  /**
+   * Owner: the photographed printing is what is in the box. Writes the card's In-box Printing as
+   * the Scan tab's "Box has this printing" does; the photo is not decided by it. `illustration`
+   * is the printings file's when the picker knows it, else undefined and looked up.
+   */
+  async function setInBox(ref: SharedShotRef, illustration?: string | null) {
+    if (!store || boxBusy !== null) return;
+    const card = cards?.get(ref.oracle_id);
+    if (!card || !canBox(ref.oracle_id, ref.scryfall_id)) return;
+    setBoxBusy(ref.scryfall_id);
+    setBoxNote(null);
+    try {
+      const art = illustration === undefined ? await illustrationOf(ref) : illustration;
+      await store.updateCard(card.oracle_id, { kind: 'in_box', in_box: inBoxFromPrinting(ref, art) });
+      setBoxNote({ error: false, text: `In-box printing of ${card.name} set to ${ref.set.toUpperCase()} ${ref.collector_number}.` });
+    } catch (e) {
+      console.warn('Box has this printing failed', e);
+      setBoxNote({ error: true, text: errorText(e) });
+    } finally {
+      setBoxBusy(null);
     }
   }
 
@@ -400,7 +469,9 @@ function PileDesk({
               <ol className="candidates desk-candidates">
                 {s.candidates.map((c, i) => {
                   const chosen = s.chosen?.scryfall_id === c.scryfall_id;
-                  const again = alreadyIn(tagsOf(c)) !== null;
+                  const tags = tagsOf(c);
+                  const again = alreadyIn(tags) !== null;
+                  const toBox = otherPrinting(tags) && canBox(c.oracle_id, c.scryfall_id);
                   const open = picker?.oracle_id === c.oracle_id && picker.pickedId === c.scryfall_id;
                   return (
                     <li key={`${c.scryfall_id}-${c.oracle_id}`} className={chosen ? 'chosen' : undefined}>
@@ -431,6 +502,11 @@ function PileDesk({
                           onClick={() => setPicker(open ? null : { oracle_id: c.oracle_id, name: c.name, pickedId: c.scryfall_id })}
                         >
                           Other printing…
+                        </button>
+                      )}
+                      {toBox && (
+                        <button type="button" className="link" onClick={() => void setInBox(c)} disabled={boxBusy !== null}>
+                          {boxBusy === c.scryfall_id ? 'Setting…' : 'Box has this printing'}
                         </button>
                       )}
                     </li>
@@ -464,6 +540,9 @@ function PileDesk({
                   busy={busy}
                   onPick={(ref) => choose(ref)}
                   onCopy={(ref) => pick(ref)}
+                  canBox={(id) => canBox(picker.oracle_id, id)}
+                  boxBusy={boxBusy}
+                  onBox={(ref, illustration) => void setInBox(ref, illustration)}
                   onClose={() => setPicker(null)}
                 />
               )}
@@ -471,6 +550,11 @@ function PileDesk({
               {error?.id === s.id && (
                 <p className="status error" role="alert">
                   {error.text}
+                </p>
+              )}
+              {boxNote && (
+                <p className={boxNote.error ? 'status error' : 'status'} role={boxNote.error ? 'alert' : 'status'}>
+                  {boxNote.text}
                 </p>
               )}
               {decidable && (
@@ -483,6 +567,12 @@ function PileDesk({
                     A candidate marked as already in a pile is recorded as a repeat of that card, which names it; “Second copy” beside it
                     adds it to this pile after all. “Not a card” is for the empty sheet or a hand only.
                   </p>
+                  {auth.isOwner && (
+                    <p className="muted desk-keys">
+                      “Box has this printing” under another printing of an In-box card records that printing as the one in the box, as the
+                      Scan tab does; it does not decide the photo.
+                    </p>
+                  )}
                 </>
               )}
             </div>
@@ -509,6 +599,7 @@ function DeskPhoto({ shot }: { shot: SharedShot }) {
 /**
  * A card's printings as a wrapping row of images; a click decides the photo as that printing: a
  * repeat of the card when a pile already has it (`again` says which), else the card in the photo.
+ * For the Owner, "Box has this printing" under a printing records it as the card's In-box one.
  */
 function PrintingPicker({
   target,
@@ -518,6 +609,9 @@ function PrintingPicker({
   busy,
   onPick,
   onCopy,
+  canBox,
+  boxBusy,
+  onBox,
   onClose,
 }: {
   target: PickerTarget;
@@ -529,6 +623,12 @@ function PrintingPicker({
   onPick: (ref: SharedShotRef) => void;
   /** A second copy: the card in the photo, though a pile has it already. */
   onCopy: (ref: SharedShotRef) => void;
+  /** Whether the printing may be recorded as the In-box one (false for anyone but the Owner). */
+  canBox: (id: string) => boolean;
+  /** The printing whose In-box record is saving, or null. */
+  boxBusy: string | null;
+  /** Record the printing as the In-box one; the illustration is the printings file's. */
+  onBox: (ref: SharedShotRef, illustration_id: string | null) => void;
   onClose: () => void;
 }) {
   const [attempt, setAttempt] = useState(0);
@@ -586,6 +686,11 @@ function PrintingPicker({
               {again !== null && (
                 <button type="button" className="link" disabled={busy} onClick={() => onCopy(refOfPrinting(p))}>
                   Second copy
+                </button>
+              )}
+              {canBox(p.id) && (
+                <button type="button" className="link" disabled={boxBusy !== null} onClick={() => onBox(refOfPrinting(p), p.illustration_id)}>
+                  {boxBusy === p.id ? 'Setting…' : 'Box has this printing'}
                 </button>
               )}
             </li>

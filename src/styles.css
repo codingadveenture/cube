@@ -2084,11 +2084,12 @@ a.button {
   flex-wrap: wrap;
   gap: 0.5rem;
 }
-/* 143 px wide is 200 px tall at the card's ratio; "Second copy" goes under a printing of a card a pile already has. */
+/* 143 px wide is 200 px tall at the card's ratio; "Second copy" and "Box has this printing" go under a printing, wrapping within its width. */
 .desk-printings > li {
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
+  width: 143px;
 }
 .desk-printings > li > .link {
   align-self: flex-start;
