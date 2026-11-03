@@ -118,7 +118,7 @@ function Shell() {
         </nav>
         <AccountChip />
       </header>
-      <main className="main">
+      <main className={route.view === 'review' ? 'main wide' : 'main'}>
         <Suspense fallback={<p className="status">Loading…</p>}>{body}</Suspense>
       </main>
       <Toast />

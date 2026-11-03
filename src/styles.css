@@ -135,6 +135,10 @@ h3 {
   margin: 0 auto;
   padding: 0.5rem var(--gutter) 2rem;
 }
+/* The desk review uses the width a monitor has: the photo beside three candidates in one row. */
+.main.wide {
+  max-width: 1500px;
+}
 
 @media (max-width: 700px) {
   .nav {
@@ -2056,6 +2060,13 @@ a.button {
 .desk-candidates {
   grid-template-columns: repeat(auto-fill, minmax(190px, 230px));
   gap: 0.75rem;
+}
+/* Beside the photo, the three candidates share one row and shrink before they wrap. */
+@media (min-width: 900px) {
+  .desk-candidates {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    max-width: 780px;
+  }
 }
 .desk .candidate {
   font-size: 0.95rem;

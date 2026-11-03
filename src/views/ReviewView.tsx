@@ -668,6 +668,12 @@ function PrintingPicker({
 }) {
   const [attempt, setAttempt] = useState(0);
   const state = usePrintings(target.oracle_id, attempt);
+  // Opened from a candidate far up the column: bring the printings into view instead of leaving the
+  // Owner to scroll for them.
+  const root = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    root.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
   if (state.status === 'loading') return <p className="status">Loading the printings of {target.name}…</p>;
   if (state.status === 'error') {
     return (
@@ -692,7 +698,7 @@ function PrintingPicker({
     collector_number: p.collector_number,
   });
   return (
-    <div className="desk-picker">
+    <div className="desk-picker" ref={root}>
       <p>
         Printings of <strong>{name}</strong> <span className="muted num">({ordered.length})</span>{' '}
         <button type="button" className="link" onClick={onClose}>
