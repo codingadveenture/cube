@@ -1,7 +1,6 @@
 // Scryfall for the Update flow: card facts by name (POST /cards/collection, 75 names per request)
 // and every paper Printing of a card (GET /cards/search on oracleid, at least 600 ms apart, with
-// Retry-After honoured). The Upstream's cube search in net.ts keeps the same spacing through
-// searchGap. The converters at the top are pure and tested.
+// Retry-After honoured). The converters at the top are pure and tested.
 import { normalizeName } from '../lib/normalize';
 import type { ColorCategory, TypeCategory } from '../types';
 import type { CardFacts } from '../store/types';
@@ -82,7 +81,7 @@ export interface FactsHit {
   scryfall_id: string;
 }
 
-/** Card facts from a Scryfall card object; oracle cycle tags are not on Scryfall's API (the Cube record carries them). */
+/** Card facts from a Scryfall card object; oracle cycle tags are not on Scryfall's API and come from cubeJSON. */
 export function factsFromScryfall(sc: ScryfallCard): FactsHit | null {
   const faces = sc.card_faces ?? [];
   const front = faces[0] ?? sc;
@@ -195,7 +194,7 @@ export function isAborted(e: unknown): boolean {
   return e instanceof Aborted || (e instanceof DOMException && e.name === 'AbortError');
 }
 
-export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) return reject(new Aborted());
     const t = setTimeout(() => {
@@ -325,17 +324,12 @@ function retryAfterMs(res: Response, fallback: number): number {
 
 let lastSearchStart = 0;
 
-/** Waits until a search gap has passed since the previous /cards/search started, then counts this one. */
-export async function searchGap(signal?: AbortSignal): Promise<void> {
-  const wait = lastSearchStart + SEARCH_GAP_MS - Date.now();
-  if (wait > 0) await sleep(wait, signal);
-  lastSearchStart = Date.now();
-}
-
 /** One /cards/search GET, at least 600 ms after the previous one started, Retry-After honoured. */
 async function searchGet(url: string, signal?: AbortSignal): Promise<{ data: ScryfallCard[]; has_more?: boolean; next_page?: string } | null> {
   for (let attempt = 0; attempt < 3; attempt++) {
-    await searchGap(signal);
+    const wait = lastSearchStart + SEARCH_GAP_MS - Date.now();
+    if (wait > 0) await sleep(wait, signal);
+    lastSearchStart = Date.now();
     const res = await fetch(url, { signal });
     if (res.status === 404) return null;
     if (res.status === 429) {

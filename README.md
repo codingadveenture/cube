@@ -168,12 +168,9 @@ For other print tools, "Copy mtgprint list" gives `1 Name (SET) number` lines fo
 
 ## Updates from the Arena Powered Cube
 
-The Upstream is the Arena Powered Cube as Scryfall publishes it (https://scryfall.com/cubes/apcube), read through the Scryfall search API (`cube:apcube`, one card object per listed Printing, 175 a page); the List stays on CubeCobra (`MTGVintageCube`).
-On the Update page (`#/upstream`) press "Refresh the List and Upstream" to read both; the Owner's fetch is saved for everyone.
+On the Update page (`#/upstream`) press "Refresh from CubeCobra" to read the List (`MTGVintageCube`) and Upstream (`mtgapc`, the Arena Powered Cube as kept on CubeCobra); the Owner's fetch is saved for everyone.
 The feed shows Upstream's adds and cuts after the sticky Winner's Picks and Bans, and the Owner decides each one with Accept, Reject or Later (or accepts all remaining), while cards outside the feed can be typed in by name.
-"Build the Update" turns the accepted adds into In cards with facts and a Wanted Printing (the default rule on a Scryfall search of the card's paper Printings, else the Printing the Upstream lists) and the accepted cuts into Out cards, and shows the preview.
-The Upstream lists Arena printings, many of them digital-only; the default-printing rule handles that, since it picks from the paper Printings first and falls back to the Upstream's only when no paper Printing qualifies.
-Scryfall's API carries no Tagger tags, so a new card gets no cycle tags from the Upstream, and the Cycles view groups it only when it already carries tags.
+"Build the Update" turns the accepted adds into In cards with facts and a Wanted Printing (the default rule on a Scryfall search, else the Printing Upstream uses) and the accepted cuts into Out cards, and shows the preview.
 "Apply Update" writes the new card docs and takes the Out cards off the List, so new cards are "to print" and Out cards still in the box are "to pull".
 The Print batch now includes every card to print, Mark as printed puts it in the box, and the Cube view's "To pull" group has "Mark pulled" for the cards you have taken out.
 Finally push the List back to CubeCobra by hand: download `cubecobra-YYYY-MM-DD.csv` for "Replace with CSV" (it also carries every Wanted Printing) or copy the paste text for the bulk upload.

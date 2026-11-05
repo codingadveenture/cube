@@ -10,8 +10,7 @@ export interface StickySets {
   bans: string[];
 }
 
-/** Names trimmed and made unique by normalizeName, the sameness the feed compares by. */
-export function uniqueNames(names: Iterable<string>): string[] {
+function uniqueNames(names: Iterable<string>): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
   for (const raw of names) {

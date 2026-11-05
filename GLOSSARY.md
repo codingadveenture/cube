@@ -11,8 +11,8 @@ The intended contents of the Cube, kept on CubeCobra (`MTGVintageCube`). The Lis
 names should be in the Cube. The Cube is verified against the List.
 
 ## Upstream
-The Arena Powered Cube list as Scryfall publishes it (https://scryfall.com/cubes/apcube). The
-List is derived from Upstream by applying the group's Winner's Picks and Bans.
+The Arena Powered Cube list as kept on CubeCobra (`mtgapc`). The List is derived from
+Upstream by applying the group's Winner's Picks and Bans.
 
 ## Winner's Pick
 A card chosen by the winner of a draft night. It enters the List and stays there permanently,

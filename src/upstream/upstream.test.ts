@@ -1,17 +1,16 @@
 /// <reference types="node" />
 import { readFileSync } from 'node:fs';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { Card, CardsFile } from '../types';
 import { EMPTY_OVERRIDES, type CardFacts, type LogEntry, type WantedState } from '../store/types';
 import { cardPatchWrite } from '../store/writes';
 import { acceptRemaining, computeFeed, decide, groupFeed, markApplied, stickySets } from './feed';
 import { keyOf, nameIndex, parseCubelist, parseNameLines } from './names';
 import { buildUpdateWrites, inAction, updateBatches, type InCard } from './update';
-import { CSV_COLUMNS, csvField, cubecobraCsv, cubecobraPaste, exportName, listBasics, pasteLine } from './cubecobra';
+import { CSV_COLUMNS, csvField, cubecobraCsv, cubecobraPaste, exportName, listBasics, pasteLine, upstreamPrintings } from './cubecobra';
 import { colorCategory, factsFromScryfall, indexPrinting, keepPrinting, lookupName, typeCategory, type ScryfallCard } from './scryfall';
 import { findUpstream, resolveOuts, upstreamWanted } from './resolveIn';
 import { toUpdateHistory, toUpstreamMeta } from './meta';
-import { cubeSearchUrl, fetchUpstreamNames, fetchUpstreamPrintings, NO_SCRYFALL, UPSTREAM, upstreamNames, upstreamPrintingOf } from './net';
 
 const root = new URL('../../', import.meta.url);
 const cards = (JSON.parse(readFileSync(new URL('public/data/cards.json', root), 'utf8')) as CardsFile).cards;
@@ -291,101 +290,19 @@ describe('the CubeCobra export', () => {
     expect(cubecobraPaste([fire, goblin]).split('\n')).toHaveLength(2);
   });
 
-  it('reads an Upstream Printing from a Scryfall card object, without cycle tags', () => {
-    const ps = [upstreamPrintingOf({ id: 'sid', oracle_id: 'oid', name: 'Card', set: 'MH2', collector_number: '5', image_uris: { normal: 'img' } })];
-    expect(ps).toEqual([{ oracle_id: 'oid', name: 'Card', scryfall_id: 'sid', set: 'mh2', collector_number: '5', image_normal: 'img', cycle_tags: [] }]);
+  it('reads Upstream Printings and cycle tags from cubeJSON', () => {
+    const json = {
+      cards: {
+        mainboard: [
+          { cardID: 'sid', details: { oracle_id: 'oid', name: 'Card', set: 'MH2', collector_number: '5', image_normal: 'img', oracle_tags: ['cycle-mh2-incarnation', 'removal'] } },
+          { cardID: '' },
+        ],
+      },
+    };
+    const ps = upstreamPrintings(json);
+    expect(ps).toEqual([{ oracle_id: 'oid', name: 'Card', scryfall_id: 'sid', set: 'mh2', collector_number: '5', image_normal: 'img', cycle_tags: ['cycle-mh2-incarnation'] }]);
     expect(findUpstream(ps, 'other', 'card')).toBe(ps[0]);
     expect(upstreamWanted(ps[0]!, 'Card')).toMatchObject({ scryfall_id: 'sid', reason: 'upstream-pick', image_normal: 'img' });
-  });
-});
-
-describe('the Upstream from Scryfall', () => {
-  // Two pages as the cube search answers them: a transform card with its images on the faces only,
-  // a split card, a digital-only Arena printing, and a card without an image.
-  const ajani = {
-    id: 'p-ajani',
-    oracle_id: 'o-ajani',
-    name: 'Ajani, Nacatl Pariah // Ajani, Nacatl Avenger',
-    layout: 'transform',
-    set: 'mh3',
-    collector_number: '237',
-    games: ['paper', 'arena'],
-    card_faces: [
-      { name: 'Ajani, Nacatl Pariah', image_uris: { normal: 'ajani-front.jpg' } },
-      { name: 'Ajani, Nacatl Avenger', image_uris: { normal: 'ajani-back.jpg' } },
-    ],
-  };
-  const fire = { id: 'p-fire', oracle_id: 'o-fire', name: 'Fire // Ice', layout: 'split', set: 'dmr', collector_number: '215', card_faces: [{ name: 'Fire' }, { name: 'Ice' }], image_uris: { normal: 'fire-ice.jpg' } };
-  const abrade = { id: 'p-abrade', oracle_id: 'o-abrade', name: 'Abrade', set: 'AKR', collector_number: '136', digital: true, games: ['arena'], image_uris: { normal: 'abrade.jpg' } };
-  const bare = { id: 'p-bare', name: 'No Image', set: 'xxx', collector_number: '1' };
-  const page1 = cubeSearchUrl(UPSTREAM.cube);
-  const page2 = 'https://api.scryfall.com/cards/search?format=json&order=name&page=2&q=cube%3Aapcube&unique=prints';
-  const pages: Record<string, unknown> = {
-    [page1]: { object: 'list', total_cards: 4, has_more: true, next_page: page2, data: [ajani, fire] },
-    [page2]: { object: 'list', total_cards: 4, has_more: false, data: [abrade, bare] },
-  };
-
-  /** fetch stub: answers each page by URL, or with the given Response for every request. */
-  function stubFetch(answer?: Response | Error) {
-    const calls: { url: string; accept: string | undefined }[] = [];
-    const fn = vi.fn(async (url: string, init?: { headers?: Record<string, string> }) => {
-      calls.push({ url, accept: init?.headers?.Accept });
-      if (answer instanceof Error) throw answer;
-      if (answer) return answer;
-      const body = pages[url];
-      return body ? new Response(JSON.stringify(body), { status: 200 }) : new Response('{"object":"error"}', { status: 404 });
-    });
-    vi.stubGlobal('fetch', fn);
-    return calls;
-  }
-  afterEach(() => vi.unstubAllGlobals());
-
-  it('follows next_page while has_more, and one search serves both the names and the Printings', async () => {
-    const calls = stubFetch();
-    const names = await fetchUpstreamNames();
-    expect(names).toEqual(['Ajani, Nacatl Pariah // Ajani, Nacatl Avenger', 'Fire // Ice', 'Abrade', 'No Image']);
-    expect(calls.map((c) => c.url)).toEqual([page1, page2]);
-    expect(calls.every((c) => c.accept === 'application/json')).toBe(true);
-    expect(page1).toBe('https://api.scryfall.com/cards/search?q=cube%3Aapcube&unique=prints&order=name');
-    const printings = await fetchUpstreamPrintings();
-    expect(calls).toHaveLength(2);
-    expect(printings).toEqual([
-      { oracle_id: 'o-ajani', name: ajani.name, scryfall_id: 'p-ajani', set: 'mh3', collector_number: '237', image_normal: 'ajani-front.jpg', cycle_tags: [] },
-      { oracle_id: 'o-fire', name: 'Fire // Ice', scryfall_id: 'p-fire', set: 'dmr', collector_number: '215', image_normal: 'fire-ice.jpg', cycle_tags: [] },
-      { oracle_id: 'o-abrade', name: 'Abrade', scryfall_id: 'p-abrade', set: 'akr', collector_number: '136', image_normal: 'abrade.jpg', cycle_tags: [] },
-      { oracle_id: null, name: 'No Image', scryfall_id: 'p-bare', set: 'xxx', collector_number: '1', image_normal: null, cycle_tags: [] },
-    ]);
-  });
-
-  it('spells a split card as CubeCobra’s cubelist does, so it is neither an add nor a cut', () => {
-    const index = nameIndex(cards);
-    const key = (n: string) => keyOf(index, n);
-    const list = parseCubelist('Fire // Ice\r\nLightning Bolt\n');
-    const upstream = upstreamNames([ajani, fire, abrade, fire].map(upstreamPrintingOf));
-    expect(upstream).toEqual([ajani.name, 'Fire // Ice', 'Abrade']);
-    expect(key(upstream[1]!)).toBe(key(list[0]!));
-    expect(key(upstream[1]!)).toBe(byName('Fire // Ice').oracle_id);
-    const feed = computeFeed({ list, upstream, sticky: { adds: [], bans: [] }, keyOf: key });
-    expect(feed.adds.map((a) => a.name)).toEqual(['Abrade', ajani.name]);
-    expect(feed.cuts.map((c) => c.name)).toEqual(['Lightning Bolt']);
-    // Without a known oracle_id the normalised names still agree: both are the front face.
-    const plain = (n: string) => keyOf(new Map(), n);
-    expect(plain('Fire // Ice')).toBe(plain('Fire'));
-  });
-
-  it('turns a rate limit into a plain message with Retry-After', async () => {
-    stubFetch(new Response('', { status: 429, headers: { 'Retry-After': '30' } }));
-    await expect(fetchUpstreamNames()).rejects.toThrow('Scryfall says too many requests; try again in 30 seconds.');
-  });
-
-  it('says when Scryfall has no such cube', async () => {
-    stubFetch(new Response(JSON.stringify({ object: 'error', code: 'not_found', status: 404, details: 'Your query didn’t match any cards.' }), { status: 404 }));
-    await expect(fetchUpstreamNames()).rejects.toThrow('Scryfall has no cube called apcube.');
-  });
-
-  it('names Scryfall when there is no connection', async () => {
-    stubFetch(new TypeError('Failed to fetch'));
-    await expect(fetchUpstreamNames()).rejects.toThrow(NO_SCRYFALL);
   });
 });
 
