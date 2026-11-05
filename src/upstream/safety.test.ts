@@ -1,13 +1,13 @@
 /// <reference types="node" />
 // The data-safety rules of the Update flow: sticky name matching, stale decisions and previews,
-// what Apply writes, new-card guards, the history trim, snapshot sanity and CubeCobra errors.
+// what Apply writes, new-card guards, the history trim, snapshot sanity and the sites' errors.
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import type { Card, CardsFile } from '../types';
 import type { CardFacts, CardPatchFor, Decision, WantedState } from '../store/types';
 import { computeFeed, decide, groupFeed, looseName, markApplied, previewBasis, staleDecisions } from './feed';
 import { keyOf, nameIndex, snapshotProblem } from './names';
-import { cubecobraHttpError } from './net';
+import { cubecobraHttpError, scryfallHttpError } from './net';
 import { planApply, planIsEmpty, type Preview } from './plan';
 import type { ResolvedIn, ResolvedOut } from './resolveIn';
 import { guardNewCards, updateBatches } from './update';
@@ -265,17 +265,19 @@ describe('snapshot sanity', () => {
   it('rejects an empty, truncated or oversized cubelist', () => {
     expect(snapshotProblem(540, 540, 'L', 'U')).toBeNull();
     expect(snapshotProblem(300, 600, 'L', 'U')).toBeNull();
-    expect(snapshotProblem(0, 540, 'L', 'U')).toContain('0 names for L');
-    expect(snapshotProblem(540, 12, 'L', 'U')).toContain('12 names for U');
-    expect(snapshotProblem(601, 299, 'L', 'U')).toMatch(/601 names for L and 299 names for U/);
+    expect(snapshotProblem(0, 540, 'L', 'U')).toContain('0 names for the List (L)');
+    expect(snapshotProblem(540, 12, 'L', 'U')).toContain('12 names for the Upstream (U)');
+    expect(snapshotProblem(601, 299, 'L', 'U')).toMatch(/601 names for the List \(L\) and 299 names for the Upstream \(U\)/);
   });
 });
 
-describe('CubeCobra errors', () => {
+describe('CubeCobra and Scryfall errors', () => {
   it('words rate limits and outages plainly', () => {
     expect(cubecobraHttpError(429, null)).toBe('CubeCobra says too many requests; try again in a minute.');
     expect(cubecobraHttpError(429, '30')).toBe('CubeCobra says too many requests; try again in 30 seconds.');
     expect(cubecobraHttpError(429, 'Wed, 21 Oct 2026 07:28:00 GMT')).toBe('CubeCobra says too many requests; try again in a minute.');
     expect(cubecobraHttpError(503, null)).toBe('CubeCobra is not answering (HTTP 503). Try again later.');
+    expect(scryfallHttpError(429, '1')).toBe('Scryfall says too many requests; try again in 1 second.');
+    expect(scryfallHttpError(503, null)).toBe('Scryfall is not answering (HTTP 503). Try again later.');
   });
 });

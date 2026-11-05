@@ -1,5 +1,6 @@
-// #/upstream ("Update"): refresh the List and Upstream from CubeCobra, decide on the Upstream feed,
-// build and apply the Update, and hand the new List back to CubeCobra.
+// #/upstream ("Update"): refresh the List (from CubeCobra) and Upstream (the Arena Powered Cube,
+// from Scryfall), decide on the Upstream feed, build and apply the Update, and hand the new List
+// back to CubeCobra.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Card } from '../../types';
 import { smallImage } from '../../printings/images';
@@ -9,7 +10,7 @@ import type { Decision, DecisionStatus, UpdateHistoryEntry } from '../../store/t
 import { acceptRemaining, computeFeed, decide, groupFeed, previewBasis, staleDecisions, stickySets, type FeedItem } from '../../upstream/feed';
 import { toUpdateHistory, toUpstreamMeta } from '../../upstream/meta';
 import { keyOf, nameIndex, parseNameLines, snapshotProblem } from '../../upstream/names';
-import { fetchCubelist, LIST_ID, UPSTREAM_ID } from '../../upstream/net';
+import { fetchCubelist, fetchUpstreamNames, LIST_ID, UPSTREAM } from '../../upstream/net';
 import { cachedFacts, fetchFacts, isAborted, type FactsHit } from '../../upstream/scryfall';
 import { resolveIns, resolveOuts, type ResolvedIn } from '../../upstream/resolveIn';
 import { pendingReprints } from '../../upstream/update';
@@ -24,6 +25,8 @@ interface Snapshot {
 }
 
 const MANUAL_KEY = 'cube.update.manual';
+const LIST_LABEL = `${LIST_ID}, from CubeCobra`;
+const UPSTREAM_LABEL = `${UPSTREAM.label}, from Scryfall`;
 
 function readManual(): string {
   try {
@@ -62,7 +65,7 @@ export default function UpstreamView({ cards, cardsReady }: { cards: Card[]; car
   const stored: Snapshot | null = meta.fetched_at
     ? { fetched_at: meta.fetched_at, list_names: meta.list_names, upstream_names: meta.upstream_names }
     : null;
-  const storedProblem = stored ? snapshotProblem(stored.list_names.length, stored.upstream_names.length, LIST_ID, UPSTREAM_ID) : null;
+  const storedProblem = stored ? snapshotProblem(stored.list_names.length, stored.upstream_names.length, LIST_LABEL, UPSTREAM_LABEL) : null;
   const snap: Snapshot | null = local ?? (storedProblem ? null : stored);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
@@ -71,8 +74,8 @@ export default function UpstreamView({ cards, cardsReady }: { cards: Card[]; car
     setRefreshing(true);
     setRefreshError(null);
     try {
-      const [list_names, upstream_names] = await Promise.all([fetchCubelist(LIST_ID), fetchCubelist(UPSTREAM_ID)]);
-      const problem = snapshotProblem(list_names.length, upstream_names.length, LIST_ID, UPSTREAM_ID);
+      const [list_names, upstream_names] = await Promise.all([fetchCubelist(LIST_ID), fetchUpstreamNames()]);
+      const problem = snapshotProblem(list_names.length, upstream_names.length, LIST_LABEL, UPSTREAM_LABEL);
       if (problem) {
         // Keep the previous snapshot: an empty or truncated answer would turn the List into cuts.
         setRefreshError(problem);
@@ -169,8 +172,8 @@ export default function UpstreamView({ cards, cardsReady }: { cards: Card[]; car
     <div className="upstream">
       <h1>Update</h1>
       <p className="muted">
-        The List follows Upstream, the MTGO Vintage Cube, plus the Winner&rsquo;s Picks and minus the Bans. Refresh, decide on each change,
-        build the Update, print and pull, then push the List back to CubeCobra.
+        The List follows Upstream, the Arena Powered Cube as Scryfall publishes it, plus the Winner&rsquo;s Picks and minus the Bans. Refresh,
+        decide on each change, build the Update, print and pull, then push the List back to CubeCobra.
       </p>
       <LiveStatus live={metaLive} what="Update data" />
 
@@ -178,14 +181,14 @@ export default function UpstreamView({ cards, cardsReady }: { cards: Card[]; car
         <h2 id="refresh-head">1. Refresh</h2>
         <div className="actions">
           <button type="button" className="primary" disabled={refreshing} onClick={() => void refresh()}>
-            {refreshing ? 'Reading CubeCobra…' : 'Refresh from CubeCobra'}
+            {refreshing ? 'Reading CubeCobra and Scryfall…' : 'Refresh the List and Upstream'}
           </button>
         </div>
         {refreshError && <p className="status error">{refreshError}</p>}
         {!local && storedProblem && <p className="status error">The saved snapshot is not used. {storedProblem}</p>}
         {snap ? (
           <p className="num">
-            List ({LIST_ID}): {snap.list_names.length} cards · Upstream ({UPSTREAM_ID}): {snap.upstream_names.length} cards · fetched{' '}
+            List ({LIST_LABEL}): {snap.list_names.length} cards · Upstream ({UPSTREAM_LABEL}): {snap.upstream_names.length} cards · fetched{' '}
             {formatTime(snap.fetched_at)}
             {local ? '' : ' (saved snapshot)'}
           </p>

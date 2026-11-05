@@ -1,4 +1,5 @@
 import type { CardsFile } from '../types';
+import { UPSTREAM } from '../upstream/net';
 import { Account } from './Account';
 
 const REPO = 'https://github.com/codingadveenture/cube';
@@ -43,6 +44,9 @@ export function AboutView({ data }: { data: CardsFile | null }) {
         </li>
         <li>
           The List: <a href="https://cubecobra.com/cube/overview/MTGVintageCube">CubeCobra, MTGVintageCube</a>.
+        </li>
+        <li>
+          The Upstream: <a href={UPSTREAM.url}>Scryfall, {UPSTREAM.label}</a>.
         </li>
         {data && (
           <li className="num">

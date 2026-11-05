@@ -66,13 +66,14 @@ export const LIST_MAX = 600;
 
 /**
  * Why a fetched List and Upstream pair must not be saved or used, or null when both look like a
- * Vintage Cube (between LIST_MIN and LIST_MAX names each).
+ * Vintage Cube (between LIST_MIN and LIST_MAX names each). The labels say what each was read from,
+ * since the two come from different sites.
  */
-export function snapshotProblem(listCount: number, upstreamCount: number, listId: string, upstreamId: string): string | null {
+export function snapshotProblem(listCount: number, upstreamCount: number, listLabel: string, upstreamLabel: string): string | null {
   const bad = (n: number) => n < LIST_MIN || n > LIST_MAX;
   const parts: string[] = [];
-  if (bad(listCount)) parts.push(`${listCount} names for ${listId}`);
-  if (bad(upstreamCount)) parts.push(`${upstreamCount} names for ${upstreamId}`);
+  if (bad(listCount)) parts.push(`${listCount} names for the List (${listLabel})`);
+  if (bad(upstreamCount)) parts.push(`${upstreamCount} names for the Upstream (${upstreamLabel})`);
   if (parts.length === 0) return null;
-  return `CubeCobra returned ${parts.join(' and ')}, which does not look like a whole cube (expected ${LIST_MIN} to ${LIST_MAX}); not used.`;
+  return `The refresh returned ${parts.join(' and ')}, which does not look like a whole cube (expected ${LIST_MIN} to ${LIST_MAX} each); not used.`;
 }

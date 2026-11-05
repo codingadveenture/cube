@@ -159,6 +159,10 @@ export function listBasics(json: CubeJson): CubeJsonCard[] {
   return Array.isArray(basics) ? basics.filter((b) => !!b && !!(b.details?.name || b.name)) : [];
 }
 
+/**
+ * The Printing the Upstream lists for one of its cards (net.ts reads it from Scryfall), and the
+ * card's cycle-* tags when the source has any; Scryfall's API has none, so they are empty today.
+ */
 export interface UpstreamPrinting {
   oracle_id: string | null;
   name: string;
@@ -167,19 +171,4 @@ export interface UpstreamPrinting {
   collector_number: string;
   image_normal: string | null;
   cycle_tags: string[];
-}
-
-/** Each mainboard card's Printing (cardID is the Scryfall id) and its cycle-* oracle tags. */
-export function upstreamPrintings(json: CubeJson): UpstreamPrinting[] {
-  return (json.cards?.mainboard ?? [])
-    .filter((c) => c && c.cardID)
-    .map((c) => ({
-      oracle_id: c.details?.oracle_id ?? null,
-      name: c.details?.name ?? c.name ?? '',
-      scryfall_id: c.cardID,
-      set: (c.details?.set ?? '').toLowerCase(),
-      collector_number: c.details?.collector_number ?? '',
-      image_normal: c.details?.image_normal ?? null,
-      cycle_tags: (c.details?.oracle_tags ?? []).filter((t) => t.startsWith('cycle-')),
-    }));
 }

@@ -1,4 +1,4 @@
-// The Upstream feed: what Upstream (the MTGO Vintage Cube) would change in the List, after the
+// The Upstream feed: what Upstream (the Arena Powered Cube) would change in the List, after the
 // group's sticky Winner's Picks and Bans. Pure: no React, no storage, no network.
 import { normalizeName } from '../lib/normalize';
 import type { Decision, DecisionStatus, LogEntry, Overrides } from '../store/types';
@@ -10,7 +10,8 @@ export interface StickySets {
   bans: string[];
 }
 
-function uniqueNames(names: Iterable<string>): string[] {
+/** Names trimmed and made unique by normalizeName, the sameness the feed compares by. */
+export function uniqueNames(names: Iterable<string>): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
   for (const raw of names) {

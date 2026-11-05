@@ -34,7 +34,8 @@ export function baselineCubeDoc(now: string, stamp: boolean): Omit<CubeDoc, 'bas
   return {
     name: 'Vintage Cube',
     cubecobraId: 'MTGVintageCube',
-    upstreamId: 'modovintage',
+    // Informational: where the Upstream is read from (src/upstream/net.ts); nothing reads it back.
+    upstreamId: 'scryfall:apcube',
     ...(stamp ? { baselineImportedAt: now } : {}),
     updatedAt: now,
   };

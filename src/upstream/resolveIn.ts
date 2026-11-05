@@ -1,14 +1,14 @@
 // Resolving the In and Out names of an Update to cards, facts and Wanted Printings. The default
-// rule runs on a Scryfall search of each new card's Printings; when the search fails, the Printing
-// Upstream uses (from its cubeJSON, fetched once and only here) is taken instead.
+// rule runs on a Scryfall search of each new card's paper Printings; when the search fails, the
+// Printing Upstream lists (Scryfall's cube list, shared with the Refresh) is taken instead.
 import { normalizeName } from '../lib/normalize';
 import { defaultPrinting, todayIso } from '../printings/defaultRule';
 import { wantedFromPrinting } from '../printings/wanted';
 import type { WantedState } from '../store/types';
 import type { Card } from '../types';
-import { upstreamPrintings, type UpstreamPrinting } from './cubecobra';
+import type { UpstreamPrinting } from './cubecobra';
 import { keyOf, type NameIndex } from './names';
-import { fetchUpstreamJson } from './net';
+import { fetchUpstreamPrintings } from './net';
 import { fetchFacts, isAborted, searchPrintings, type Progress } from './scryfall';
 import { inAction, type InAction, type InCard } from './update';
 
@@ -27,7 +27,7 @@ export interface ResolvedOut {
   error: string | null;
 }
 
-/** The Wanted Printing taken from Upstream's cubeJSON. */
+/** The Wanted Printing taken from Upstream's list; it may be digital-only, which is why the default rule goes first. */
 export function upstreamWanted(p: UpstreamPrinting, name: string): WantedState {
   return {
     scryfall_id: p.scryfall_id,
@@ -98,7 +98,7 @@ export async function resolveIns(items: readonly { name: string; sticky: boolean
   let upstream: UpstreamPrinting[] | null = null;
   let upstreamError: string | null = null;
   try {
-    upstream = upstreamPrintings(await fetchUpstreamJson(o.signal));
+    upstream = await fetchUpstreamPrintings(o.signal);
   } catch (e) {
     if (isAborted(e)) throw e;
     upstreamError = e instanceof Error ? e.message : String(e);
