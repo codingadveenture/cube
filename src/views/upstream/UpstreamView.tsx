@@ -172,6 +172,12 @@ export default function UpstreamView({ cards, cardsReady }: { cards: Card[]; car
         The List follows Upstream, the Arena Powered Cube, plus the Winner&rsquo;s Picks and minus the Bans. Refresh, decide on each change,
         build the Update, print and pull, then push the List back to CubeCobra.
       </p>
+      <p className="muted">
+        Before an Update, tell the record what the box holds, on the <a href="#/scan">Scan tab</a>: Missing cards &ldquo;not in the box&rdquo;,
+        Unexpected cards &ldquo;record as in the box&rdquo;. The Update then prints and pulls only what the box needs: the{' '}
+        <a href="#/print">Print tab</a> lists every card to print with its Printings link and makes the PDF, and the{' '}
+        <a href="#/cube">Cube</a> lists every card to pull.
+      </p>
       <LiveStatus live={metaLive} what="Update data" />
 
       <section className="panel" aria-labelledby="refresh-head">
