@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ExpectedCard, ResolvedPrinting, ScannedRowWithPrinting } from './diff';
-import { inBoxForToPrint, notInBoxCandidates, type PrintingLookup } from './owner';
+import type { FactsHit } from '../upstream/scryfall';
+import { inBoxForToPrint, notInBoxCandidates, recordedCardState, scannedInBox, type PrintingLookup } from './owner';
 
 const wanted = { scryfall_id: 'w-id', set: 'm10', collector_number: '7', illustration_id: 'w-ill', name: null };
 
@@ -72,5 +73,63 @@ describe('notInBoxCandidates', () => {
     const inList = (id: string) => id !== 'pull';
     const out = notInBoxCandidates([c('a'), c('pull'), c('done'), c('b')], inList, { 'missing:done': true, 'unexpected:a': true });
     expect(out.map((x) => x.oracle_id)).toEqual(['a', 'b']);
+  });
+});
+
+describe('scannedInBox', () => {
+  it('is null when no row resolves, so the caller decides the fallback', async () => {
+    expect(await scannedInBox([row()], lookup())).toBeNull();
+    expect(await scannedInBox([row({ printing: printing() })], lookup())).toBeNull();
+  });
+
+  it('is the scanned Printing with its id at confidence high', async () => {
+    const r = await scannedInBox([row({ printing: printing({ scryfall_id: 'p-id' }) })], lookup());
+    expect(r).toEqual({ scryfall_id: 'p-id', set: 'lea', collector_number: '161', illustration_id: 'p-ill', name: 'Bolt', source: 'scan', confidence: 'high' });
+  });
+});
+
+describe('recordedCardState', () => {
+  const hit: FactsHit = {
+    oracle_id: 'o-bolt',
+    scryfall_id: 'sf-default',
+    facts: {
+      name: 'Lightning Bolt',
+      type_line: 'Instant',
+      mana_cost: '{R}',
+      cmc: 1,
+      colors: ['R'],
+      color_identity: ['R'],
+      color_category: 'R',
+      type_category: 'Instant',
+      layout: 'normal',
+      rarity: 'common',
+      image_normal: 'https://img/default.jpg',
+      back_name: null,
+      back_image_normal: null,
+      oracle_cycle_tags: [],
+      produces_tokens: [],
+    },
+  };
+  const inBox = { scryfall_id: 'p-id', set: 'lea', collector_number: '161', illustration_id: 'p-ill', name: 'Bolt', source: 'scan', confidence: 'high' };
+
+  it('is in the box as the scanned Printing, off the List, Wanted the same, with the facts', () => {
+    const s = recordedCardState(hit, inBox);
+    expect(s.in_box).toEqual(inBox);
+    expect(s.in_list).toBe(false);
+    expect(s.list_source).toBe('scan');
+    expect(s.wanted).toEqual({ scryfall_id: 'p-id', set: 'lea', collector_number: '161', illustration_id: 'p-ill', name: 'Bolt', reason: 'same-as-box', image_normal: null });
+    expect(s.facts).toBe(hit.facts);
+    expect(s.name).toBe('Lightning Bolt');
+    expect(s.flags).toEqual([]);
+    expect(s.retired_printing).toBeNull();
+  });
+
+  it('writes no undefined field (Firestore rejects them)', () => {
+    const s = recordedCardState(hit, inBox);
+    const walk = (x: unknown, path: string) => {
+      if (x && typeof x === 'object') for (const [k, v] of Object.entries(x)) walk(v, `${path}.${k}`);
+      expect(x, path).not.toBeUndefined();
+    };
+    walk(s, 'state');
   });
 });

@@ -5,6 +5,7 @@ import type { Card } from '../../types';
 import { usePrintMetaDoc, useStore } from '../../store/context';
 import { localDateIso } from '../../printings/defaultRule';
 import { smallImage } from '../../printings/images';
+import { printingsHash } from '../../router';
 import {
   composeSlips,
   markPrintedPatches,
@@ -231,8 +232,8 @@ export default function PrintView({ cards, section }: { cards: Card[]; section: 
       <section aria-labelledby="batch-head">
         <h2 id="batch-head">Print batch</h2>
         <p className="muted">
-          Every new card from an Update (to print) and every card whose Wanted Printing differs from its In-box Printing is here, ticked. Back
-          faces of double-faced cards go to the Back pool automatically.
+          Every new card from an Update (to print) and every card whose Wanted Printing differs from its In-box Printing is here, ticked, at its
+          Wanted Printing: open Printings on a line to choose another art. Back faces of double-faced cards go to the Back pool automatically.
         </p>
         <h3 className="batch-group">
           Fronts: {checkedLines.length} of {reprints.length + extras.length} ticked
@@ -260,6 +261,11 @@ export default function PrintView({ cards, section }: { cards: Card[]; section: 
                   </span>
                 </span>
               </label>
+              {l.oracle_id && l.source !== 'extra' && (
+                <a className="line-pick" href={printingsHash(l.oracle_id)}>
+                  Printings
+                </a>
+              )}
               {l.source === 'extra' && (
                 <button type="button" onClick={() => setExtras(extras.filter((x) => x.key !== l.key))}>
                   Remove

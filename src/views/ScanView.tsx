@@ -15,7 +15,7 @@ import {
 } from '../scan/diff';
 import { knownPrintings, localPrintings, resolvePrintings, type ResolveProgress } from '../scan/resolve';
 import { expectedCards, toPrintCards } from '../scan/expected';
-import { inBoxForToPrint, notInBoxCandidates } from '../scan/owner';
+import { inBoxForToPrint, notInBoxCandidates, recordedCardState, scannedInBox } from '../scan/owner';
 import {
   clearSession,
   emptySession,
@@ -31,7 +31,8 @@ import { lookupById, lookupPrinting } from '../store/lookup';
 import { MAX_PILE_ROWS, pilesForDiff, sharedPileInput } from '../store/piles';
 import { progressText, type UploadProgress } from '../store/shotChunks';
 import { loadIncluded, loadPhotosPending, loadSharedFrom, saveIncluded, saveSharedFrom, setPhotosPending } from '../store/scanPrefs';
-import type { InBoxState, SharedPile } from '../store/types';
+import type { CardPatchFor, InBoxState, SharedPile } from '../store/types';
+import { fetchFacts } from '../upstream/scryfall';
 import { formatTime, LiveStatus, NameField, useDisplayName } from './common';
 
 // Camera code (IndexedDB shots, thumbnails, the art catalog of Search by name) loads only when a
@@ -54,7 +55,7 @@ const NOTHING_SHARED = 'Nothing arrived from the share. Try Choose files instead
 /** One line per tab: what the list means and what to do with it. */
 const TAB_HINT: Record<Tab, string> = {
   missing: 'On the List but not scanned: look for these in the box.',
-  unexpected: 'Scanned but not on the List: take these out.',
+  unexpected: 'Scanned but not in the Cube record: take these out. The Owner can record them as in the box first; they then count under To pull in the Cube, and an Update that wants one knows the box has it.',
   'to-print': 'On the List and marked To print, but the scan found it. If the box really has it, say so and it leaves the print batch.',
   'different-art': 'Scanned with other art than the In-box Printing: check the card in the box.',
   duplicates: 'Scanned more than once: take out the extra copies.',
@@ -69,6 +70,8 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
   const [error, setError] = useState<string | null>(null);
   // Errors of the Owner row actions show in the tab panel, next to the rows; the page error is off-screen there.
   const [rowError, setRowError] = useState<string | null>(null);
+  // "Record as in the box" in progress: its progress text, or null.
+  const [recording, setRecording] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [removed, setRemoved] = useState<{ pile: Pile; index: number } | null>(null);
   const [paste, setPaste] = useState('');
@@ -321,6 +324,75 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
     );
   }
 
+  /**
+   * Owner: Unexpected cards are in the box, so the record gets a doc for each: in the box as the
+   * scanned Printing, off the List (To pull in the Cube). Facts come from Scryfall by name. A name
+   * the record knows after all (an alias) is skipped and named; "Box has this printing" is for those.
+   */
+  async function recordInBox(list: UnexpectedResult[]) {
+    if (!store || list.length === 0 || recording !== null) return;
+    // A new doc must never land on one the server has: only from a server snapshot.
+    if (cardStates.status !== 'ready' || cardStates.fromCache) {
+      setRowError('The shared card state has not loaded from the server yet. Try again in a moment.');
+      return;
+    }
+    setRowError(null);
+    const lookup = { bySetNumber: (set: string, number: string) => lookupPrinting(set, number, known), byId: (id: string) => lookupById(id, known) };
+    const problems: string[] = [];
+    const patches: CardPatchFor[] = [];
+    const seen = new Set<string>();
+    try {
+      setRecording(`Looking up ${list.length} ${list.length === 1 ? 'card' : 'cards'} on Scryfall…`);
+      const facts = await fetchFacts(list.map((u) => u.name));
+      let n = 0;
+      for (const u of list) {
+        setRecording(`Recording ${++n} of ${list.length}…`);
+        const hit = facts.get(u.name);
+        if (!hit) {
+          problems.push(`${u.name} (not found on Scryfall)`);
+          continue;
+        }
+        const existing = byOracle.get(hit.oracle_id);
+        if (existing) {
+          problems.push(`${u.name} (already in the record as ${existing.name})`);
+          continue;
+        }
+        if (seen.has(hit.oracle_id)) continue;
+        seen.add(hit.oracle_id);
+        let inBox = await scannedInBox(u.rows, lookup);
+        if (!inBox) {
+          // No scanned Printing resolved: Scryfall's Printing of the name, at confidence medium.
+          const p = await lookupById(hit.scryfall_id, known);
+          if (!p) {
+            problems.push(`${u.name} (no Printing found)`);
+            continue;
+          }
+          inBox = { scryfall_id: hit.scryfall_id, set: p.set, collector_number: p.collector_number, illustration_id: p.illustration_id, name: p.name, source: 'scan', confidence: 'medium' };
+        }
+        patches.push({ oracle_id: hit.oracle_id, patch: { kind: 'new_card', state: recordedCardState(hit, inBox) } });
+      }
+    } catch (e) {
+      console.warn('Recording unexpected cards failed', e);
+      setRowError(`Could not look the cards up (no connection?). Nothing was written. ${errorText(e)}`);
+      setRecording(null);
+      return;
+    }
+    setRecording(null);
+    if (problems.length > 0) setRowError(`Not recorded: ${problems.join(', ')}.`);
+    if (patches.length === 0) return;
+    await save(
+      () => store.updateCards(patches),
+      `${patches.length} ${patches.length === 1 ? 'card' : 'cards'} recorded as in the box, off the List; ${patches.length === 1 ? 'it is' : 'they are'} under To pull in the Cube.`,
+    );
+  }
+
+  function recordUnexpected(list: UnexpectedResult[]) {
+    const n = list.length;
+    const cardsWord = n === 1 ? 'card' : 'cards';
+    if (!window.confirm(`Record ${n} unexpected ${cardsWord} as in the box? ${n === 1 ? 'It gets' : 'They get'} a card record, off the List, and ${n === 1 ? 'shows' : 'show'} under To pull in the Cube.`)) return;
+    void recordInBox(list);
+  }
+
   function markMissingNotInBox(list: ExpectedCard[]) {
     const n = list.length;
     const cardsWord = n === 1 ? 'card' : 'cards';
@@ -462,6 +534,7 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
   // Only List cards can go to the print batch; a missing card that is To pull is not offered.
   const onList = (c: Pick<ExpectedCard, 'oracle_id'>) => byOracle.get(c.oracle_id)?.in_list === true;
   const unresolvedMissing = notInBoxCandidates(diff.missing, (id) => onList({ oracle_id: id }), session.resolved);
+  const unresolvedUnexpected = diff.unexpected.filter((u) => !session.resolved[`unexpected:${normalizeName(u.name)}`]);
   // Owner writes wait for the shared card state, the way CardActions does.
   const statesReady = cardStates.status === 'ready';
 
@@ -659,10 +732,10 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
 
           <div role="tabpanel" id="scan-panel" aria-labelledby={`scan-tab-${tab}`} tabIndex={0}>
             <p className="muted">{TAB_HINT[tab]}</p>
-            {canWrite && !statesReady && (tab === 'missing' || tab === 'to-print') && (
+            {canWrite && !statesReady && (tab === 'missing' || tab === 'to-print' || tab === 'unexpected') && (
               <p className="muted">Changes wait until the shared card state has loaded.</p>
             )}
-            {rowError && (tab === 'missing' || tab === 'to-print') && (
+            {rowError && (tab === 'missing' || tab === 'to-print' || tab === 'unexpected') && (
               <p className="status error" role="alert">{rowError}</p>
             )}
             {tab === 'missing' && (
@@ -695,11 +768,32 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
               </>
             )}
             {tab === 'unexpected' && (
-              <ItemList empty="Nothing unexpected.">
-                {diff.unexpected.map((u) => (
-                  <UnexpectedItem key={u.name} u={u} session={session} toggle={toggle} />
-                ))}
-              </ItemList>
+              <>
+                {canWrite && unresolvedUnexpected.length > 0 && (
+                  <div className="actions">
+                    <button type="button" onClick={() => recordUnexpected(unresolvedUnexpected)} disabled={!statesReady || recording !== null}>
+                      Record {unresolvedUnexpected.length} unresolved unexpected {unresolvedUnexpected.length === 1 ? 'card' : 'cards'} as in the box
+                    </button>
+                  </div>
+                )}
+                {recording && (
+                  <p className="status num" role="status">
+                    {recording}
+                  </p>
+                )}
+                <ItemList empty="Nothing unexpected.">
+                  {diff.unexpected.map((u) => (
+                    <UnexpectedItem
+                      key={u.name}
+                      u={u}
+                      session={session}
+                      toggle={toggle}
+                      onInBox={canWrite ? () => void recordInBox([u]) : undefined}
+                      disabled={!statesReady || recording !== null}
+                    />
+                  ))}
+                </ItemList>
+              </>
             )}
             {tab === 'to-print' && (
               <ItemList empty="No card marked To print was scanned.">
@@ -874,10 +968,14 @@ function UnexpectedItem({
   u,
   session,
   toggle,
+  onInBox,
+  disabled = false,
 }: {
   u: UnexpectedResult;
   session: ScanSession;
   toggle: (k: string) => void;
+  onInBox?: () => void;
+  disabled?: boolean;
 }) {
   const p = u.rows.find((r) => r.printing)?.printing ?? null;
   const first = u.rows[0];
@@ -895,9 +993,14 @@ function UnexpectedItem({
         <span className="muted num">
           {u.count > 1 ? `${u.count} scanned` : '1 scanned'}
           {where && ` · ${where}`}
-          {piles.length > 0 && ` · in ${piles.join(', ')}`} · not on the List
+          {piles.length > 0 && ` · in ${piles.join(', ')}`} · not in the record
         </span>
       </span>
+      {onInBox && (
+        <button type="button" className="link" onClick={onInBox} disabled={disabled}>
+          In the box
+        </button>
+      )}
     </Item>
   );
 }

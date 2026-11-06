@@ -35,6 +35,9 @@ The site is at <https://codingadveenture.github.io/cube/>.
    pile; quantities are summed.
 5. Read the diff: Missing, Unexpected, Different art, Duplicates. Tick "Resolved" as you fix each
    card; the session stays in the browser until you clear it, and "Export session JSON" saves it.
+   The Owner can mark Missing cards as not in the box (they go to the Print batch) and record
+   Unexpected cards as in the box (they get a card record, off the List, under To pull in the
+   Cube). Do both before an Update, so the Update prints and pulls only what the box needs.
 
 A plain list also works, pasted or as a .txt file, one card per line: `Name`, `2 Name`,
 `2x Name` or `Name (SET) 123`.

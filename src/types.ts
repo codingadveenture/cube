@@ -52,7 +52,7 @@ export interface Flag {
 }
 
 /** Where a card's place on the List comes from. */
-export type ListSource = 'cubecobra' | 'sheet-adds' | 'winner_pick' | 'upstream';
+export type ListSource = 'cubecobra' | 'sheet-adds' | 'winner_pick' | 'upstream' | 'scan';
 
 /**
  * Where a card stands, from In-box and in_list: in the box and on the List ('in_box'), on the
