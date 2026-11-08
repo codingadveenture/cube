@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import type { Card } from '../types';
 import { normalizeName } from '../lib/normalize';
-import { replaceHash, reviewHash } from '../router';
+import { printingsHash, replaceHash, reviewHash } from '../router';
 import { parseScanText, type Pile } from '../scan/parse';
 import {
   diffScan,
@@ -26,12 +26,17 @@ import {
   type ScanSession,
 } from '../scan/session';
 import { takeSharedFiles } from '../scan/shared';
-import { errorText, PHOTOS_DENIED, useCardStates, useScans, useStore, type Live } from '../store/context';
+import { boxAgainstUpstream, scryfallByName, type BoxCard } from '../scan/upstreamDiff';
+import { errorText, PHOTOS_DENIED, useCardStates, useLog, useOverrides, useScans, useStore, useUpstreamMetaDoc, type Live } from '../store/context';
 import { lookupById, lookupPrinting } from '../store/lookup';
 import { MAX_PILE_ROWS, pilesForDiff, sharedPileInput } from '../store/piles';
 import { progressText, type UploadProgress } from '../store/shotChunks';
 import { loadIncluded, loadPhotosPending, loadSharedFrom, saveIncluded, saveSharedFrom, setPhotosPending } from '../store/scanPrefs';
 import type { CardPatchFor, InBoxState, SharedPile } from '../store/types';
+import { proposedList, stickySets } from '../upstream/feed';
+import { toUpstreamMeta } from '../upstream/meta';
+import { keyOf, LIST_MAX, LIST_MIN, nameIndex } from '../upstream/names';
+import { fetchCubelist, UPSTREAM_ID } from '../upstream/net';
 import { fetchFacts } from '../upstream/scryfall';
 import { formatTime, LiveStatus, NameField, useDisplayName } from './common';
 
@@ -51,6 +56,14 @@ interface PhotoUpload {
 type Tab = 'missing' | 'unexpected' | 'to-print' | 'different-art' | 'duplicates' | 'other-set' | 'unknown';
 
 const NOTHING_SHARED = 'Nothing arrived from the share. Try Choose files instead.';
+
+/** Upstream's names, fetched by this device or saved on the Update page by the Owner. */
+interface UpstreamNames {
+  names: string[];
+  fetched_at: string;
+  saved: boolean;
+}
+const wholeCube = (names: readonly string[]) => names.length >= LIST_MIN && names.length <= LIST_MAX;
 
 /** One line per tab: what the list means and what to do with it. */
 const TAB_HINT: Record<Tab, string> = {
@@ -540,6 +553,56 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
 
   const imageOf = (c: ExpectedCard) => byOracle.get(c.oracle_id)?.in_box?.image_small ?? c.in_box.image_small;
 
+  // The box against Upstream: the scanned piles compared straight with the proposed List (Upstream
+  // with the Winner's Picks kept and the Bans left out). The Winner's Picks come from the shared Log,
+  // so the diff waits for it; before that every Winner's Pick would show as a pull.
+  const upstreamMeta = useUpstreamMetaDoc();
+  const log = useLog();
+  const overrides = useOverrides();
+  const stickyReady = log.status === 'ready' && !log.fromCache && overrides.status === 'ready' && !overrides.fromCache;
+  const sticky = useMemo(() => stickySets(overrides.data, log.data), [overrides.data, log.data]);
+  const names = useMemo(() => nameIndex(cards), [cards]);
+  const [fetchedUpstream, setFetchedUpstream] = useState<UpstreamNames | null>(null);
+  const [comparing, setComparing] = useState(false);
+  const [compareError, setCompareError] = useState<string | null>(null);
+  // The Owner's saved snapshot (Update page) serves until this device fetches its own.
+  const savedUpstream = useMemo((): UpstreamNames | null => {
+    const m = toUpstreamMeta(upstreamMeta.data);
+    return m.fetched_at && wholeCube(m.upstream_names) ? { names: m.upstream_names, fetched_at: m.fetched_at, saved: true } : null;
+  }, [upstreamMeta.data]);
+  const upstream = fetchedUpstream ?? savedUpstream;
+  const boxDiff = useMemo(() => {
+    if (!upstream || !stickyReady) return null;
+    const key = (n: string) => keyOf(names, n);
+    const { proposed } = proposedList({ upstream: upstream.names, sticky, keyOf: key, also: rows.map((r) => r.name) });
+    return boxAgainstUpstream(diff, proposed, key);
+  }, [upstream, stickyReady, names, sticky, rows, diff]);
+
+  async function compareUpstream() {
+    setComparing(true);
+    setCompareError(null);
+    try {
+      const list = await fetchCubelist(UPSTREAM_ID);
+      if (!wholeCube(list)) {
+        throw new Error(`CubeCobra returned ${list.length} names for ${UPSTREAM_ID}, which does not look like a whole cube (expected ${LIST_MIN} to ${LIST_MAX}); not used.`);
+      }
+      setFetchedUpstream({ names: list, fetched_at: new Date().toISOString(), saved: false });
+    } catch (e) {
+      setCompareError(errorText(e));
+    } finally {
+      setComparing(false);
+    }
+  }
+
+  async function copyNames(list: readonly BoxCard[], what: string) {
+    try {
+      await navigator.clipboard.writeText(list.map((c) => c.name).join('\n'));
+      setNotice(`Copied ${list.length} names ${what}.`);
+    } catch {
+      setNotice('Copying was blocked by the browser.');
+    }
+  }
+
   return (
     <div className="scan">
       <h1>Scan</h1>
@@ -857,9 +920,124 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
               </>
             )}
           </div>
+
+          <section className="panel box-diff" aria-labelledby="box-diff-head">
+            <h2 id="box-diff-head">The box against Upstream</h2>
+            <p className="muted">
+              The scanned piles compared straight with Upstream, the Arena Powered Cube ({UPSTREAM_ID}), with the Winner&rsquo;s Picks kept and
+              the Bans left out as on the List. To pull: in the box but not wanted. To print: wanted but not in the box. Nothing in the record
+              changes; this is the whole gap when the box skipped an Update.
+            </p>
+            <div className="actions">
+              <button type="button" className="primary" disabled={comparing} onClick={() => void compareUpstream()}>
+                {comparing ? 'Reading CubeCobra…' : fetchedUpstream ? 'Refresh Upstream' : 'Compare with Upstream'}
+              </button>
+              {boxDiff && (
+                <>
+                  <button type="button" onClick={() => void copyNames(boxDiff.pull, 'to pull')} disabled={boxDiff.pull.length === 0}>
+                    Copy pull list
+                  </button>
+                  <button type="button" onClick={() => void copyNames(boxDiff.print, 'to print')} disabled={boxDiff.print.length === 0}>
+                    Copy print list
+                  </button>
+                </>
+              )}
+            </div>
+            {compareError && <p className="status error" role="alert">{compareError}</p>}
+            {upstream ? (
+              <p className="muted num">
+                Upstream ({UPSTREAM_ID}): {upstream.names.length} cards · fetched {formatTime(upstream.fetched_at)}
+                {upstream.saved ? ' (the snapshot saved on the Update page)' : ''}
+              </p>
+            ) : (
+              <p className="muted">Not fetched yet.</p>
+            )}
+            {upstream && !stickyReady && <p className="muted">Waiting for the shared Log (Winner&rsquo;s Picks and Bans)…</p>}
+            {boxDiff && (
+              <>
+                <dl className="totals num">
+                  <Total label="In the box" value={boxDiff.box.length} />
+                  <Total label="Upstream wants" value={boxDiff.proposed} />
+                  <Total label="To pull" value={boxDiff.pull.length} warn />
+                  <Total label="To print" value={boxDiff.print.length} warn />
+                </dl>
+                <h3 className="num">To pull: {boxDiff.pull.length}</h3>
+                <p className="muted">
+                  Take these out of the box; each says which pile it was scanned in. A name opens the card on the site, or on Scryfall when the
+                  record does not know it.
+                </p>
+                <ItemList empty="Nothing to pull: Upstream wants everything in the box.">
+                  {boxDiff.pull.map((c) => (
+                    <BoxDiffItem key={c.key} c={c} side="pull" card={c.oracle_id ? byOracle.get(c.oracle_id) : undefined} session={session} toggle={toggle} />
+                  ))}
+                </ItemList>
+                <h3 className="num">To print: {boxDiff.print.length}</h3>
+                <p className="muted">
+                  Open Printings on a card to choose the art; a card the record does not know yet opens on Scryfall. Once the Update is applied,
+                  the <a href="#/print">Print tab</a> lists these with the PDF.
+                </p>
+                <ItemList empty="Nothing to print: the box has everything Upstream wants.">
+                  {boxDiff.print.map((c) => (
+                    <BoxDiffItem key={c.key} c={c} side="print" card={c.oracle_id ? byOracle.get(c.oracle_id) : undefined} session={session} toggle={toggle} />
+                  ))}
+                </ItemList>
+              </>
+            )}
+          </section>
         </>
       )}
     </div>
+  );
+}
+
+/** One line of the box against Upstream: a card to pull from the box or to print for it. */
+function BoxDiffItem({
+  c,
+  side,
+  card,
+  session,
+  toggle,
+}: {
+  c: BoxCard;
+  side: 'pull' | 'print';
+  card: Card | undefined;
+  session: ScanSession;
+  toggle: (k: string) => void;
+}) {
+  const image = side === 'pull' ? c.image_small ?? card?.in_box?.image_small ?? null : card?.wanted.image_small ?? null;
+  const href = card ? `#/cube/${encodeURIComponent(card.oracle_id)}` : scryfallByName(c.name);
+  const status =
+    side === 'pull'
+      ? card
+        ? card.in_list
+          ? 'Upstream cuts it'
+          : 'Off the List already'
+        : 'Not in the record'
+      : card
+        ? card.in_list
+          ? 'On the List, not in the box'
+          : 'In the record, off the List'
+        : 'New: not in the record yet';
+  const scanned = side === 'pull' ? `${c.count > 1 ? `${c.count} scanned` : '1 scanned'}${c.piles.length > 0 ? ` · in ${c.piles.join(', ')}` : ''} · ` : '';
+  return (
+    <Item k={`${side}:${c.key}`} session={session} toggle={toggle}>
+      <Thumb src={image} />
+      <span className="row-text">
+        <a className="row-name" href={href} {...(card ? {} : { target: '_blank', rel: 'noopener noreferrer' })}>
+          {c.name}
+        </a>
+        <span className="muted num">
+          {scanned}
+          {status}
+          {card ? '' : ' · Scryfall'}
+        </span>
+      </span>
+      {side === 'print' && card && (
+        <a className="line-pick" href={printingsHash(card.oracle_id)}>
+          Printings
+        </a>
+      )}
+    </Item>
   );
 }
 

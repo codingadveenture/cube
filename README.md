@@ -38,6 +38,12 @@ The site is at <https://codingadveenture.github.io/cube/>.
    The Owner can mark Missing cards as not in the box (they go to the Print batch) and record
    Unexpected cards as in the box (they get a card record, off the List, under To pull in the
    Cube). Do both before an Update, so the Update prints and pulls only what the box needs.
+6. "The box against Upstream", under the tabs, compares the scanned piles straight with the
+   Arena Powered Cube (Winner's Picks kept, Bans out): the cards to pull from the box as it is,
+   each with the pile it was scanned in, and the cards to print to bring the box up to date,
+   each with its Printings link. It reads CubeCobra and changes nothing, so it is the whole gap
+   when the box skipped an Update. The Print tab's PDF and the Cube's To pull still come from
+   step 5 and the Update.
 
 A plain list also works, pasted or as a .txt file, one card per line: `Name`, `2 Name`,
 `2x Name` or `Name (SET) 123`.

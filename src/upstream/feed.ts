@@ -79,18 +79,31 @@ function byKey(names: readonly string[], keyOf: (n: string) => string): Map<stri
   return m;
 }
 
+export interface ProposedInput {
+  upstream: readonly string[];
+  sticky: StickySets;
+  keyOf: (name: string) => string;
+  /** Other names a loosely written sticky name may match, besides Upstream's (the List's, the box's). */
+  also?: readonly string[];
+}
+
+export interface Proposed {
+  /** key -> name of every card the proposed List holds. */
+  proposed: Map<string, string>;
+  /** key -> name of the sticky adds, resolved. */
+  stickyAdds: Map<string, string>;
+  /** Sticky names (Winner's Picks, Bans) that match no oracle_id and no known name. */
+  unresolvedSticky: string[];
+}
+
 /**
- * Proposed = (Upstream minus Bans) plus sticky adds. Upstream adds = proposed minus the List;
- * Upstream cuts = the List minus proposed (so a sticky add is never cut). Names are compared by
- * keyOf. Each item carries the decision stored under its name (or any name with the same key) for
- * the same side.
+ * The proposed List: (Upstream minus Bans) plus the sticky adds, compared by keyOf. A sticky name
+ * resolves by its oracle_id; failing that, by a loose match on an Upstream or `also` name.
  */
-export function computeFeed(input: FeedInput): Feed {
+export function proposedList(input: ProposedInput): Proposed {
   const { keyOf } = input;
-  const list = byKey(input.list, keyOf);
-  // A sticky name resolves by its oracle_id; failing that, by a loose match on a List or Upstream name.
   const loose = new Map<string, string>();
-  for (const n of [...input.list, ...input.upstream]) {
+  for (const n of [...(input.also ?? []), ...input.upstream]) {
     const l = looseName(n);
     if (l && !loose.has(l)) loose.set(l, keyOf(n));
   }
@@ -108,6 +121,18 @@ export function computeFeed(input: FeedInput): Feed {
   const proposed = new Map<string, string>();
   for (const [k, n] of byKey(input.upstream, keyOf)) if (!bans.has(k)) proposed.set(k, n);
   for (const [k, n] of stickyAdds) if (!proposed.has(k)) proposed.set(k, n);
+  return { proposed, stickyAdds, unresolvedSticky: [...unresolved].sort((a, b) => a.localeCompare(b, 'en')) };
+}
+
+/**
+ * Upstream adds = proposed minus the List; Upstream cuts = the List minus proposed (so a sticky add
+ * is never cut). Names are compared by keyOf. Each item carries the decision stored under its name
+ * (or any name with the same key) for the same side.
+ */
+export function computeFeed(input: FeedInput): Feed {
+  const { keyOf } = input;
+  const list = byKey(input.list, keyOf);
+  const { proposed, stickyAdds, unresolvedSticky } = proposedList({ upstream: input.upstream, sticky: input.sticky, keyOf, also: input.list });
 
   const decided = new Map<string, Decision>();
   for (const [name, d] of Object.entries(input.decisions ?? {})) {
@@ -123,7 +148,7 @@ export function computeFeed(input: FeedInput): Feed {
   const byName = (a: FeedItem, b: FeedItem) => a.name.localeCompare(b.name, 'en');
   const adds = [...proposed].filter(([k]) => !list.has(k)).map(([k, n]) => item(n, k, 'add')).sort(byName);
   const cuts = [...list].filter(([k]) => !proposed.has(k)).map(([k, n]) => item(n, k, 'cut')).sort(byName);
-  return { adds, cuts, proposed: proposed.size, unresolvedSticky: [...unresolved].sort((a, b) => a.localeCompare(b, 'en')) };
+  return { adds, cuts, proposed: proposed.size, unresolvedSticky };
 }
 
 /**

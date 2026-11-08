@@ -1294,7 +1294,8 @@ button.tile-button {
   min-height: 44px;
   cursor: pointer;
 }
-.batch-list .line-pick {
+.batch-list .line-pick,
+.items .line-pick {
   flex: none;
   padding: 0.5rem 0.25rem;
 }
@@ -2184,4 +2185,12 @@ a.button {
     position: sticky;
     top: 0.5rem;
   }
+}
+
+/* The box against Upstream, under the Scan tabs. */
+.box-diff {
+  margin-top: 1.5rem;
+}
+.box-diff h3 {
+  margin: 1.25rem 0 0.25rem;
 }

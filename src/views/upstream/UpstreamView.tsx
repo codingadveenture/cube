@@ -176,7 +176,8 @@ export default function UpstreamView({ cards, cardsReady }: { cards: Card[]; car
         Before an Update, tell the record what the box holds, on the <a href="#/scan">Scan tab</a>: Missing cards &ldquo;not in the box&rdquo;,
         Unexpected cards &ldquo;record as in the box&rdquo;. The Update then prints and pulls only what the box needs: the{' '}
         <a href="#/print">Print tab</a> lists every card to print with its Printings link and makes the PDF, and the{' '}
-        <a href="#/cube">Cube</a> lists every card to pull.
+        <a href="#/cube">Cube</a> lists every card to pull. For the whole gap at once, with nothing changed, the Scan tab&rsquo;s
+        &ldquo;The box against Upstream&rdquo; lists the pulls and the prints straight from the scan.
       </p>
       <LiveStatus live={metaLive} what="Update data" />
 
