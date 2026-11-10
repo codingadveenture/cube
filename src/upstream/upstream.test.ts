@@ -97,11 +97,12 @@ describe('the Upstream feed', () => {
     const all = acceptRemaining(withLater.adds, NOW);
     expect(Object.keys(all).sort()).toEqual(['Booster Tutor', 'New Card']);
     expect(all['New Card']).toEqual({ status: 'accepted', side: 'add', at: NOW, note: '', applied_at: null });
-    const accepted = computeFeed({ list, upstream, sticky, keyOf: key, decisions: all });
+    // The Later item stays out; the accepted ones are applied.
+    const accepted = computeFeed({ list, upstream, sticky, keyOf: key, decisions: { ...later, ...all } });
     const applied = markApplied(accepted.adds, '2026-10-25T00:00:00.000Z');
     expect(Object.keys(applied).sort()).toEqual(['Booster Tutor', 'New Card']);
     expect(applied['New Card']!.applied_at).toBe('2026-10-25T00:00:00.000Z');
-    const after = computeFeed({ list, upstream, sticky, keyOf: key, decisions: { ...all, ...applied } });
+    const after = computeFeed({ list, upstream, sticky, keyOf: key, decisions: { ...later, ...all, ...applied } });
     expect(groupFeed(after.adds).applied.map((i) => i.name)).toEqual(['Booster Tutor', 'New Card']);
   });
 });
