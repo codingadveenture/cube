@@ -6,7 +6,7 @@ import { smallImage } from '../../printings/images';
 import { historyTrim } from '../../print/settings';
 import { errorText, useLog, useOverrides, useStore, useUpdatesMetaDoc, useUpstreamMetaDoc } from '../../store/context';
 import type { Decision, DecisionStatus, UpdateHistoryEntry } from '../../store/types';
-import { acceptRemaining, computeFeed, decide, groupFeed, previewBasis, staleDecisions, stickySets, type FeedItem } from '../../upstream/feed';
+import { computeFeed, decide, groupFeed, previewBasis, staleDecisions, stickySets, type FeedItem } from '../../upstream/feed';
 import { toUpdateHistory, toUpstreamMeta } from '../../upstream/meta';
 import { keyOf, nameIndex, parseNameLines, snapshotProblem } from '../../upstream/names';
 import { fetchCubelist, LIST_ID, UPSTREAM_ID } from '../../upstream/net';
@@ -169,8 +169,8 @@ export default function UpstreamView({ cards, cardsReady }: { cards: Card[]; car
     <div className="upstream">
       <h1>Update</h1>
       <p className="muted">
-        The List follows Upstream, the Arena Powered Cube, plus the Winner&rsquo;s Picks and minus the Bans. Refresh, decide on each change,
-        build the Update, print and pull, then push the List back to CubeCobra.
+        The List follows Upstream, the Arena Powered Cube, plus the Winner&rsquo;s Picks and minus the Bans. Refresh, build the Update with every change taken
+        (Reject or Later stops one), print and pull, then push the List back to CubeCobra.
       </p>
       <p className="muted">
         Before an Update, tell the record what the box holds, on the <a href="#/scan">Scan tab</a>: Missing cards &ldquo;not in the box&rdquo;,
@@ -218,8 +218,11 @@ export default function UpstreamView({ cards, cardsReady }: { cards: Card[]; car
 
       {feed && (
         <section className="panel" aria-labelledby="feed-head">
-          <h2 id="feed-head">2. Decide</h2>
-          <p className="muted num">The proposed List has {feed.proposed} cards.</p>
+          <h2 id="feed-head">2. The changes</h2>
+          <p className="muted num">
+            The proposed List has {feed.proposed} cards. Every change below goes into the Update as it is; press Reject or Later on one to keep it
+            out.
+          </p>
           {factsProgress && factsProgress.done < factsProgress.total && (
             <p className="status num" role="status">
               Card facts from Scryfall: {factsProgress.done} of {factsProgress.total}
@@ -232,8 +235,6 @@ export default function UpstreamView({ cards, cardsReady }: { cards: Card[]; car
             factsFor={factsFor}
             isOwner={canDecide}
             onDecide={decideOne}
-            onAcceptAll={(items) => void setDecisions(acceptRemaining(items, new Date().toISOString()), 'Accepted all remaining adds.')}
-            acceptAllLabel="Accept all remaining adds"
           />
           <FeedSide
             title="Upstream cuts"
@@ -241,8 +242,6 @@ export default function UpstreamView({ cards, cardsReady }: { cards: Card[]; car
             factsFor={factsFor}
             isOwner={canDecide}
             onDecide={decideOne}
-            onAcceptAll={(items) => void setDecisions(acceptRemaining(items, new Date().toISOString()), 'Accepted all remaining cuts.')}
-            acceptAllLabel="Accept all remaining cuts"
           />
         </section>
       )}
@@ -305,16 +304,12 @@ function FeedSide({
   factsFor,
   isOwner,
   onDecide,
-  onAcceptAll,
-  acceptAllLabel,
 }: {
   title: string;
   items: FeedItem[];
   factsFor: (i: FeedItem) => ItemFacts | null;
   isOwner: boolean;
   onDecide: (i: FeedItem, s: DecisionStatus) => void;
-  onAcceptAll: (items: FeedItem[]) => void;
-  acceptAllLabel: string;
 }) {
   const g = groupFeed(items);
   const list = (xs: FeedItem[]) => (
@@ -332,14 +327,7 @@ function FeedSide({
       {items.length === 0 && <p className="muted">None.</p>}
       {g.open.length > 0 && (
         <>
-          <p className="muted num">{g.open.length} to decide</p>
-          {isOwner && g.open.length > 1 && (
-            <div className="actions">
-              <button type="button" onClick={() => onAcceptAll(items)}>
-                {acceptAllLabel}
-              </button>
-            </div>
-          )}
+          <p className="muted num">{g.open.length} taken as {g.open.length === 1 ? 'it is' : 'they are'}</p>
           {list(g.open)}
         </>
       )}
@@ -479,8 +467,13 @@ function BuildUpdate({
   const abort = useRef<AbortController | null>(null);
   useEffect(() => () => abort.current?.abort(), []);
 
-  const acceptedAdds = feed ? groupFeed(feed.adds).accepted : [];
-  const acceptedCuts = feed ? groupFeed(feed.cuts).accepted : [];
+  // Open changes go in as they are: only Reject and Later keep one out.
+  const taken = (items: readonly FeedItem[]) => {
+    const g = groupFeed(items);
+    return [...g.open, ...g.accepted];
+  };
+  const acceptedAdds = feed ? taken(feed.adds) : [];
+  const acceptedCuts = feed ? taken(feed.cuts) : [];
   const stickyKeys = useMemo(() => new Set(stickyAdds.map((n) => keyOf(index, n))), [stickyAdds, index]);
   const feedKeys = new Set(acceptedAdds.map((i) => i.key));
   const manualIns = manual.filter((n) => !feedKeys.has(keyOf(index, n)));
@@ -556,7 +549,7 @@ function BuildUpdate({
     <section className="panel" aria-labelledby="build-head">
       <h2 id="build-head">3. Build the Update</h2>
       <p className="muted num">
-        {acceptedAdds.length + manualIns.length} In ({acceptedAdds.length} accepted adds, {manualIns.length} by name) · {acceptedCuts.length} Out
+        {acceptedAdds.length + manualIns.length} In ({acceptedAdds.length} Upstream adds, {manualIns.length} by name) · {acceptedCuts.length} Out
       </p>
       <div className="actions">
         <button type="button" className="primary" disabled={total === 0 || state.status === 'running' || !ready || applying} onClick={() => void build()}>

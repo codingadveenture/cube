@@ -211,8 +211,10 @@ export function acceptRemaining(items: readonly FeedItem[], at: string): Record<
 export function markApplied(items: readonly FeedItem[], at: string): Record<string, Decision> {
   const out: Record<string, Decision> = {};
   for (const i of items) {
-    if (!i.decision || i.decision.status !== 'accepted' || i.decision.applied_at) continue;
-    out[i.name] = { ...i.decision, applied_at: at };
+    // An open item went in as it was: it is recorded as accepted and applied.
+    const d: Decision = i.decision ?? { status: 'accepted', side: i.side, at, note: '', applied_at: null };
+    if (d.status !== 'accepted' || d.applied_at) continue;
+    out[i.name] = { ...d, applied_at: at };
   }
   return out;
 }

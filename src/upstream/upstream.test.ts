@@ -83,6 +83,13 @@ describe('the Upstream feed', () => {
     expect(groupFeed(feed.cuts).rejected.map((i) => i.name)).toEqual(['Old Card']);
   });
 
+  it('marks an open item applied as accepted, since it went in as it was', () => {
+    const feed = computeFeed({ list, upstream, sticky, keyOf: key });
+    const open = feed.adds.find((i) => !i.decision)!;
+    const applied = markApplied([open], NOW);
+    expect(applied[open.name]).toMatchObject({ status: 'accepted', side: 'add', applied_at: NOW });
+  });
+
   it('accepts all remaining, and marks accepted items applied', () => {
     const feed = computeFeed({ list, upstream, sticky, keyOf: key, decisions: decide([], 'accepted', NOW) });
     const later = decide([feed.adds[0]!], 'later', NOW);

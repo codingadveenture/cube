@@ -306,7 +306,8 @@ export async function fetchFacts(
     }
     const fresh: FactsCache = {};
     for (const name of part) {
-      const hit = byName.get(normalizeName(name)) ?? byName.get(normalizeName(lookupName(name))) ?? null;
+      const hit =
+        byName.get(normalizeName(name)) ?? byName.get(normalizeName(lookupName(name))) ?? (await fuzzyFacts(lookupName(name), signal));
       memory.set(normalizeName(name), hit);
       if (hit) fresh[normalizeName(name)] = hit;
       out.set(name, hit);
@@ -315,6 +316,29 @@ export async function fetchFacts(
     onProgress?.({ done: Math.min(total, i + part.length), total });
   }
   return out;
+}
+
+/** A name without its punctuation, the way CubeCobra and the Log often write a quoted name. */
+function bareName(name: string): string {
+  return normalizeName(name).replace(/[^\p{L}\p{N}]+/gu, '');
+}
+
+/**
+ * A second try for a name /cards/collection did not find: Scryfall's fuzzy lookup, kept only when
+ * the answer is the same name bar punctuation, so "Name Sticker Goblin" finds "Name Sticker" Goblin
+ * and a real misspelling still comes back as not found.
+ */
+async function fuzzyFacts(name: string, signal?: AbortSignal): Promise<FactsHit | null> {
+  const body = await searchGet(`${API}/cards/named?fuzzy=${encodeURIComponent(name)}`, signal).catch((e: unknown) => {
+    if (isAborted(e)) throw e;
+    return null;
+  });
+  const sc = body && 'oracle_id' in body ? (body as unknown as ScryfallCard) : null;
+  if (!sc) return null;
+  const hit = factsFromScryfall(sc);
+  if (!hit) return null;
+  const asked = bareName(name);
+  return answerNames(sc).some((n) => bareName(n) === asked) ? hit : null;
 }
 
 function retryAfterMs(res: Response, fallback: number): number {
