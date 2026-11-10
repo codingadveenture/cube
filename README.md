@@ -180,7 +180,7 @@ For other print tools, "Copy mtgprint list" gives `1 Name (SET) number` lines fo
 ## Updates from the Arena Powered Cube
 
 On the Update page (`#/upstream`) press "Refresh from CubeCobra" to read the List (`MTGVintageCube`) and Upstream (`mtgapc`, the Arena Powered Cube as kept on CubeCobra); the Owner's fetch is saved for everyone.
-The feed shows Upstream's adds and cuts after the sticky Winner's Picks and Bans, and every one goes into the Update unless the Owner presses Reject or Later on it, while cards outside the feed can be typed in by name.
+The feed shows Upstream's adds and cuts after the sticky Winner's Picks and Bans, and every one goes into the Update unless the Owner presses Reject or Later on it, while cards outside the feed can be typed in by name. The feed compares the record's own List, which runs ahead of CubeCobra until the CSV is pushed, so a Ban on a card applied here goes out at once.
 "Build the Update" turns the accepted adds into In cards with facts and a Wanted Printing (the default rule on a Scryfall search, else the Printing Upstream uses) and the accepted cuts into Out cards, and shows the preview.
 "Apply Update" writes the new card docs and takes the Out cards off the List, so new cards are "to print" and Out cards still in the box are "to pull".
 The Print batch now includes every card to print, Mark as printed puts it in the box, and the Cube view's "To pull" group has "Mark pulled" for the cards you have taken out.

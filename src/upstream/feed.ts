@@ -49,9 +49,10 @@ export interface FeedInput {
   keyOf: (name: string) => string;
   decisions?: Readonly<Record<string, Decision>>;
   /**
-   * Names the record has on the List (in_list), which may run ahead of CubeCobra: an applied Update
-   * is pushed there by hand. They count for the cuts only, so a Ban on a card applied here but not
-   * on CubeCobra yet goes out at once.
+   * Names the record has on the List (in_list). The record runs ahead of CubeCobra, since an applied
+   * Update is pushed there by hand; when given, it is the List the feed compares, so a Ban on a card
+   * applied here goes out at once, and a card cut here that the group wants back comes in again.
+   * `list` (the CubeCobra snapshot) still helps loose name matching.
    */
   record_list?: readonly string[];
 }
@@ -131,14 +132,19 @@ export function proposedList(input: ProposedInput): Proposed {
 }
 
 /**
- * Upstream adds = proposed minus the List; Upstream cuts = the List (and the record's List) minus
- * proposed (so a sticky add is never cut). Names are compared by keyOf. Each item carries the decision stored under its name
+ * Upstream adds = proposed minus the List; Upstream cuts = the List minus proposed (so a sticky add
+ * is never cut). The List is the record's when given, else the CubeCobra snapshot. Names are compared by keyOf. Each item carries the decision stored under its name
  * (or any name with the same key) for the same side.
  */
 export function computeFeed(input: FeedInput): Feed {
   const { keyOf } = input;
-  const list = byKey(input.list, keyOf);
-  const { proposed, stickyAdds, unresolvedSticky } = proposedList({ upstream: input.upstream, sticky: input.sticky, keyOf, also: input.list });
+  const list = byKey(input.record_list ?? input.list, keyOf);
+  const { proposed, stickyAdds, unresolvedSticky } = proposedList({
+    upstream: input.upstream,
+    sticky: input.sticky,
+    keyOf,
+    also: [...input.list, ...(input.record_list ?? [])],
+  });
 
   const decided = new Map<string, Decision>();
   for (const [name, d] of Object.entries(input.decisions ?? {})) {
@@ -153,9 +159,7 @@ export function computeFeed(input: FeedInput): Feed {
   });
   const byName = (a: FeedItem, b: FeedItem) => a.name.localeCompare(b.name, 'en');
   const adds = [...proposed].filter(([k]) => !list.has(k)).map(([k, n]) => item(n, k, 'add')).sort(byName);
-  const listed = new Map(list);
-  for (const [k, n] of byKey(input.record_list ?? [], keyOf)) if (!listed.has(k)) listed.set(k, n);
-  const cuts = [...listed].filter(([k]) => !proposed.has(k)).map(([k, n]) => item(n, k, 'cut')).sort(byName);
+  const cuts = [...list].filter(([k]) => !proposed.has(k)).map(([k, n]) => item(n, k, 'cut')).sort(byName);
   return { adds, cuts, proposed: proposed.size, unresolvedSticky };
 }
 

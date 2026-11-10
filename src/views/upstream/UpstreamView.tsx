@@ -108,8 +108,9 @@ export default function UpstreamView({ cards, cardsReady }: { cards: Card[]; car
   const byId = useMemo(() => new Map(cards.map((c) => [c.oracle_id, c])), [cards]);
 
   const sticky = useMemo(() => stickySets(overrides.data, log.data), [overrides.data, log.data]);
-  // The record's List runs ahead of CubeCobra until the CSV is pushed; its cards can still be cut.
-  const recordList = useMemo(() => cards.filter((c) => c.in_list).map((c) => c.name), [cards]);
+  // The record's List runs ahead of CubeCobra until the CSV is pushed, so the feed compares it once
+  // the shared card state has loaded (cards.json alone is older than the record).
+  const recordList = useMemo(() => (cardsReady ? cards.filter((c) => c.in_list).map((c) => c.name) : undefined), [cards, cardsReady]);
   const feed = useMemo(
     () =>
       snap
