@@ -1,11 +1,11 @@
 // #/print: the Print batch, Tokens and the Print sheet (settings, calibration, PDF, lists, Mark as printed).
 // Loaded on demand; jsPDF is loaded only when a PDF is generated.
-import { useEffect, useMemo, useRef, useState } from 'react';
-import type { Card } from '../../types';
-import { usePrintMetaDoc, useStore } from '../../store/context';
-import { localDateIso } from '../../printings/defaultRule';
-import { smallImage } from '../../printings/images';
-import { printingsHash } from '../../router';
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { Card } from "../../types";
+import { usePrintMetaDoc, useStore } from "../../store/context";
+import { localDateIso } from "../../printings/defaultRule";
+import { smallImage } from "../../printings/images";
+import { printingsHash } from "../../router";
 import {
   composeSlips,
   markPrintedPatches,
@@ -17,11 +17,11 @@ import {
   type BatchLine,
   type Slip,
   type TokenLine,
-} from '../../print/batch';
-import { calibrate } from '../../print/calibration';
-import { mergeExtras, resolveExtras, toExtras } from '../../print/extras';
-import { plainError } from '../../print/errors';
-import { MIN_MARGIN, fits, sheetMargins, slipPages } from '../../print/layout';
+} from "../../print/batch";
+import { calibrate } from "../../print/calibration";
+import { mergeExtras, resolveExtras, toExtras } from "../../print/extras";
+import { plainError } from "../../print/errors";
+import { MIN_MARGIN, fits, sheetMargins, slipPages } from "../../print/layout";
 import {
   EXTRAS_KEY,
   LOCAL_PROFILES_KEY,
@@ -41,9 +41,14 @@ import {
   writeLocal,
   type PrinterProfile,
   type PrintSettings,
-} from '../../print/settings';
-import { RECOMMENDATION_LABEL, loadTokens, printableTokens, type TokenType } from '../../print/tokens';
-import { CopyButton, LiveStatus } from '../common';
+} from "../../print/settings";
+import {
+  RECOMMENDATION_LABEL,
+  loadTokens,
+  printableTokens,
+  type TokenType,
+} from "../../print/tokens";
+import { CopyButton, LiveStatus } from "../common";
 
 function usePersisted<T>(key: string, initial: () => T): [T, (v: T) => void] {
   const [value, setValue] = useState<T>(initial);
@@ -60,13 +65,17 @@ function toTokenLines(v: unknown): TokenLine[] {
   if (!Array.isArray(v)) return [];
   return v.filter(
     (t): t is TokenLine =>
-      !!t && typeof t === 'object' && typeof (t as TokenLine).key === 'string' && typeof (t as TokenLine).image_png === 'string' && typeof (t as TokenLine).count === 'number',
+      !!t &&
+      typeof t === "object" &&
+      typeof (t as TokenLine).key === "string" &&
+      typeof (t as TokenLine).image_png === "string" &&
+      typeof (t as TokenLine).count === "number",
   );
 }
 
 function toProfiles(v: unknown): Record<string, PrinterProfile> {
   const out: Record<string, PrinterProfile> = {};
-  if (v && typeof v === 'object' && !Array.isArray(v)) {
+  if (v && typeof v === "object" && !Array.isArray(v)) {
     for (const [name, p] of Object.entries(v as Record<string, unknown>)) {
       const prof = toProfile(p, name);
       if (prof) out[name] = { ...prof, name };
@@ -77,7 +86,7 @@ function toProfiles(v: unknown): Record<string, PrinterProfile> {
 
 /** The thumbnail for a token's png. */
 function tokenThumb(png: string): string {
-  return png.replace('/png/', '/small/').replace(/\.png(?=$|\?)/, '.jpg');
+  return png.replace("/png/", "/small/").replace(/\.png(?=$|\?)/, ".jpg");
 }
 
 /** Why the block does not fit on A4, in plain words. */
@@ -99,11 +108,23 @@ interface Generated {
 }
 
 type GenState =
-  | { status: 'idle' }
-  | { status: 'running'; done: number; total: number; current: string | null; what: string }
-  | { status: 'error'; message: string };
+  | { status: "idle" }
+  | {
+      status: "running";
+      done: number;
+      total: number;
+      current: string | null;
+      what: string;
+    }
+  | { status: "error"; message: string };
 
-export default function PrintView({ cards, section }: { cards: Card[]; section: string | null }) {
+export default function PrintView({
+  cards,
+  section,
+}: {
+  cards: Card[];
+  section: string | null;
+}) {
   const { auth, store, save } = useStore();
   const isOwner = auth.isOwner;
   const metaLive = usePrintMetaDoc();
@@ -111,25 +132,49 @@ export default function PrintView({ cards, section }: { cards: Card[]; section: 
 
   // Batch.
   // New cards (on the List, not printed yet) first, then reprints.
-  const reprints = useMemo(() => [...newCardLines(cards), ...reprintLines(cards)], [cards]);
-  const [unchecked, setUnchecked] = usePersisted<string[]>(UNCHECKED_KEY, () => {
-    const v = readLocal<unknown>(UNCHECKED_KEY, []);
-    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
-  });
-  const [extras, setExtras] = usePersisted<BatchLine[]>(EXTRAS_KEY, () => toExtras(readLocal<unknown>(EXTRAS_KEY, [])));
-  const [tokenBatch, setTokenBatch] = usePersisted<TokenLine[]>(TOKENS_KEY, () => toTokenLines(readLocal<unknown>(TOKENS_KEY, [])));
+  const reprints = useMemo(
+    () => [...newCardLines(cards), ...reprintLines(cards)],
+    [cards],
+  );
+  const [unchecked, setUnchecked] = usePersisted<string[]>(
+    UNCHECKED_KEY,
+    () => {
+      const v = readLocal<unknown>(UNCHECKED_KEY, []);
+      return Array.isArray(v)
+        ? v.filter((x): x is string => typeof x === "string")
+        : [];
+    },
+  );
+  const [extras, setExtras] = usePersisted<BatchLine[]>(EXTRAS_KEY, () =>
+    toExtras(readLocal<unknown>(EXTRAS_KEY, [])),
+  );
+  const [tokenBatch, setTokenBatch] = usePersisted<TokenLine[]>(
+    TOKENS_KEY,
+    () => toTokenLines(readLocal<unknown>(TOKENS_KEY, [])),
+  );
   const skip = useMemo(() => new Set(unchecked), [unchecked]);
-  const checkedLines = useMemo(() => [...reprints, ...extras].filter((l) => !skip.has(l.key)), [reprints, extras, skip]);
+  const checkedLines = useMemo(
+    () => [...reprints, ...extras].filter((l) => !skip.has(l.key)),
+    [reprints, extras, skip],
+  );
 
   // Settings: the Owner edits the shared ones (and saves them); visitors keep theirs on this device.
-  const [localSettings, setLocalSettings] = useState<unknown>(() => readLocal<unknown>(LOCAL_SETTINGS_KEY, null));
+  const [localSettings, setLocalSettings] = useState<unknown>(() =>
+    readLocal<unknown>(LOCAL_SETTINGS_KEY, null),
+  );
   const [ownerDraft, setOwnerDraft] = useState<PrintSettings | null>(null);
   const shared = useMemo(() => mergeSettings(meta.settings), [meta.settings]);
-  const settings = isOwner ? (ownerDraft ?? shared) : effectiveSettings(meta.settings, localSettings, false);
-  const [localProfiles, setLocalProfiles] = usePersisted<Record<string, PrinterProfile>>(LOCAL_PROFILES_KEY, () =>
+  const settings = isOwner
+    ? (ownerDraft ?? shared)
+    : effectiveSettings(meta.settings, localSettings, false);
+  const [localProfiles, setLocalProfiles] = usePersisted<
+    Record<string, PrinterProfile>
+  >(LOCAL_PROFILES_KEY, () =>
     toProfiles(readLocal<unknown>(LOCAL_PROFILES_KEY, {})),
   );
-  const profiles = isOwner ? meta.profiles : { ...meta.profiles, ...localProfiles };
+  const profiles = isOwner
+    ? meta.profiles
+    : { ...meta.profiles, ...localProfiles };
 
   function setSettings(next: PrintSettings) {
     if (isOwner) setOwnerDraft(next);
@@ -139,17 +184,24 @@ export default function PrintView({ cards, section }: { cards: Card[]; section: 
     }
   }
 
-  const slips = useMemo(() => composeSlips(checkedLines, tokenBatch, settings.quality), [checkedLines, tokenBatch, settings.quality]);
+  const slips = useMemo(
+    () => composeSlips(checkedLines, tokenBatch, settings.quality),
+    [checkedLines, tokenBatch, settings.quality],
+  );
   const pageCount = useMemo(() => slipPages(slips).length, [slips]);
 
-  const [gen, setGen] = useState<GenState>({ status: 'idle' });
+  const [gen, setGen] = useState<GenState>({ status: "idle" });
   const [generated, setGenerated] = useState<Generated | null>(null);
   const abort = useRef<AbortController | null>(null);
   useEffect(() => () => abort.current?.abort(), []);
-  useEffect(() => () => (generated ? URL.revokeObjectURL(generated.url) : undefined), [generated]);
+  useEffect(
+    () => () => (generated ? URL.revokeObjectURL(generated.url) : undefined),
+    [generated],
+  );
 
   useEffect(() => {
-    if (section === 'tokens') document.getElementById('tokens')?.scrollIntoView();
+    if (section === "tokens")
+      document.getElementById("tokens")?.scrollIntoView();
   }, [section]);
 
   async function makePdf(testOnly: boolean) {
@@ -157,19 +209,30 @@ export default function PrintView({ cards, section }: { cards: Card[]; section: 
     const these: Slip[] = testOnly ? [] : slips;
     const ctl = new AbortController();
     abort.current = ctl;
-    setGen({ status: 'running', done: 0, total: 0, current: null, what: testOnly ? 'test page' : 'print sheet' });
+    setGen({
+      status: "running",
+      done: 0,
+      total: 0,
+      current: null,
+      what: testOnly ? "test page" : "print sheet",
+    });
     try {
-      const { buildPrintPdf, pdfFileName } = await import('../../print/pdf');
+      const { buildPrintPdf, pdfFileName } = await import("../../print/pdf");
       const result = await buildPrintPdf({
         slips: these,
         settings,
         date,
         signal: ctl.signal,
-        onProgress: (p) => setGen((g) => (g.status === 'running' ? { ...g, ...p } : g)),
+        onProgress: (p) =>
+          setGen((g) => (g.status === "running" ? { ...g, ...p } : g)),
       });
-      const fileName = testOnly ? `cube-test-page-${date}.pdf` : pdfFileName(date);
-      const url = URL.createObjectURL(new Blob([result.bytes], { type: 'application/pdf' }));
-      const a = document.createElement('a');
+      const fileName = testOnly
+        ? `cube-test-page-${date}.pdf`
+        : pdfFileName(date);
+      const url = URL.createObjectURL(
+        new Blob([result.bytes], { type: "application/pdf" }),
+      );
+      const a = document.createElement("a");
       a.href = url;
       a.download = fileName;
       document.body.appendChild(a);
@@ -184,12 +247,12 @@ export default function PrintView({ cards, section }: { cards: Card[]; section: 
         lines: testOnly ? [] : checkedLines,
         tokens: testOnly ? [] : tokenBatch,
       });
-      setGen({ status: 'idle' });
+      setGen({ status: "idle" });
     } catch (e) {
-      if (ctl.signal.aborted) setGen({ status: 'idle' });
+      if (ctl.signal.aborted) setGen({ status: "idle" });
       else {
-        console.error('Print sheet:', e);
-        setGen({ status: 'error', message: plainError(e, 'pdf') });
+        console.error("Print sheet:", e);
+        setGen({ status: "error", message: plainError(e, "pdf") });
       }
     }
   }
@@ -199,14 +262,23 @@ export default function PrintView({ cards, section }: { cards: Card[]; section: 
     // In-box comes from the lines that went on the sheet, not the cards' current Wanted.
     const patches = markPrintedPatches(cards, g.lines);
     // A batch of only extras or tokens changes no In-box Printing but is still recorded.
-    const entry = printHistoryEntry(g.lines, g.tokens, patches, { date: localDateIso(), at: new Date().toISOString(), printer: settings.profile.name });
+    const entry = printHistoryEntry(g.lines, g.tokens, patches, {
+      date: localDateIso(),
+      at: new Date().toISOString(),
+      printer: settings.profile.name,
+    });
     // The entry is appended with arrayUnion, so a stale or empty snapshot never replaces the
     // stored history; old entries are trimmed only from what the server last said.
-    const trim = metaLive.status === 'ready' && !metaLive.fromCache ? historyTrim(metaLive.data?.history) : [];
+    const trim =
+      metaLive.status === "ready" && !metaLive.fromCache
+        ? historyTrim(metaLive.data?.history)
+        : [];
     // One atomic batch: the In-box patches and the history entry land together or not at all.
     const ok = await save(
       () => store.markPrinted(patches, entry ? { ...entry } : null, trim),
-      patches.length > 0 ? `Marked ${patches.length} ${patches.length === 1 ? 'card' : 'cards'} as printed.` : 'Print recorded in the history.',
+      patches.length > 0
+        ? `Marked ${patches.length} ${patches.length === 1 ? "card" : "cards"} as printed.`
+        : "Print recorded in the history.",
     );
     if (!ok) return;
     const done = new Set(g.lines.map((l) => l.key));
@@ -218,27 +290,55 @@ export default function PrintView({ cards, section }: { cards: Card[]; section: 
   }
 
   const backLines = checkedLines.filter((l) => l.back_image_normal);
-  const running = gen.status === 'running';
+  const running = gen.status === "running";
   const sheetFits = fits(settings);
 
   return (
     <div className="print">
       <h1>Print</h1>
       <p className="muted">
-        Build a Print batch, add tokens, then generate one PDF that prints every slip at the right size. Page 1 is always the test page.
+        Build a Print batch, add tokens, then generate one PDF that prints every
+        slip at the right size. Page 1 is always the test page.
       </p>
       <LiveStatus live={metaLive} what="print settings" />
 
       <section aria-labelledby="batch-head">
         <h2 id="batch-head">Print batch</h2>
         <p className="muted">
-          Every new card from an Update (to print) and every card whose Wanted Printing differs from its In-box Printing is here, ticked, at its
-          Wanted Printing: open Printings on a line to choose another art. Back faces of double-faced cards go to the Back pool automatically.
+          Every new card from an Update (to print) and every card whose Wanted
+          Printing differs from its In-box Printing is here, ticked, at its
+          Wanted Printing: open Printings on a line to choose another art. Back
+          faces of double-faced cards go to the Back pool automatically.
         </p>
         <h3 className="batch-group">
-          Fronts: {checkedLines.length} of {reprints.length + extras.length} ticked
+          Fronts: {checkedLines.length} of {reprints.length + extras.length}{" "}
+          ticked
         </h3>
-        {reprints.length + extras.length === 0 && <p className="status">No new cards or reprints pending. Add more below.</p>}
+        {reprints.length + extras.length > 0 && (
+          <div className="actions">
+            <button
+              type="button"
+              onClick={() =>
+                setUnchecked(
+                  [...reprints, ...extras]
+                    .filter((l) => l.source !== "new")
+                    .map((l) => l.key),
+                )
+              }
+              title="Untick every reprint (an art change) and extra line, leaving the new cards"
+            >
+              New cards only
+            </button>
+            <button type="button" onClick={() => setUnchecked([])}>
+              Tick all
+            </button>
+          </div>
+        )}
+        {reprints.length + extras.length === 0 && (
+          <p className="status">
+            No new cards or reprints pending. Add more below.
+          </p>
+        )}
         <ul className="batch-list">
           {[...reprints, ...extras].map((l) => (
             <li key={l.key}>
@@ -246,28 +346,50 @@ export default function PrintView({ cards, section }: { cards: Card[]; section: 
                 <input
                   type="checkbox"
                   checked={!skip.has(l.key)}
-                  onChange={(e) => setUnchecked(e.target.checked ? unchecked.filter((k) => k !== l.key) : [...unchecked, l.key])}
+                  onChange={(e) =>
+                    setUnchecked(
+                      e.target.checked
+                        ? unchecked.filter((k) => k !== l.key)
+                        : [...unchecked, l.key],
+                    )
+                  }
                 />
-                <img src={smallImage(l.image_normal)} alt="" loading="lazy" decoding="async" width={48} height={67} />
+                <img
+                  src={smallImage(l.image_normal)}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                  width={48}
+                  height={67}
+                />
                 <span className="line-main">
                   <span>
-                    {l.quantity > 1 ? `${l.quantity} x ` : ''}
+                    {l.quantity > 1 ? `${l.quantity} x ` : ""}
                     {l.name}
                   </span>
                   <span className="num">
                     {l.set.toUpperCase()} {l.collector_number}
-                    {l.source === 'extra' ? ' · extra' : l.source === 'new' ? ' · new card' : ''}
-                    {l.back_image_normal ? ' · double-faced' : ''}
+                    {l.source === "extra"
+                      ? " · extra"
+                      : l.source === "new"
+                        ? " · new card"
+                        : ""}
+                    {l.back_image_normal ? " · double-faced" : ""}
                   </span>
                 </span>
               </label>
-              {l.oracle_id && l.source !== 'extra' && (
+              {l.oracle_id && l.source !== "extra" && (
                 <a className="line-pick" href={printingsHash(l.oracle_id)}>
                   Printings
                 </a>
               )}
-              {l.source === 'extra' && (
-                <button type="button" onClick={() => setExtras(extras.filter((x) => x.key !== l.key))}>
+              {l.source === "extra" && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setExtras(extras.filter((x) => x.key !== l.key))
+                  }
+                >
                   Remove
                 </button>
               )}
@@ -276,11 +398,20 @@ export default function PrintView({ cards, section }: { cards: Card[]; section: 
         </ul>
         {backLines.length > 0 && (
           <>
-            <h3 className="batch-group">Back pool: {backLines.reduce((n, l) => n + l.quantity, 0)} slips</h3>
+            <h3 className="batch-group">
+              Back pool: {backLines.reduce((n, l) => n + l.quantity, 0)} slips
+            </h3>
             <ul className="batch-list">
               {backLines.map((l) => (
                 <li key={l.key}>
-                  <img src={smallImage(l.back_image_normal!)} alt="" loading="lazy" decoding="async" width={48} height={67} />
+                  <img
+                    src={smallImage(l.back_image_normal!)}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    width={48}
+                    height={67}
+                  />
                   <span className="line-main">
                     <span>{l.back_name ?? `${l.name} (back)`}</span>
                     <span className="num">back of {l.name}</span>
@@ -292,17 +423,31 @@ export default function PrintView({ cards, section }: { cards: Card[]; section: 
         )}
         {tokenBatch.length > 0 && (
           <>
-            <h3 className="batch-group">Tokens: {tokenBatch.reduce((n, t) => n + t.count, 0)} slips</h3>
+            <h3 className="batch-group">
+              Tokens: {tokenBatch.reduce((n, t) => n + t.count, 0)} slips
+            </h3>
             <ul className="batch-list">
               {tokenBatch.map((t) => (
                 <li key={t.key}>
-                  <img src={tokenThumb(t.image_png)} alt="" loading="lazy" decoding="async" width={48} height={67} />
+                  <img
+                    src={tokenThumb(t.image_png)}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    width={48}
+                    height={67}
+                  />
                   <span className="line-main">
                     <span>
                       {t.count} x {t.name}
                     </span>
                   </span>
-                  <button type="button" onClick={() => setTokenBatch(tokenBatch.filter((x) => x.key !== t.key))}>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setTokenBatch(tokenBatch.filter((x) => x.key !== t.key))
+                    }
+                  >
                     Remove
                   </button>
                 </li>
@@ -311,23 +456,35 @@ export default function PrintView({ cards, section }: { cards: Card[]; section: 
           </>
         )}
         <p className="num">
-          {slips.length} slips on {pageCount} {pageCount === 1 ? 'page' : 'pages'}, plus the test page.
+          {slips.length} slips on {pageCount}{" "}
+          {pageCount === 1 ? "page" : "pages"}, plus the test page.
         </p>
-        <AddMore cards={cards} onAdd={(lines) => setExtras(mergeExtras(extras, lines))} />
+        <AddMore
+          cards={cards}
+          onAdd={(lines) => setExtras(mergeExtras(extras, lines))}
+        />
         <h3>Lists for other print tools</h3>
         <div className="actions">
-          <CopyButton text={mtgprintList(checkedLines)} label="Copy mtgprint list" />
+          <CopyButton
+            text={mtgprintList(checkedLines)}
+            label="Copy mtgprint list"
+          />
         </div>
         <p className="muted list-note">
-          For mtgprint.net: one line per front card, "1 Name (SET) number". mtgprint adds the back face of a double-faced card by itself, so back faces
-          and tokens are left out.
+          For mtgprint.net: one line per front card, "1 Name (SET) number".
+          mtgprint adds the back face of a double-faced card by itself, so back
+          faces and tokens are left out.
         </p>
         <div className="actions">
-          <CopyButton text={proxyGeneratorList(checkedLines)} label="Copy MTG Proxy Generator list" />
+          <CopyButton
+            text={proxyGeneratorList(checkedLines)}
+            label="Copy MTG Proxy Generator list"
+          />
         </div>
         <p className="muted list-note">
-          For MTG Proxy Generator: "1 SET/number -cd" fetches exactly that Printing from Scryfall. A double-faced card comes out as two cards, front
-          and back, from its one line; tokens are left out.
+          For MTG Proxy Generator: "1 SET/number -cd" fetches exactly that
+          Printing from Scryfall. A double-faced card comes out as two cards,
+          front and back, from its one line; tokens are left out.
         </p>
       </section>
 
@@ -335,7 +492,11 @@ export default function PrintView({ cards, section }: { cards: Card[]; section: 
 
       <section aria-labelledby="sheet-head">
         <h2 id="sheet-head">Print sheet</h2>
-        <SettingsForm settings={settings} profiles={profiles} onChange={setSettings} />
+        <SettingsForm
+          settings={settings}
+          profiles={profiles}
+          onChange={setSettings}
+        />
         {isOwner && ownerDraft && !sameSettings(ownerDraft, shared) && (
           <div className="actions">
             <button
@@ -343,7 +504,14 @@ export default function PrintView({ cards, section }: { cards: Card[]; section: 
               className="primary"
               disabled={!store}
               onClick={async () => {
-                if (store && (await save(() => store.setMeta('print', { settings: ownerDraft }), 'Print settings saved for everyone.'))) setOwnerDraft(null);
+                if (
+                  store &&
+                  (await save(
+                    () => store.setMeta("print", { settings: ownerDraft }),
+                    "Print settings saved for everyone.",
+                  ))
+                )
+                  setOwnerDraft(null);
               }}
             >
               Save settings for everyone
@@ -353,7 +521,12 @@ export default function PrintView({ cards, section }: { cards: Card[]; section: 
             </button>
           </div>
         )}
-        {!isOwner && <p className="muted">Your settings are kept on this device. The Owner&rsquo;s settings are the starting point.</p>}
+        {!isOwner && (
+          <p className="muted">
+            Your settings are kept on this device. The Owner&rsquo;s settings
+            are the starting point.
+          </p>
+        )}
 
         <Calibration
           settings={settings}
@@ -362,7 +535,11 @@ export default function PrintView({ cards, section }: { cards: Card[]; section: 
             if (isOwner && store) {
               // Only the factors: other unsaved changes in the draft stay unsaved.
               const ok = await save(
-                () => store.setMeta('print', { profiles: { [profile.name]: profile }, settings: { ...shared, profile } }),
+                () =>
+                  store.setMeta("print", {
+                    profiles: { [profile.name]: profile },
+                    settings: { ...shared, profile },
+                  }),
                 `Factors saved for ${profile.name}.`,
               );
               if (ok) setOwnerDraft((d) => (d ? { ...d, profile } : null));
@@ -376,10 +553,19 @@ export default function PrintView({ cards, section }: { cards: Card[]; section: 
 
         <h3>Generate</h3>
         <div className="actions">
-          <button type="button" className="primary" disabled={running || slips.length === 0 || !sheetFits} onClick={() => void makePdf(false)}>
+          <button
+            type="button"
+            className="primary"
+            disabled={running || slips.length === 0 || !sheetFits}
+            onClick={() => void makePdf(false)}
+          >
             Generate PDF
           </button>
-          <button type="button" disabled={running} onClick={() => void makePdf(true)}>
+          <button
+            type="button"
+            disabled={running}
+            onClick={() => void makePdf(true)}
+          >
             Print the test page
           </button>
           {running && (
@@ -389,29 +575,44 @@ export default function PrintView({ cards, section }: { cards: Card[]; section: 
           )}
         </div>
         <p className="muted">
-          {slips.length > 0 ? `${slips.length} slips, ${pageCount + 1} pages with the test page.` : 'Nothing in the batch yet; the test page can still be printed.'}
-          {settings.quality === 'best' ? ' Best quality uses the png images: slower and a much larger file.' : ''}
+          {slips.length > 0
+            ? `${slips.length} slips, ${pageCount + 1} pages with the test page.`
+            : "Nothing in the batch yet; the test page can still be printed."}
+          {settings.quality === "best"
+            ? " Best quality uses the png images: slower and a much larger file."
+            : ""}
         </p>
-        {gen.status === 'running' && (
+        {gen.status === "running" && (
           <div role="status">
             <p>
               Building the {gen.what}
-              {gen.total > 0 ? `: image ${Math.min(gen.done + 1, gen.total)} of ${gen.total}${gen.current ? ` (${gen.current})` : ''}` : '…'}
+              {gen.total > 0
+                ? `: image ${Math.min(gen.done + 1, gen.total)} of ${gen.total}${gen.current ? ` (${gen.current})` : ""}`
+                : "…"}
             </p>
             {gen.total > 0 && <progress max={gen.total} value={gen.done} />}
           </div>
         )}
         {!sheetFits && <p className="status error">{tooBigText(settings)}</p>}
-        {gen.status === 'error' && <p className="status error">{gen.message}</p>}
+        {gen.status === "error" && (
+          <p className="status error">{gen.message}</p>
+        )}
         {generated && (
           <div className="panel" role="status">
             <p>
-              Ready: <a href={generated.url} download={generated.fileName}>{generated.fileName}</a>, {generated.pages}{' '}
-              {generated.pages === 1 ? 'page' : 'pages'}. Print it at 100 percent (Actual size).
+              Ready:{" "}
+              <a href={generated.url} download={generated.fileName}>
+                {generated.fileName}
+              </a>
+              , {generated.pages} {generated.pages === 1 ? "page" : "pages"}.
+              Print it at 100 percent (Actual size).
             </p>
             {generated.failed.length > 0 && (
               <>
-                <p className="status error">These images could not be fetched; their slots show the card name instead:</p>
+                <p className="status error">
+                  These images could not be fetched; their slots show the card
+                  name instead:
+                </p>
                 <ul className="failed-list">
                   {generated.failed.map((f) => (
                     <li key={f.url}>{f.name}</li>
@@ -422,17 +623,28 @@ export default function PrintView({ cards, section }: { cards: Card[]; section: 
             {(generated.lines.length > 0 || generated.tokens.length > 0) &&
               (isOwner ? (
                 <div className="actions">
-                  <button type="button" className="primary" disabled={!store} onClick={() => void markPrinted(generated)}>
+                  <button
+                    type="button"
+                    className="primary"
+                    disabled={!store}
+                    onClick={() => void markPrinted(generated)}
+                  >
                     Mark these as printed
                   </button>
                 </div>
               ) : (
-                <p className="muted">Once the slips are in the box, the Owner marks them as printed.</p>
+                <p className="muted">
+                  Once the slips are in the box, the Owner marks them as
+                  printed.
+                </p>
               ))}
             {isOwner && generated.lines.length > 0 && (
               <p className="muted">
-                Sets the In-box Printing to the Printing on this sheet for the {generated.lines.filter((l) => l.source === 'new').length} new cards and{' '}
-                {generated.lines.filter((l) => l.source === 'reprint').length} reprints and removes the extras and tokens from the batch.
+                Sets the In-box Printing to the Printing on this sheet for the{" "}
+                {generated.lines.filter((l) => l.source === "new").length} new
+                cards and{" "}
+                {generated.lines.filter((l) => l.source === "reprint").length}{" "}
+                reprints and removes the extras and tokens from the batch.
               </p>
             )}
           </div>
@@ -444,7 +656,9 @@ export default function PrintView({ cards, section }: { cards: Card[]; section: 
               {[...meta.history].reverse().map((h, i) => (
                 <li key={i}>
                   {historyLine(h)}
-                  {h.names.length > 0 ? ` (${h.names.slice(0, 8).join(', ')}${h.names.length > 8 ? ', …' : ''})` : ''}
+                  {h.names.length > 0
+                    ? ` (${h.names.slice(0, 8).join(", ")}${h.names.length > 8 ? ", …" : ""})`
+                    : ""}
                 </li>
               ))}
             </ul>
@@ -455,8 +669,14 @@ export default function PrintView({ cards, section }: { cards: Card[]; section: 
   );
 }
 
-function AddMore({ cards, onAdd }: { cards: Card[]; onAdd: (lines: BatchLine[]) => void }) {
-  const [text, setText] = useState('');
+function AddMore({
+  cards,
+  onAdd,
+}: {
+  cards: Card[];
+  onAdd: (lines: BatchLine[]) => void;
+}) {
+  const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string[]>([]);
   return (
@@ -471,16 +691,28 @@ function AddMore({ cards, onAdd }: { cards: Card[]; onAdd: (lines: BatchLine[]) 
           setBusy(false);
           onAdd(r.lines);
           setFailed(r.failed);
-          setText(r.failed.length ? r.failed.map((f) => f.replace(/: .*$/, '')).join('\n') : '');
+          setText(
+            r.failed.length
+              ? r.failed.map((f) => f.replace(/: .*$/, "")).join("\n")
+              : "",
+          );
         }}
       >
         <label className="field">
-          <span>One card per line: Name, 2 Name, or Name (SET) 123. A card in the Cube without a set gets its Wanted Printing.</span>
-          <textarea value={text} onChange={(e) => setText(e.target.value)} rows={4} spellCheck={false} />
+          <span>
+            One card per line: Name, 2 Name, or Name (SET) 123. A card in the
+            Cube without a set gets its Wanted Printing.
+          </span>
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            rows={4}
+            spellCheck={false}
+          />
         </label>
         <div className="actions">
           <button type="submit" disabled={busy || !text.trim()}>
-            {busy ? 'Looking up…' : 'Add to batch'}
+            {busy ? "Looking up…" : "Add to batch"}
           </button>
         </div>
         {failed.length > 0 && (
@@ -495,7 +727,13 @@ function AddMore({ cards, onAdd }: { cards: Card[]; onAdd: (lines: BatchLine[]) 
   );
 }
 
-function TokensSection({ batch, onChange }: { batch: TokenLine[]; onChange: (t: TokenLine[]) => void }) {
+function TokensSection({
+  batch,
+  onChange,
+}: {
+  batch: TokenLine[];
+  onChange: (t: TokenLine[]) => void;
+}) {
   const [tokens, setTokens] = useState<TokenType[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -505,8 +743,8 @@ function TokensSection({ batch, onChange }: { batch: TokenLine[]; onChange: (t: 
     loadTokens().then(
       (f) => alive && setTokens(printableTokens(f)),
       (e: unknown) => {
-        console.error('Tokens:', e);
-        if (alive) setError(plainError(e, 'tokens'));
+        console.error("Tokens:", e);
+        if (alive) setError(plainError(e, "tokens"));
       },
     );
     return () => {
@@ -516,7 +754,10 @@ function TokensSection({ batch, onChange }: { batch: TokenLine[]; onChange: (t: 
   return (
     <section id="tokens" aria-labelledby="tokens-head">
       <h2 id="tokens-head">Tokens</h2>
-      <p className="muted">Suggested counts cover 9 drafts out of 10. Tap a token for the reasoning.</p>
+      <p className="muted">
+        Suggested counts cover 9 drafts out of 10. Tap a token for the
+        reasoning.
+      </p>
       {error && (
         <div className="actions">
           <p className="status error">{error}</p>
@@ -529,7 +770,14 @@ function TokensSection({ batch, onChange }: { batch: TokenLine[]; onChange: (t: 
       {tokens && (
         <ul className="token-list">
           {tokens.map((t) => (
-            <TokenRow key={t.key} token={t} inBatch={batch.find((b) => b.key === t.key) ?? null} onAdd={(line) => onChange([...batch.filter((b) => b.key !== line.key), line])} />
+            <TokenRow
+              key={t.key}
+              token={t}
+              inBatch={batch.find((b) => b.key === t.key) ?? null}
+              onAdd={(line) =>
+                onChange([...batch.filter((b) => b.key !== line.key), line])
+              }
+            />
           ))}
         </ul>
       )}
@@ -537,34 +785,80 @@ function TokensSection({ batch, onChange }: { batch: TokenLine[]; onChange: (t: 
   );
 }
 
-function TokenRow({ token, inBatch, onAdd }: { token: TokenType; inBatch: TokenLine | null; onAdd: (t: TokenLine) => void }) {
-  const [count, setCount] = useState(String(inBatch?.count ?? token.suggested_count));
+function TokenRow({
+  token,
+  inBatch,
+  onAdd,
+}: {
+  token: TokenType;
+  inBatch: TokenLine | null;
+  onAdd: (t: TokenLine) => void;
+}) {
+  const [count, setCount] = useState(
+    String(inBatch?.count ?? token.suggested_count),
+  );
   const n = Number.parseInt(count, 10);
   const valid = Number.isFinite(n) && n >= 1 && n <= 200;
-  const pt = token.power !== null && token.toughness !== null ? ` ${token.power}/${token.toughness}` : '';
+  const pt =
+    token.power !== null && token.toughness !== null
+      ? ` ${token.power}/${token.toughness}`
+      : "";
   return (
     <li>
-      <img src={tokenThumb(token.image_png)} alt="" loading="lazy" decoding="async" width={48} height={67} />
+      <img
+        src={tokenThumb(token.image_png)}
+        alt=""
+        loading="lazy"
+        decoding="async"
+        width={48}
+        height={67}
+      />
       <div className="token-body">
         <details>
           <summary>
             <span>
               {token.name}
-              {pt} · suggested {token.suggested_count} · <span className={`rec rec-${token.recommendation}`}>{RECOMMENDATION_LABEL[token.recommendation]}</span>
+              {pt} · suggested {token.suggested_count} ·{" "}
+              <span className={`rec rec-${token.recommendation}`}>
+                {RECOMMENDATION_LABEL[token.recommendation]}
+              </span>
             </span>
           </summary>
           <p>{token.rationale}</p>
           <p className="muted">
-            {RECOMMENDATION_LABEL[token.recommendation]}: {token.recommendation_reason}
+            {RECOMMENDATION_LABEL[token.recommendation]}:{" "}
+            {token.recommendation_reason}
           </p>
         </details>
         <div className="token-controls">
           <label>
             <span className="visually-hidden">Copies of {token.name}</span>
-            <input type="number" inputMode="numeric" min={1} max={200} value={count} onChange={(e) => setCount(e.target.value)} />
+            <input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={200}
+              value={count}
+              onChange={(e) => setCount(e.target.value)}
+            />
           </label>
-          <button type="button" disabled={!valid} onClick={() => onAdd({ key: token.key, name: token.name, count: n, image_png: token.image_png })}>
-            {inBatch ? (inBatch.count === n ? `In batch: ${n}` : 'Update batch') : 'Add to batch'}
+          <button
+            type="button"
+            disabled={!valid}
+            onClick={() =>
+              onAdd({
+                key: token.key,
+                name: token.name,
+                count: n,
+                image_png: token.image_png,
+              })
+            }
+          >
+            {inBatch
+              ? inBatch.count === n
+                ? `In batch: ${n}`
+                : "Update batch"
+              : "Add to batch"}
           </button>
         </div>
       </div>
@@ -608,7 +902,8 @@ function NumberField({
         onBlur={(e) => {
           const v = parseSetting(e.target.value, min, max);
           if (v === null) {
-            if (e.target.value.trim() !== String(value)) setHint(`Allowed: ${min} to ${max}${unit}. Kept ${value}.`);
+            if (e.target.value.trim() !== String(value))
+              setHint(`Allowed: ${min} to ${max}${unit}. Kept ${value}.`);
             e.target.value = String(value);
             return;
           }
@@ -636,24 +931,57 @@ function SettingsForm({
   onChange: (s: PrintSettings) => void;
 }) {
   // Every change goes through mergeSettings, so an out-of-range number keeps the old value.
-  const set = (patch: Partial<PrintSettings>) => onChange(mergeSettings({ ...settings, ...patch }, settings));
+  const set = (patch: Partial<PrintSettings>) =>
+    onChange(mergeSettings({ ...settings, ...patch }, settings));
   const names = Object.keys(profiles).sort();
   return (
     <div>
       <h3>Settings</h3>
       <div className="settings-grid">
-        <NumberField id="set-slipw" label="Slip width (mm)" value={settings.slipW} {...RANGES.slipW} unit=" mm" onChange={(v) => set({ slipW: v })} />
-        <NumberField id="set-sliph" label="Slip height (mm)" value={settings.slipH} {...RANGES.slipH} unit=" mm" onChange={(v) => set({ slipH: v })} />
-        <NumberField id="set-gap" label="Gap between slips (mm)" value={settings.gap} {...RANGES.gap} unit=" mm" onChange={(v) => set({ gap: v })} />
+        <NumberField
+          id="set-slipw"
+          label="Slip width (mm)"
+          value={settings.slipW}
+          {...RANGES.slipW}
+          unit=" mm"
+          onChange={(v) => set({ slipW: v })}
+        />
+        <NumberField
+          id="set-sliph"
+          label="Slip height (mm)"
+          value={settings.slipH}
+          {...RANGES.slipH}
+          unit=" mm"
+          onChange={(v) => set({ slipH: v })}
+        />
+        <NumberField
+          id="set-gap"
+          label="Gap between slips (mm)"
+          value={settings.gap}
+          {...RANGES.gap}
+          unit=" mm"
+          onChange={(v) => set({ gap: v })}
+        />
         <label className="field">
           <span>Image quality</span>
-          <select value={settings.quality} onChange={(e) => set({ quality: e.target.value === 'best' ? 'best' : 'standard' })}>
-            <option value="standard">Standard (large jpg, about 270 dpi)</option>
+          <select
+            value={settings.quality}
+            onChange={(e) =>
+              set({ quality: e.target.value === "best" ? "best" : "standard" })
+            }
+          >
+            <option value="standard">
+              Standard (large jpg, about 270 dpi)
+            </option>
             <option value="best">Best (png, 300 dpi, slower)</option>
           </select>
         </label>
         <label className="check-field">
-          <input type="checkbox" checked={settings.cropMarks} onChange={(e) => set({ cropMarks: e.target.checked })} />
+          <input
+            type="checkbox"
+            checked={settings.cropMarks}
+            onChange={(e) => set({ cropMarks: e.target.checked })}
+          />
           <span>Crop marks</span>
         </label>
       </div>
@@ -663,7 +991,9 @@ function SettingsForm({
           <label className="field">
             <span>Saved profiles</span>
             <select
-              value={profiles[settings.profile.name] ? settings.profile.name : ''}
+              value={
+                profiles[settings.profile.name] ? settings.profile.name : ""
+              }
               onChange={(e) => {
                 const p = profiles[e.target.value];
                 if (p) set({ profile: { ...p } });
@@ -687,7 +1017,8 @@ function SettingsForm({
             maxLength={60}
             onBlur={(e) => {
               const name = e.target.value.trim();
-              if (name && name !== settings.profile.name) set({ profile: { ...settings.profile, name } });
+              if (name && name !== settings.profile.name)
+                set({ profile: { ...settings.profile, name } });
             }}
           />
         </label>
@@ -709,9 +1040,12 @@ function SettingsForm({
         />
       </div>
       <p className="muted num">
-        Slips are drawn at {(settings.slipW * settings.profile.fx).toFixed(2)} x {(settings.slipH * settings.profile.fy).toFixed(2)} mm.
+        Slips are drawn at {(settings.slipW * settings.profile.fx).toFixed(2)} x{" "}
+        {(settings.slipH * settings.profile.fy).toFixed(2)} mm.
       </p>
-      {!fits(settings) && <p className="status error">{tooBigText(settings)}</p>}
+      {!fits(settings) && (
+        <p className="status error">{tooBigText(settings)}</p>
+      )}
     </div>
   );
 }
@@ -725,8 +1059,8 @@ function Calibration({
   isOwner: boolean;
   onSave: (p: PrinterProfile) => Promise<boolean>;
 }) {
-  const [mx, setMx] = useState('');
-  const [my, setMy] = useState('');
+  const [mx, setMx] = useState("");
+  const [my, setMy] = useState("");
   const [name, setName] = useState(settings.profile.name);
   const [kept, setKept] = useState<string | null>(null);
   const verdict = mx && my ? calibrate(mx, my) : null;
@@ -736,31 +1070,42 @@ function Calibration({
     // The Owner gets a toast; a visitor's factors change nothing visible, so say it here.
     if (ok && !isOwner) {
       setKept(`Factors kept on this device for ${profile.name}.`);
-      setMx('');
-      setMy('');
+      setMx("");
+      setMy("");
     }
   }
   return (
     <div className="panel calibration">
       <h3>Calibration</h3>
       <p className="muted">
-        Print the test page at 100 percent, measure the two lines in mm and enter the lengths. The factors make the next print come out at the
+        Print the test page at 100 percent, measure the two lines in mm and
+        enter the lengths. The factors make the next print come out at the
         target size.
       </p>
       <div className="settings-grid">
         <label className="field">
           <span>180 mm line measured (mm)</span>
-          <input type="text" inputMode="decimal" value={mx} onChange={(e) => {
+          <input
+            type="text"
+            inputMode="decimal"
+            value={mx}
+            onChange={(e) => {
               setMx(e.target.value);
               setKept(null);
-            }} />
+            }}
+          />
         </label>
         <label className="field">
           <span>260 mm line measured (mm)</span>
-          <input type="text" inputMode="decimal" value={my} onChange={(e) => {
+          <input
+            type="text"
+            inputMode="decimal"
+            value={my}
+            onChange={(e) => {
               setMy(e.target.value);
               setKept(null);
-            }} />
+            }}
+          />
         </label>
       </div>
       {kept && (
@@ -768,16 +1113,34 @@ function Calibration({
           {kept}
         </p>
       )}
-      {verdict && <p className={verdict.kind === 'ok' ? '' : 'status error'}>{verdict.message}</p>}
-      {verdict?.kind === 'ok' && (
+      {verdict && (
+        <p className={verdict.kind === "ok" ? "" : "status error"}>
+          {verdict.message}
+        </p>
+      )}
+      {verdict?.kind === "ok" && (
         <div className="inline-fields">
           <label className="field">
             <span>Printer name</span>
-            <input type="text" value={name} maxLength={60} onChange={(e) => setName(e.target.value)} />
+            <input
+              type="text"
+              value={name}
+              maxLength={60}
+              onChange={(e) => setName(e.target.value)}
+            />
           </label>
           <div className="actions">
-            <button type="button" className="primary" disabled={!name.trim()} onClick={() => void keep({ name: name.trim(), fx: verdict.fx, fy: verdict.fy })}>
-              {isOwner ? 'Save factors for everyone' : 'Keep factors on this device'}
+            <button
+              type="button"
+              className="primary"
+              disabled={!name.trim()}
+              onClick={() =>
+                void keep({ name: name.trim(), fx: verdict.fx, fy: verdict.fy })
+              }
+            >
+              {isOwner
+                ? "Save factors for everyone"
+                : "Keep factors on this device"}
             </button>
           </div>
         </div>

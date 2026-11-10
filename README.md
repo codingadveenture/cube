@@ -170,7 +170,7 @@ The Owner can accept a split; the accepted arrangement is stored in `cubes/main/
 
 ## Printing
 
-The Print batch on the Print page starts with every card whose Wanted Printing differs from its In-box Printing, plus any extra lines and tokens you add, and the back faces of double-faced cards go to a Back pool automatically.
+The Print batch on the Print page starts with every card whose Wanted Printing differs from its In-box Printing, plus any extra lines and tokens you add, and the back faces of double-faced cards go to a Back pool automatically. "New cards only" unticks the art reprints and extras in one press, and "Tick all" puts them back; the ticks are per device.
 Generate PDF builds one file in the browser with nine slips per A4 page at the target size, and page 1 is always a test page, which "Print the test page" also gives on its own.
 Print the test page from a computer at 100 percent or Actual size and measure its two lines: the 180 mm line across and the 260 mm line down.
 Enter both lengths in the Calibration box: if either is off by more than about 2 percent the print dialog is still scaling, otherwise the box gives the correction factors fx and fy.
