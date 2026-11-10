@@ -25,6 +25,8 @@ export interface BoxDiff {
   print: BoxCard[];
   /** Box cards the proposed List lacks, by name. */
   pull: BoxCard[];
+  /** Box cards the proposed List has too (they stay), by name. */
+  kept: BoxCard[];
   /** How many cards the proposed List has. */
   proposed: number;
 }
@@ -91,11 +93,12 @@ export function boxAgainstUpstream(diff: Diff, proposed: ReadonlyMap<string, str
   const box = boxCards(diff, keyOf);
   const inBox = new Set(box.map((c) => c.key));
   const pull = box.filter((c) => !proposed.has(c.key)).sort(byName);
+  const kept = box.filter((c) => proposed.has(c.key)).sort(byName);
   const print = [...proposed]
     .filter(([k]) => !inBox.has(k))
     .map(([key, name]): BoxCard => ({ key, name, oracle_id: key.startsWith('n:') ? null : key, count: 0, piles: [], image_small: null }))
     .sort(byName);
-  return { box, print, pull, proposed: proposed.size };
+  return { box, print, pull, kept, proposed: proposed.size };
 }
 
 /** Scryfall's paper printings of a card the record does not know, by exact front name. */

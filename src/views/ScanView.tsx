@@ -560,7 +560,11 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
   const log = useLog();
   const overrides = useOverrides();
   const stickyReady = log.status === 'ready' && !log.fromCache && overrides.status === 'ready' && !overrides.fromCache;
-  const sticky = useMemo(() => stickySets(overrides.data, log.data), [overrides.data, log.data]);
+  // The shared Log could not be read (offline, or Firestore's daily quota is spent): compare
+  // without the Winner's Picks and Bans rather than not at all, and say so.
+  const stickyFailed =
+    log.status === 'error' || log.status === 'unavailable' || overrides.status === 'error' || overrides.status === 'unavailable';
+  const sticky = useMemo(() => (stickyReady ? stickySets(overrides.data, log.data) : { adds: [], bans: [] }), [stickyReady, overrides.data, log.data]);
   const names = useMemo(() => nameIndex(cards), [cards]);
   const [fetchedUpstream, setFetchedUpstream] = useState<UpstreamNames | null>(null);
   const [comparing, setComparing] = useState(false);
@@ -572,11 +576,19 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
   }, [upstreamMeta.data]);
   const upstream = fetchedUpstream ?? savedUpstream;
   const boxDiff = useMemo(() => {
-    if (!upstream || !stickyReady) return null;
+    if (!upstream || !(stickyReady || stickyFailed)) return null;
     const key = (n: string) => keyOf(names, n);
     const { proposed } = proposedList({ upstream: upstream.names, sticky, keyOf: key, also: rows.map((r) => r.name) });
     return boxAgainstUpstream(diff, proposed, key);
-  }, [upstream, stickyReady, names, sticky, rows, diff]);
+  }, [upstream, stickyReady, stickyFailed, names, sticky, rows, diff]);
+  // The lists split by the record: on the List (in_list) or not.
+  const onListCard = (c: BoxCard) => (c.oracle_id ? byOracle.get(c.oracle_id)?.in_list === true : false);
+  const printListed = boxDiff?.print.filter(onListCard) ?? [];
+  const printNew = boxDiff?.print.filter((c) => !onListCard(c)) ?? [];
+  const pullCuts = boxDiff?.pull.filter(onListCard) ?? [];
+  const pullOff = boxDiff?.pull.filter((c) => !onListCard(c)) ?? [];
+  // Wanted and in the box, but not on the List: an Update calls them adds, yet they need no printing.
+  const keptOffList = boxDiff?.kept.filter((c) => !onListCard(c)) ?? [];
 
   async function compareUpstream() {
     setComparing(true);
@@ -952,7 +964,13 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
             ) : (
               <p className="muted">Not fetched yet.</p>
             )}
-            {upstream && !stickyReady && <p className="muted">Waiting for the shared Log (Winner&rsquo;s Picks and Bans)…</p>}
+            {upstream && !stickyReady && !stickyFailed && <p className="muted">Waiting for the shared Log (Winner&rsquo;s Picks and Bans)…</p>}
+            {upstream && stickyFailed && (
+              <p className="status error">
+                The shared Log could not be read, so the Winner&rsquo;s Picks and Bans are not applied here: a Winner&rsquo;s Pick shows under To
+                pull, and a Ban under To print.
+              </p>
+            )}
             {boxDiff && (
               <>
                 <dl className="totals num">
@@ -961,6 +979,18 @@ export function ScanView({ cards, query }: { cards: Card[]; query: URLSearchPara
                   <Total label="To pull" value={boxDiff.pull.length} warn />
                   <Total label="To print" value={boxDiff.print.length} warn />
                 </dl>
+                <p className="muted num">
+                  To print: {printNew.length} not on the List, {printListed.length} on the List but never printed. To pull: {pullCuts.length} List
+                  cards Upstream cuts, {pullOff.length} not on the List.
+                  {keptOffList.length > 0 &&
+                    ` In the box and wanted, though not on the List: ${keptOffList.length}; an Update lists them as adds, but they need no printing.`}
+                </p>
+                {keptOffList.length > 0 && (
+                  <details className="muted">
+                    <summary>The {keptOffList.length} wanted cards already in the box but not on the List</summary>
+                    <p>{keptOffList.map((c) => c.name).join(', ')}</p>
+                  </details>
+                )}
                 <h3 className="num">To pull: {boxDiff.pull.length}</h3>
                 <p className="muted">
                   Take these out of the box; each says which pile it was scanned in. A name opens the card on the site, or on Scryfall when the

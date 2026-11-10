@@ -42,6 +42,7 @@ describe('the box against Upstream', () => {
     expect(d.proposed).toBe(4);
     expect(d.pull.map((c) => c.name)).toEqual(['Opt']);
     expect(d.pull[0]!.piles).toEqual(['B']);
+    expect(d.kept.map((c) => c.name)).toEqual(['Lightning Bolt', 'Sol Ring']);
     expect(d.print.map((c) => c.name)).toEqual(['Ancestral Recall', 'Black Lotus']);
     expect(d.print.find((c) => c.name === 'Black Lotus')!.oracle_id).toBe('o-Black Lotus');
     expect(d.print.find((c) => c.name === 'Ancestral Recall')!.oracle_id).toBeNull();
