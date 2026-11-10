@@ -108,9 +108,14 @@ export default function UpstreamView({ cards, cardsReady }: { cards: Card[]; car
   const byId = useMemo(() => new Map(cards.map((c) => [c.oracle_id, c])), [cards]);
 
   const sticky = useMemo(() => stickySets(overrides.data, log.data), [overrides.data, log.data]);
+  // The record's List runs ahead of CubeCobra until the CSV is pushed; its cards can still be cut.
+  const recordList = useMemo(() => cards.filter((c) => c.in_list).map((c) => c.name), [cards]);
   const feed = useMemo(
-    () => (snap ? computeFeed({ list: snap.list_names, upstream: snap.upstream_names, sticky, keyOf: key, decisions: meta.decisions }) : null),
-    [snap, sticky, key, meta.decisions],
+    () =>
+      snap
+        ? computeFeed({ list: snap.list_names, upstream: snap.upstream_names, sticky, keyOf: key, decisions: meta.decisions, record_list: recordList })
+        : null,
+    [snap, sticky, key, meta.decisions, recordList],
   );
 
   // Load facts for feed items the Cube does not know, in batches of 75.

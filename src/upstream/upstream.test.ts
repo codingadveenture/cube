@@ -56,6 +56,14 @@ describe('the Upstream feed', () => {
     expect(feed.proposed).toBe(7);
   });
 
+  it('cuts a card the record has on the List although CubeCobra does not, when a Ban lands before the push', () => {
+    // 'Fresh Add' was applied here but is not on CubeCobra yet; now the group bans it.
+    const feed = computeFeed({ list, upstream, sticky: { adds: sticky.adds, bans: [...sticky.bans, 'Fresh Add'] }, keyOf: key, record_list: ['Lightning Bolt', 'Fresh Add'] });
+    expect(feed.cuts.map((c) => c.name)).toEqual(['Fresh Add', 'Old Card']);
+    // A record card the proposed List wants is no add either: it is on the List already.
+    expect(feed.adds.map((a) => a.name)).toEqual(['Another New Card', 'Booster Tutor', 'New Card']);
+  });
+
   it('falls back to the normalised name when no oracle_id is known', () => {
     const plain = (n: string) => `n:${n.toLowerCase()}`;
     const feed = computeFeed({ list: ['Ademi of the Silkchutes'], upstream: ['Spectacular Spider-Man'], sticky: { adds: [], bans: [] }, keyOf: plain });

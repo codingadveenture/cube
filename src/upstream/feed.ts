@@ -48,6 +48,12 @@ export interface FeedInput {
   sticky: StickySets;
   keyOf: (name: string) => string;
   decisions?: Readonly<Record<string, Decision>>;
+  /**
+   * Names the record has on the List (in_list), which may run ahead of CubeCobra: an applied Update
+   * is pushed there by hand. They count for the cuts only, so a Ban on a card applied here but not
+   * on CubeCobra yet goes out at once.
+   */
+  record_list?: readonly string[];
 }
 
 export interface Feed {
@@ -125,8 +131,8 @@ export function proposedList(input: ProposedInput): Proposed {
 }
 
 /**
- * Upstream adds = proposed minus the List; Upstream cuts = the List minus proposed (so a sticky add
- * is never cut). Names are compared by keyOf. Each item carries the decision stored under its name
+ * Upstream adds = proposed minus the List; Upstream cuts = the List (and the record's List) minus
+ * proposed (so a sticky add is never cut). Names are compared by keyOf. Each item carries the decision stored under its name
  * (or any name with the same key) for the same side.
  */
 export function computeFeed(input: FeedInput): Feed {
@@ -147,7 +153,9 @@ export function computeFeed(input: FeedInput): Feed {
   });
   const byName = (a: FeedItem, b: FeedItem) => a.name.localeCompare(b.name, 'en');
   const adds = [...proposed].filter(([k]) => !list.has(k)).map(([k, n]) => item(n, k, 'add')).sort(byName);
-  const cuts = [...list].filter(([k]) => !proposed.has(k)).map(([k, n]) => item(n, k, 'cut')).sort(byName);
+  const listed = new Map(list);
+  for (const [k, n] of byKey(input.record_list ?? [], keyOf)) if (!listed.has(k)) listed.set(k, n);
+  const cuts = [...listed].filter(([k]) => !proposed.has(k)).map(([k, n]) => item(n, k, 'cut')).sort(byName);
   return { adds, cuts, proposed: proposed.size, unresolvedSticky };
 }
 
